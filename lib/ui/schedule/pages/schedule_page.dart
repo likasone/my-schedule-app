@@ -117,8 +117,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   /// 快捷切换指纹锁保护状态
   /// [安全关键]：无论开启还是关闭，均调用硬件级生物识别（指纹/面容）进行安全核验
   Future<void> _toggleFingerprintLock(BuildContext context) async {
-    final settingsService = ref.read(settingsServiceProvider).valueOrNull;
-    if (settingsService == null) return;
+    final settingsService = await ref.read(settingsServiceProvider.future);
     final deviceAuth = ref.read(deviceAuthServiceProvider);
     final isSupported = await deviceAuth.isSupported();
 
@@ -150,7 +149,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
   /// 顶部指纹锁快捷状态微按钮组件
   Widget _buildFingerprintStatusButton(BuildContext context) {
-    final settingsService = ref.watch(settingsServiceProvider).valueOrNull;
+    final settingsService = ref.watch(settingsServiceProvider).asData?.value;
     final isLocked = settingsService?.isAppLockEnabled ?? false;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
