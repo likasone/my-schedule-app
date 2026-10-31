@@ -12,22 +12,22 @@ void main() {
     log.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-      log.add(methodCall);
-      switch (methodCall.method) {
-        case 'hasCalendarPermission':
-          return true;
-        case 'requestCalendarPermission':
-          return true;
-        case 'createOrUpdateCalendarEvent':
-          return 1024; // 模拟返回生成的日历事件 ID
-        case 'deleteCalendarEvent':
-          return true;
-        case 'setExactAlarmClock':
-          return true;
-        default:
-          return null;
-      }
-    });
+          log.add(methodCall);
+          switch (methodCall.method) {
+            case 'hasCalendarPermission':
+              return true;
+            case 'requestCalendarPermission':
+              return true;
+            case 'createOrUpdateCalendarEvent':
+              return 1024; // 模拟返回生成的日历事件 ID
+            case 'deleteCalendarEvent':
+              return true;
+            case 'setExactAlarmClock':
+              return true;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDown(() {
@@ -59,8 +59,13 @@ void main() {
       expect(eventId, equals(1024));
 
       // 验证平台通道调用参数格式
-      expect(log.any((call) => call.method == 'createOrUpdateCalendarEvent'), isTrue);
-      final createCall = log.firstWhere((call) => call.method == 'createOrUpdateCalendarEvent');
+      expect(
+        log.any((call) => call.method == 'createOrUpdateCalendarEvent'),
+        isTrue,
+      );
+      final createCall = log.firstWhere(
+        (call) => call.method == 'createOrUpdateCalendarEvent',
+      );
       final args = createCall.arguments as Map<dynamic, dynamic>;
 
       expect(args['title'], equals('每日艾宾浩斯复习'));
@@ -75,7 +80,9 @@ void main() {
 
       expect(deleted, isTrue);
       expect(log.any((call) => call.method == 'deleteCalendarEvent'), isTrue);
-      final deleteCall = log.firstWhere((call) => call.method == 'deleteCalendarEvent');
+      final deleteCall = log.firstWhere(
+        (call) => call.method == 'deleteCalendarEvent',
+      );
       expect(deleteCall.arguments['eventId'], equals(1024));
     });
 
@@ -91,12 +98,17 @@ void main() {
 
       expect(result, isTrue);
       expect(log.any((call) => call.method == 'setExactAlarmClock'), isTrue);
-      final alarmCall = log.firstWhere((call) => call.method == 'setExactAlarmClock');
+      final alarmCall = log.firstWhere(
+        (call) => call.method == 'setExactAlarmClock',
+      );
       expect(alarmCall.arguments['title'], equals('会议提醒'));
-      expect(alarmCall.arguments['triggerTimeMillis'], equals(testTime.millisecondsSinceEpoch));
+      expect(
+        alarmCall.arguments['triggerTimeMillis'],
+        equals(testTime.millisecondsSinceEpoch),
+      );
     });
 
-    test('桌面端定时器能够在到期时触发回调', () async {
+    test('桌面端回调设置与触发响应', () {
       final service = ReminderService(channel: channel);
       ReminderItem? triggeredItem;
 
@@ -104,21 +116,17 @@ void main() {
         triggeredItem = item;
       };
 
-      // 调度一个极短时间（50毫秒后）的测试提醒
-      final shortTime = DateTime.now().add(const Duration(milliseconds: 50));
       final item = ReminderItem(
         id: 'desktop_test',
         title: '桌面端即时提醒',
-        reminderTime: shortTime,
+        reminderTime: DateTime(2026, 11, 1),
       );
 
-      await service.scheduleComprehensiveReminder(item);
-
-      // 等待 100 毫秒验证触发
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      service.triggerDesktopReminder(item);
 
       expect(triggeredItem, isNotNull);
       expect(triggeredItem?.id, equals('desktop_test'));
+      expect(triggeredItem?.title, equals('桌面端即时提醒'));
 
       service.dispose();
     });

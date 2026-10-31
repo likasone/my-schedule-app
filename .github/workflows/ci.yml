@@ -235,7 +235,7 @@ jobs:
       # 授权 Android SDK 目录读写权限并接受所有许可证，避免 sdkmanager 下载安装 NDK 时非零退出
       - name: Prepare Android SDK permissions & licenses
         run: |
-          sudo chown -R $USER:$USER /usr/local/lib/android/sdk
+          sudo chown -R "$USER:$USER" /usr/local/lib/android/sdk
           yes | sdkmanager --licenses || true
 
       # 选 release 而不是 debug：AOT 编译、图标字体 tree shaking 与 R8 混淆只在

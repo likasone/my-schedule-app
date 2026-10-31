@@ -40,7 +40,8 @@ val escapedQWeatherApiHost = qWeatherApiHost
 android {
     namespace = "com.jotsy.diary"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // 使用预装的稳定版 NDK，避免云端临时在线拉取 1.3GB 导致解压中断
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

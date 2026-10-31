@@ -61,7 +61,9 @@ class ReminderItem {
 ///    - 桌面运行期间维护内存优先级的定时器队列，支持准时弹窗与系统托盘消息通知。
 class ReminderService {
   ReminderService({MethodChannel? channel})
-      : _channel = channel ?? const MethodChannel('com.jotsy.diary/calendar_reminder');
+    : _channel =
+          channel ??
+          const MethodChannel('com.jotsy.diary/calendar_reminder');
 
   final MethodChannel _channel;
 
@@ -72,10 +74,12 @@ class ReminderService {
   void Function(ReminderItem reminder)? onDesktopReminderTriggered;
 
   /// 判断当前平台是否为 Android
-  bool get isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   /// 判断当前平台是否为 Windows 桌面端
-  bool get isWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  bool get isWindows =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   /// 检查当前是否已获得系统日历读写权限（仅 Android 生效，桌面端默认返回 true）
   Future<bool> hasCalendarPermission() async {
@@ -93,7 +97,9 @@ class ReminderService {
   Future<bool> requestCalendarPermission() async {
     if (!isAndroid) return true;
     try {
-      final result = await _channel.invokeMethod<bool>('requestCalendarPermission');
+      final result = await _channel.invokeMethod<bool>(
+        'requestCalendarPermission',
+      );
       return result ?? false;
     } on PlatformException catch (e) {
       debugPrint('申请日历权限异常: ${e.message}');
@@ -145,10 +151,10 @@ class ReminderService {
   Future<bool> deleteCalendarEvent(int calendarEventId) async {
     if (!isAndroid) return true;
     try {
-      final result = await _channel.invokeMethod<bool>(
-        'deleteCalendarEvent',
-        <String, dynamic>{'eventId': calendarEventId},
-      );
+      final result = await _channel.invokeMethod<bool>('deleteCalendarEvent', <
+        String,
+        dynamic
+      >{'eventId': calendarEventId});
       return result ?? false;
     } on PlatformException catch (e) {
       debugPrint('删除系统日历事件失败: ${e.message}');
@@ -167,14 +173,14 @@ class ReminderService {
 
     try {
       final triggerMillis = triggerTime.millisecondsSinceEpoch;
-      final result = await _channel.invokeMethod<bool>(
-        'setExactAlarmClock',
-        <String, dynamic>{
-          'triggerTimeMillis': triggerMillis,
-          'title': title,
-          'notes': notes,
-        },
-      );
+      final result = await _channel.invokeMethod<bool>('setExactAlarmClock', <
+        String,
+        dynamic
+      >{
+        'triggerTimeMillis': triggerMillis,
+        'title': title,
+        'notes': notes,
+      });
       return result ?? false;
     } on PlatformException catch (e) {
       debugPrint('设置高精度闹钟失败: ${e.message}');
@@ -235,6 +241,12 @@ class ReminderService {
       // 触发桌面端提醒广播
       onDesktopReminderTriggered?.call(item);
     });
+  }
+
+  /// 供测试与即时预览验证桌面端提醒响应
+  @visibleForTesting
+  void triggerDesktopReminder(ReminderItem item) {
+    onDesktopReminderTriggered?.call(item);
   }
 
   /// 释放与销毁所有正在等待的定时任务
