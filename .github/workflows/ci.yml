@@ -223,13 +223,13 @@ jobs:
             printf 'storeFile=ci-throwaway.jks\n'
           } > android/key.properties
 
-      # 挂载 6GB Swap 虚拟内存，防止 Gradle、Kotlin 和 R8 峰值内存超出 GitHub runner 7GB 限制导致 OOM 被杀
+      # 挂载 6GB 额外 Swap 虚拟内存（避免覆盖已被系统占用的 /swapfile），防止 Gradle、Kotlin 和 R8 峰值内存超限
       - name: Increase swap space
         run: |
-          sudo fallocate -l 6G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=6144
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          sudo fallocate -l 6G /swapfile_extra || sudo dd if=/dev/zero of=/swapfile_extra bs=1M count=6144
+          sudo chmod 600 /swapfile_extra
+          sudo mkswap /swapfile_extra
+          sudo swapon /swapfile_extra
           free -h
 
       # 选 release 而不是 debug：AOT 编译、图标字体 tree shaking 与 R8 混淆只在
