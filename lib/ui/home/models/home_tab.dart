@@ -12,6 +12,7 @@ import '../../app_surface/models/app_surface_enums.dart';
 
 /// 首页 Tab。声明顺序就是底栏中的顺序。
 enum HomeTab {
+  schedule,
   diaries,
   calendar,
   explore,
@@ -19,6 +20,7 @@ enum HomeTab {
 
   /// 底栏文案。
   String label(AppLocalizations l10n) => switch (this) {
+    HomeTab.schedule => '日程',
     HomeTab.diaries => l10n.navDiaries,
     HomeTab.calendar => l10n.navCalendar,
     HomeTab.explore => l10n.navExplore,
@@ -27,6 +29,7 @@ enum HomeTab {
 
   /// 底栏图标。
   FaIconData get icon => switch (this) {
+    HomeTab.schedule => FontAwesomeIcons.solidCalendarCheck,
     HomeTab.diaries => FontAwesomeIcons.solidRectangleList,
     HomeTab.calendar => FontAwesomeIcons.solidCalendar,
     HomeTab.explore => FontAwesomeIcons.solidCompass,
@@ -35,6 +38,7 @@ enum HomeTab {
 
   /// 这个 Tab 的背景区域（“背景与材质”里可以单独设置）。
   AppBackgroundArea get backgroundArea => switch (this) {
+    HomeTab.schedule => AppBackgroundArea.calendar,
     HomeTab.diaries => AppBackgroundArea.diaries,
     HomeTab.calendar => AppBackgroundArea.calendar,
     HomeTab.explore => AppBackgroundArea.explore,
@@ -44,9 +48,10 @@ enum HomeTab {
 
 /// 按功能开关推出可见的 Tab（保持 [HomeTab] 的声明顺序）。
 ///
-/// 日记与设置始终可见：日记是应用的主体，设置是重新打开功能的唯一入口；
-/// 因此结果至少有两项，底栏始终是正常的导航行（不会落到单项兜底）。
+/// 日程、日记与设置始终可见：日记是应用的主体，日程满足计划与提醒，
+/// 设置是重新打开功能的唯一入口；底栏始终是正常的导航行。
 List<HomeTab> visibleHomeTabs(AppFeatures features) => <HomeTab>[
+  HomeTab.schedule,
   HomeTab.diaries,
   if (features.calendar) HomeTab.calendar,
   if (features.explore) HomeTab.explore,

@@ -31,6 +31,7 @@ extension _HomePageShortcuts on _HomePageState {
     LogicalKeyboardKey.digit2,
     LogicalKeyboardKey.digit3,
     LogicalKeyboardKey.digit4,
+    LogicalKeyboardKey.digit5,
   ];
 
   Map<ShortcutActivator, VoidCallback> _shortcutBindings() {

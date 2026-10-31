@@ -13,6 +13,7 @@ import 'package:node_diary/ui/app_surface/widgets/app_glass_fab.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_glass_scope.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_paged_background.dart';
 import 'package:node_diary/ui/calendar/pages/calendar_page.dart';
+import 'package:node_diary/ui/schedule/pages/schedule_page.dart';
 import 'package:node_diary/ui/diaries/pages/diaries_page.dart';
 import 'package:node_diary/ui/diaries/controllers/diary_create_entry_flow.dart';
 import 'package:node_diary/ui/explore/pages/explore_page.dart';
@@ -310,6 +311,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         (context) => switch (tab) {
           // 页面底色与实色顶栏底色不在这里传：各页从包住它的
           // AppAreaBackdrop 读自己区域的背景（见 [_buildTabPage]）。
+          HomeTab.schedule => const SchedulePage(
+            key: PageStorageKey<String>('tab_schedule'),
+          ),
           HomeTab.diaries => DiariesPage(
             key: const PageStorageKey<String>('tab_diaries'),
             onCreateActionChanged: _diariesCreateActionChanged,
