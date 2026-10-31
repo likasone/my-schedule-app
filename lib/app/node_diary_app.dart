@@ -54,7 +54,8 @@ class NodeDiaryApp extends ConsumerStatefulWidget {
   ConsumerState<NodeDiaryApp> createState() => _NodeDiaryAppState();
 }
 
-class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
+class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
+    with WidgetsBindingObserver {
   // 启动等待反馈采用“延迟出现 + 最短展示”：
   // - 设置与首屏日记在 [_loaderShowDelay] 内就绪：直接淡入首页，不出现加载页，
   //   避免此前固定 1.2s 最短展示把快速冷启动人为拉长；
@@ -76,10 +77,13 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
   bool _appLocked = false;
   bool _unlockingApp = false;
   bool _initialAppLockChecked = false;
+  DateTime? _lastPausedAt;
+  static const Duration _appLockTimeoutGracePeriod = Duration(seconds: 15);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _homeHintVisibilityController = HomeHintVisibilityController();
     _loaderShowTimer = Timer(_loaderShowDelay, _handleLoaderShowDelayElapsed);
     // 编辑期不删除媒体文件，冷启动后延迟回收无人引用的文件与选择器缓存。
@@ -127,11 +131,38 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _loaderShowTimer?.cancel();
     _loaderMinVisibleTimer?.cancel();
     _unbindAppLockListener();
     _homeHintVisibilityController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final settings = _boundSettingsService;
+    if (settings == null || !settings.isAppLockEnabled) {
+      return;
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // 记录切入后台或失焦的时刻
+      _lastPausedAt = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      // 从后台或睡眠状态恢复至前台
+      final pausedAt = _lastPausedAt;
+      _lastPausedAt = null;
+      if (pausedAt != null) {
+        final elapsed = DateTime.now().difference(pausedAt);
+        // 超过缓冲期立即触发指纹 / PIN 校验
+        if (elapsed >= _appLockTimeoutGracePeriod) {
+          _lockAndAuthenticate(settingsService: settings);
+        }
+      }
+    }
   }
 
   @override

@@ -26,8 +26,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final state = ref.watch(scheduleProvider);
     final notifier = ref.read(scheduleProvider.notifier);
 
@@ -169,9 +167,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     ScheduleState state,
     ScheduleNotifier notifier,
   ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(

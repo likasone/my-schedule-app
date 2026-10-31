@@ -42,6 +42,10 @@ class BackupSettings {
     'tagFilterMemoryEnabled': settingsService.isTagFilterMemoryEnabled,
     'rememberedTagFilterIdsRaw': settingsService.rememberedTagFilterIdsRaw,
     'diaryLocationPrecisionRaw': settingsService.diaryLocationPrecisionRaw,
+    // 日程提醒、艾宾浩斯计划与随手记事数据（随全量备份及 WebDAV 坚果云全链路 AES-256 加密保存）
+    'schedulePlansRaw': settingsService.schedulePlansRaw,
+    'scheduleEntriesRaw': settingsService.scheduleEntriesRaw,
+    'scheduleMemosRaw': settingsService.scheduleMemosRaw,
   };
 
   /// 按 [settingsNode] 应用设置；只含部分键的节点只改这些键。
@@ -324,6 +328,20 @@ class BackupSettings {
         ?.toString();
     if (locationPrecisionRaw != null && locationPrecisionRaw.isNotEmpty) {
       await settingsService.setDiaryLocationPrecisionRaw(locationPrecisionRaw);
+    }
+
+    // 恢复日程提醒、艾宾浩斯计划与随手记事数据
+    final schedulePlansRaw = settingsNode['schedulePlansRaw']?.toString();
+    if (schedulePlansRaw != null) {
+      await settingsService.setSchedulePlansRaw(schedulePlansRaw);
+    }
+    final scheduleEntriesRaw = settingsNode['scheduleEntriesRaw']?.toString();
+    if (scheduleEntriesRaw != null) {
+      await settingsService.setScheduleEntriesRaw(scheduleEntriesRaw);
+    }
+    final scheduleMemosRaw = settingsNode['scheduleMemosRaw']?.toString();
+    if (scheduleMemosRaw != null) {
+      await settingsService.setScheduleMemosRaw(scheduleMemosRaw);
     }
   }
 

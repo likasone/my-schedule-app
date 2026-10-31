@@ -811,6 +811,47 @@ class SettingsService {
     await _writePreference(_prefs.setBool(_keyAppLockEnabled, enabled));
   }
 
+  // --- 日程、艾宾浩斯计划与随手记事数据持久化（支持 WebDAV 坚果云全链路 AES-256 加密同步） ---
+  static const String _keySchedulePlans = 'app_schedule_plans_v1';
+  static const String _keyScheduleEntries = 'app_schedule_entries_v1';
+  static const String _keyScheduleMemos = 'app_schedule_memos_v1';
+
+  /// 读取已持久化的计划列表 JSON
+  String? get schedulePlansRaw => _prefs.getString(_keySchedulePlans);
+
+  /// 读取已持久化的排程执行节点列表 JSON
+  String? get scheduleEntriesRaw => _prefs.getString(_keyScheduleEntries);
+
+  /// 读取已持久化的随手记事便签 JSON
+  String? get scheduleMemosRaw => _prefs.getString(_keyScheduleMemos);
+
+  /// 写入计划列表 JSON（传入 null 时清空）
+  Future<void> setSchedulePlansRaw(String? raw) async {
+    if (raw == null) {
+      await _writePreference(_prefs.remove(_keySchedulePlans));
+    } else {
+      await _writePreference(_prefs.setString(_keySchedulePlans, raw));
+    }
+  }
+
+  /// 写入排程节点 JSON（传入 null 时清空）
+  Future<void> setScheduleEntriesRaw(String? raw) async {
+    if (raw == null) {
+      await _writePreference(_prefs.remove(_keyScheduleEntries));
+    } else {
+      await _writePreference(_prefs.setString(_keyScheduleEntries, raw));
+    }
+  }
+
+  /// 写入随手记事 JSON（传入 null 时清空）
+  Future<void> setScheduleMemosRaw(String? raw) async {
+    if (raw == null) {
+      await _writePreference(_prefs.remove(_keyScheduleMemos));
+    } else {
+      await _writePreference(_prefs.setString(_keyScheduleMemos, raw));
+    }
+  }
+
   static String _resolveInitialLocaleCodeFromSystem() {
     final locales = WidgetsBinding.instance.platformDispatcher.locales;
     for (final locale in locales) {

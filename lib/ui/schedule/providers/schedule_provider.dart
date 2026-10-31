@@ -29,26 +29,28 @@ class ScheduleState {
   /// 当前选中的视图 Tab
   final int selectedTab;
 
-  /// 数据加载状态标记
+  /// 数据加载状态
   final bool isLoading;
 
-  /// 筛选出今日需要执行或过去逾期顺延至今日的条目
+  /// 筛选出今日待执行/复习的任务项
   List<ScheduleEntry> get todayEntries {
-    final today = PlanScheduler.formatIsoDate(DateTime.now());
-    return PlanScheduler.resolveDailyViewEntries(
+    final todayIso = PlanScheduler.formatIsoDate(DateTime.now());
+    return PlanScheduler.filterEntriesForDate(
       allEntries: entries,
-      todayIso: today,
+      targetDateIso: todayIso,
+      includeOverdue: true,
     );
   }
 
-  /// 计算今日待办任务的完成率 (0.0 ~ 1.0)
+  /// 计算今日完成率（0.0 ~ 1.0）
   double get todayCompletionRate {
     final todayList = todayEntries;
-    if (todayList.isEmpty) return 1.0;
-    final done = todayList.where((e) => e.isCompleted).length;
-    return done / todayList.length;
+    if (todayList.isEmpty) return 0.0;
+    final completedCount = todayList.where((e) => e.isCompleted).length;
+    return completedCount / todayList.length;
   }
 
+  /// 复制并更新部分属性
   ScheduleState copyWith({
     List<PlanItem>? plans,
     List<ScheduleEntry>? entries,
@@ -66,16 +68,28 @@ class ScheduleState {
   }
 }
 
-/// 日程与计划状态控制器（Schedule Notifier）
-class ScheduleNotifier extends StateNotifier<ScheduleState> {
-  ScheduleNotifier(this._ref) : super(const ScheduleState()) {
-    _loadFromStorage();
-  }
+/// 全局 NotifierProvider 状态注入
+final scheduleProvider =
+    NotifierProvider<ScheduleNotifier, ScheduleState>(ScheduleNotifier.new);
 
-  final Ref _ref;
+/// 日程与计划状态控制器（Schedule Notifier）
+/// 基于 Flutter Riverpod 3.x 现代 Notifier 架构打造
+class ScheduleNotifier extends Notifier<ScheduleState> {
   static const _plansStorageKey = 'app_schedule_plans_v1';
   static const _entriesStorageKey = 'app_schedule_entries_v1';
   static const _memosStorageKey = 'app_schedule_memos_v1';
+
+  @override
+  ScheduleState build() {
+    // 异步加载存储数据，初始返回带有 isLoading 标记的状态
+    _loadFromStorage();
+    return const ScheduleState(isLoading: true);
+  }
+
+  /// 供外部（如 WebDAV 坚果云还原备份数据后）主动触发重载
+  Future<void> reloadFromStorage() async {
+    await _loadFromStorage();
+  }
 
   /// 从本地持久化存储（SharedPreferences）中异步读取数据
   Future<void> _loadFromStorage() async {
@@ -100,7 +114,9 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
             title: map['title'] as String,
             startDate: map['startDate'] as String,
             dayCount: map['dayCount'] as int? ?? 365,
-            reviewOffsets: (map['reviewOffsets'] as List?)?.cast<int>() ?? [1, 2, 4, 7, 15, 30],
+            reviewOffsets:
+                (map['reviewOffsets'] as List?)?.cast<int>() ??
+                [1, 2, 4, 7, 15, 30],
             createdAt: DateTime.parse(map['createdAt'] as String),
             notes: map['notes'] as String? ?? '',
           );
@@ -181,27 +197,35 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
   ) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final plansData = plans.map((p) => {
-      'id': p.id,
-      'title': p.title,
-      'startDate': p.startDate,
-      'dayCount': p.dayCount,
-      'reviewOffsets': p.reviewOffsets,
-      'createdAt': p.createdAt.toIso8601String(),
-      'notes': p.notes,
-    }).toList();
+    final plansData = plans
+        .map(
+          (p) => {
+            'id': p.id,
+            'title': p.title,
+            'startDate': p.startDate,
+            'dayCount': p.dayCount,
+            'reviewOffsets': p.reviewOffsets,
+            'createdAt': p.createdAt.toIso8601String(),
+            'notes': p.notes,
+          },
+        )
+        .toList();
 
-    final entriesData = entries.map((e) => {
-      'id': e.id,
-      'planId': e.planId,
-      'title': e.title,
-      'scheduledDate': e.scheduledDate,
-      'stepIndex': e.stepIndex,
-      'kind': e.kind.name,
-      'isCompleted': e.isCompleted,
-      'originalDueDate': e.originalDueDate,
-      'notes': e.notes,
-    }).toList();
+    final entriesData = entries
+        .map(
+          (e) => {
+            'id': e.id,
+            'planId': e.planId,
+            'title': e.title,
+            'scheduledDate': e.scheduledDate,
+            'stepIndex': e.stepIndex,
+            'kind': e.kind.name,
+            'isCompleted': e.isCompleted,
+            'originalDueDate': e.originalDueDate,
+            'notes': e.notes,
+          },
+        )
+        .toList();
 
     await prefs.setString(_plansStorageKey, jsonEncode(plansData));
     await prefs.setString(_entriesStorageKey, jsonEncode(entriesData));
@@ -236,7 +260,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
 
     // 若指定了具体提醒时间点，联动 ReminderService 挂载系统闹钟与日历提醒
     if (reminderTime != null) {
-      final reminderService = _ref.read(reminderServiceProvider);
+      final reminderService = ref.read(reminderServiceProvider);
       await reminderService.scheduleComprehensiveReminder(
         ReminderItem(
           id: plan.id,
@@ -271,7 +295,7 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
     final updatedEntries = [...state.entries, entry];
 
     // 挂载高穿透提醒
-    final reminderService = _ref.read(reminderServiceProvider);
+    final reminderService = ref.read(reminderServiceProvider);
     await reminderService.scheduleComprehensiveReminder(
       ReminderItem(
         id: entry.id,
@@ -342,8 +366,3 @@ class ScheduleNotifier extends StateNotifier<ScheduleState> {
     await _persist(state.plans, state.entries, updatedMemos);
   }
 }
-
-/// 全局 StateNotifierProvider 注入
-final scheduleProvider = StateNotifierProvider<ScheduleNotifier, ScheduleState>((ref) {
-  return ScheduleNotifier(ref);
-});

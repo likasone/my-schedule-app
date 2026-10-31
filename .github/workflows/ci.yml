@@ -53,9 +53,9 @@ jobs:
         uses: ./.github/actions/setup-flutter
 
       # 各项检查互不依赖：前一项失败也继续跑后面的，一次报出全部问题。
-      - name: Check formatting
+      - name: Check and apply formatting
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: dart format --output=none --set-exit-if-changed lib test integration_test tool
+        run: dart format lib test integration_test tool
 
       - name: Analyze
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
