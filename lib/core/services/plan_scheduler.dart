@@ -330,4 +330,19 @@ class PlanScheduler {
     final completedCount = planEntries.where((e) => e.isCompleted).length;
     return completedCount / planEntries.length;
   }
+
+  /// 筛选指定目标日期的待办/复习条目列表（默认携带历史逾期条目平滑前移至今天）
+  static List<ScheduleEntry> filterEntriesForDate({
+    required List<ScheduleEntry> allEntries,
+    required String targetDateIso,
+    bool includeOverdue = true,
+  }) {
+    if (includeOverdue) {
+      return resolveDailyViewEntries(
+        allEntries: allEntries,
+        todayIso: targetDateIso,
+      );
+    }
+    return allEntries.where((e) => e.scheduledDate == targetDateIso).toList();
+  }
 }
