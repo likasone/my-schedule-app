@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:node_diary/ui/widgets/expressive_loading_indicator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:node_diary/core/services/settings_service.dart';
+import 'package:node_diary/l10n/app_localizations.dart';
+
+import '../../widgets/app_modal/app_dialog.dart';
+
+/// 设置页日记卡片展示区块。
+///
+/// 输入为异步初始化的设置服务；输出当前标签显示上限及选择弹窗。
+/// 唯一副作用是在用户确认新值后持久化设置，取消弹窗不会修改服务状态。
+class SettingsDiaryCardSection extends StatelessWidget {
+  const SettingsDiaryCardSection({super.key, required this.settingsAsync});
+
+  final AsyncValue<SettingsService> settingsAsync;
+
+  String _limitLabel(AppLocalizations l10n, int limit) {
+    return limit == SettingsService.minDiaryCardTagLimit
+        ? l10n.settingsDiaryCardTagLimitHidden
+        : l10n.settingsDiaryCardTagLimitValue(limit);
+  }
+
+  Future<void> _showTagLimitDialog(
+    BuildContext context,
+    SettingsService settings,
+  ) async {
+    final originalLimit = settings.diaryCardTagLimit;
+    var selectedLimit = originalLimit;
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext dialogContext, StateSetter setDialogState) {
+            final l10n = dialogContext.l10n;
+            final colorScheme = Theme.of(dialogContext).colorScheme;
+            final selectedLabel = _limitLabel(l10n, selectedLimit);
+            return AlertDialog(
+              title: Text(l10n.settingsDiaryCardTagLimit),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    selectedLabel,
+                    style: Theme.of(dialogContext).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Slider(
+                    value: selectedLimit.toDouble(),
+                    min: SettingsService.minDiaryCardTagLimit.toDouble(),
+                    max: SettingsService.maxDiaryCardTagLimit.toDouble(),
+                    divisions:
+                        SettingsService.maxDiaryCardTagLimit -
+                        SettingsService.minDiaryCardTagLimit,
+                    label: selectedLabel,
+                    semanticFormatterCallback: (double value) =>
+                        _limitLabel(l10n, value.round()),
+                    onChanged: (double value) {
+                      setDialogState(() {
+                        selectedLimit = value.round();
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.onSurfaceVariant,
+                  ),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(l10n.commonCancel),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(l10n.commonConfirm),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true && selectedLimit != originalLimit) {
+      await settings.setDiaryCardTagLimit(selectedLimit);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return settingsAsync.when(
+      data: (SettingsService settings) => ValueListenableBuilder<int>(
+        valueListenable: settings.diaryCardTagLimitNotifier,
+        builder: (BuildContext context, int limit, Widget? child) {
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            title: Text(l10n.settingsDiaryCardTagLimit),
+            subtitle: Text(_limitLabel(l10n, limit)),
+            trailing: const FaIcon(FontAwesomeIcons.angleRight, size: 14),
+            onTap: () => _showTagLimitDialog(context, settings),
+          );
+        },
+      ),
+      loading: () => ListTile(
+        enabled: false,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        title: Text(l10n.settingsDiaryCardTagLimit),
+        trailing: ExpressiveLoadingIndicator(
+          size: 24,
+          semanticLabel: l10n.settingsDiaryCardTagLimitLoading,
+        ),
+      ),
+      error: (Object error, StackTrace stackTrace) => ListTile(
+        enabled: false,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        title: Text(l10n.settingsDiaryCardTagLimit),
+        subtitle: Text(l10n.settingsDiaryCardTagLimitUnavailable),
+      ),
+    );
+  }
+}

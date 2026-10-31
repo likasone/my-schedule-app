@@ -1,0 +1,806 @@
+// ignore_for_file: library_private_types_in_public_api, invalid_use_of_protected_member
+
+part of 'package:node_diary/ui/diaries/pages/diaries_page.dart';
+
+/// 日记列表页业务控制器。
+///
+/// 职责边界：
+/// - 处理页面事件与业务流程（搜索、筛选、归档、删除、导航）；
+/// - 与 Provider/数据库交互；
+/// - 不直接构建任何 UI 组件。
+class DiariesPageController {
+  DiariesPageController(
+    this._state, {
+    required this.feedback,
+    required this.transitionCoordinator,
+  });
+
+  /// 页面状态对象。
+  ///
+  /// 该控制器是“事件编排层”，所有用户交互最终都会回写到这个 state。
+  final _DiariesPage _state;
+
+  /// 统一处理弹窗/SnackBar 的反馈层，避免流程代码到处散落提示逻辑。
+  final DiariesPageFeedback feedback;
+
+  /// 列表过渡协调器，集中控制筛选切换和项目删改时的过渡动画节奏。
+  final DiaryListTransitionCoordinator transitionCoordinator;
+
+  /// 清空列表多选状态。
+  void clearSelection() {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return;
+    }
+    _state.setState(_state._selectedDiaryIds.clear);
+  }
+
+  /// 打开独立搜索页。
+  ///
+  /// 使用淡入覆盖式路由，弱化“页面跳转”感，保持同场景搜索体验。
+  /// 在日记本里时带上这本作为搜索范围（搜索页里可移除）。
+  void openSearchPage() {
+    final selectedTagIds = <int>{
+      ..._state.ref.read(diaryFilterProvider).selectedTagIds,
+    };
+    final scope = _state._scopeController.searchScope();
+    Navigator.of(_state.context).push(
+      DiarySearchPage.buildRoute(
+        initialTagIds: selectedTagIds,
+        scope: scope.scope,
+        scopeLabel: scope.label,
+        scopeIcon: scope.icon,
+      ),
+    );
+  }
+
+  /// 应用启动后按“标签记忆”设置恢复上次的标签筛选。
+  Future<void> restoreRememberedTagFiltersOnStartup() async {
+    try {
+      final settingsService = await _state.ref.read(
+        settingsServiceProvider.future,
+      );
+      if (!_state.mounted || !settingsService.isTagFilterMemoryEnabled) {
+        return;
+      }
+      final rememberedTagIds = decodeTagOrder(
+        settingsService.rememberedTagFilterIdsRaw,
+      );
+      if (rememberedTagIds.isEmpty) {
+        return;
+      }
+      _state.ref.read(diaryFilterProvider.notifier).setTags(rememberedTagIds);
+    } catch (_) {
+      // 设置服务加载失败时由页面主体错误态兜底，这里避免启动恢复流程抛出未处理异常。
+    }
+  }
+
+  /// 切换标签筛选。实际写入动作会通过过渡协调器排队，确保列表过渡连续。
+  void toggleTagFilter(int tagId, bool selected) {
+    transitionCoordinator.queueFilterMutation(() {
+      _state.ref.read(diaryFilterProvider.notifier).toggleTag(tagId, selected);
+      _persistTagFilterMemoryIfNeeded();
+    });
+  }
+
+  /// 清空所有标签筛选条件。
+  void clearTagFilters() {
+    if (_state.ref.read(diaryFilterProvider).selectedTagIds.isEmpty) {
+      return;
+    }
+    transitionCoordinator.queueFilterMutation(() {
+      _state.ref.read(diaryFilterProvider.notifier).clearTags();
+      _persistTagFilterMemoryIfNeeded();
+    });
+  }
+
+  /// “记住标签筛选”只记全部日记里的选择：日记本里的筛选各自独立、不落盘。
+  void _persistTagFilterMemoryIfNeeded() {
+    if (!_state.ref.read(homeNotebookScopeProvider).isAll) {
+      return;
+    }
+    final settingsService = _state.ref
+        .read(settingsServiceProvider)
+        .asData
+        ?.value;
+    if (settingsService == null || !settingsService.isTagFilterMemoryEnabled) {
+      return;
+    }
+    final rememberedTagIds =
+        _state.ref
+            .read(diaryFilterProvider)
+            .selectedTagIds
+            .toList(growable: false)
+          ..sort();
+    unawaited(
+      settingsService.setRememberedTagFilterIdsRaw(
+        encodeTagOrder(rememberedTagIds),
+      ),
+    );
+  }
+
+  /// 阅读顺序：当前显示的列表，去掉正在归档、删除而暂时隐藏的条目。预览页
+  /// 左右滑动与宽窗口右栏的上一篇 / 下一篇共用这一口径。
+  List<DiaryWithTags> readingOrder() {
+    final hidden = _readingHiddenIds();
+    return _state._lastDisplayedItems
+        .where((DiaryWithTags item) => !hidden.contains(item.diary.diaryId))
+        .toList(growable: false);
+  }
+
+  Set<String> _readingHiddenIds() => <String>{
+    ..._state._optimisticHiddenDiaryIds,
+    ..._state._pendingHideDiaryIds,
+  };
+
+  /// 预览页左右滑动的顺序（[readingOrder]）；列表还有没加载的部分时带上同一
+  /// 查询条件，预览页据此接上。
+  DiaryPreviewSequence _previewSequence() {
+    final hidden = _readingHiddenIds();
+    final query = _state._currentDiaryPageQuery;
+    return DiaryPreviewSequence.fromItems(
+      readingOrder(),
+      query: _state._hasMoreDiaries && query != null
+          ? DiaryPreviewListQuery(
+              keyword: query.keyword,
+              requiredTagIds: query.requiredTagIds,
+              sortMode: query.sortMode,
+              scope: query.scope,
+              excludedIds: hidden,
+            )
+          : null,
+    );
+  }
+
+  /// 点按列表卡片（普通模式）：双栏时在右栏阅读（选中这一篇，不推入路由；
+  /// 双栏不抓取封面，这里只兜底释放）；否则推入预览页。
+  void openDiary(DiaryWithTags diary, ImageViewerHero? coverHero) {
+    if (_state._twoPane) {
+      coverHero?.dispose();
+      _state._readingSelection.select(diary.diary.diaryId);
+      return;
+    }
+    openPreview(
+      diary.diary.diaryId,
+      initialDetail: diary,
+      coverHero: coverHero,
+    );
+  }
+
+  /// 打开日记预览页（列表默认入口；“打开日记时直接编辑”开启时为编辑页，
+  /// 见 [openDiaryPage]）。
+  ///
+  /// 预览页（或编辑页）内可能触发删除或编辑：
+  /// - 删除通过返回值触发撤销提示；
+  /// - 其余数据变更依赖数据库流自动回推，避免强制刷新导致滚动回跳。
+  void openPreview(
+    String diaryId, {
+    DiaryWithTags? initialDetail,
+    ImageViewerHero? coverHero,
+  }) {
+    final sequence = _previewSequence();
+    unawaited(
+      openDiaryPage(
+        _state.context,
+        _state.ref,
+        diaryId: diaryId,
+        initialDetail: initialDetail,
+        coverHero: coverHero,
+        sequence: sequence,
+      ).then((DiaryPreviewResult? result) async {
+        if (!_state.mounted) {
+          return;
+        }
+        // 预览页返回不再强制触发列表重建：
+        // - 列表本身由数据库流驱动，数据变更会自动刷新；
+        // - 强制刷新会导致滚动位置回跳，影响“返回后继续浏览”体验。
+        // 预览页里可能已滑到别的日记再删除：恢复的是结果里的那一篇。
+        if (result case DiaryPreviewResult(:final diaryId)) {
+          await offerUndoForDeletedDiary(diaryId);
+        }
+      }),
+    );
+  }
+
+  /// 预览（独立页面或宽窗口右栏）里删除了 [diaryId]：给出撤销提示，撤销时
+  /// 恢复（不改更新时间，回到原来的位置）。
+  Future<void> offerUndoForDeletedDiary(String diaryId) async {
+    final l10n = _state.context.l10n;
+    final undoRequested = await feedback.showUndoSnackBar(
+      message: l10n.autoT0075,
+      duration: _DiariesPage._deleteUndoSnackDuration,
+    );
+    if (!_state.mounted || !undoRequested) {
+      return;
+    }
+    try {
+      final db = _state.ref.read(appDatabaseProvider);
+      await db.restoreDiary(diaryId, touchUpdatedAt: false);
+      if (!_state.mounted) {
+        return;
+      }
+      await feedback.showInfoSnackBar(l10n.autoT0076);
+    } catch (_) {
+      if (!_state.mounted) {
+        return;
+      }
+      await feedback.showInfoSnackBar(l10n.autoT0077);
+    }
+  }
+
+  /// 从编辑页返回后主动触发刷新节拍。
+  ///
+  /// `invalidate` 让分页 Provider 重取当前窗口数据（refresh 语义，不会回到
+  /// loading）。不再整表重挂载：瀑布流空位由按 id + 更新时间生成的布局签名
+  /// key 处理，重挂载只会让返回首帧所有卡片整体重建、新卡片也无从播放出现
+  /// 动画。[createdDiaryId] 为新建发布的日记，交给协调器在退场后放出。
+  void refreshAfterEditorReturn({String? createdDiaryId}) {
+    _state.ref.invalidate(pagedDiariesProvider);
+    if (createdDiaryId != null) {
+      transitionCoordinator.revealCreatedDiary(createdDiaryId);
+    }
+  }
+
+  /// 处理“新建日记”入口（FAB、空列表）：经共用的新建流程（有草稿时先弹
+  /// 草稿选择面板），返回后刷新列表；编辑页直接发布的新日记交给协调器，
+  /// 在发布页退场后以出现动画插入。在普通日记本里新建空白日记时预先收进
+  /// 这本（与当前章节），并套用这本的默认模板。
+  Future<void> openCreateEditorWithDraftPrompt() async {
+    final target = _state._scopeController.createTarget();
+    final result = await runDiaryCreateEntryFlow(
+      _state.context,
+      _state.ref,
+      notebookId: target.notebookId,
+      chapterId: target.chapterId,
+    );
+    if (!_state.mounted || !result.opened) {
+      return;
+    }
+    refreshAfterEditorReturn(createdDiaryId: result.createdDiaryId);
+  }
+
+  /// 批量置顶所选日记。
+  ///
+  /// 设计为“仅置顶不改更新时间”，避免只做排序管理时污染“最近编辑”语义。
+  Future<void> pinSelectedDiaries({bool unpin = false}) async {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return;
+    }
+
+    final targetIds = _state._selectedDiaryIds.toList(growable: false);
+    final db = _state.ref.read(appDatabaseProvider);
+    final failedIds = <String>[];
+
+    for (final diaryId in targetIds) {
+      try {
+        if (unpin) {
+          await db.unpinDiary(diaryId, touchUpdatedAt: false);
+        } else {
+          await db.pinDiary(diaryId, touchUpdatedAt: false);
+        }
+      } catch (_) {
+        failedIds.add(diaryId);
+      }
+    }
+
+    if (!_state.mounted) {
+      return;
+    }
+
+    if (failedIds.isNotEmpty) {
+      await feedback.showInfoSnackBar(_state.context.l10n.commonRetry);
+      return;
+    }
+
+    clearSelection();
+  }
+
+  /// 判断当前所选日记是否“全部已置顶”。
+  ///
+  /// 用于控制选择态 AppBar 的置顶按钮图标：
+  /// - 全部已置顶 -> 显示“取消置顶”；
+  /// - 只要有一条未置顶 -> 显示“置顶”。
+  bool areAllSelectedPinned(Iterable<DiaryWithTags> currentItems) {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return false;
+    }
+
+    var selectedCount = 0;
+    for (final item in currentItems) {
+      if (!_state._selectedDiaryIds.contains(item.diary.diaryId)) {
+        continue;
+      }
+      selectedCount += 1;
+      if (!item.diary.isPinned) {
+        return false;
+      }
+    }
+    return selectedCount == _state._selectedDiaryIds.length &&
+        selectedCount > 0;
+  }
+
+  /// 批量删除所选日记，并提供撤销入口。
+  Future<void> deleteSelectedDiaries() async {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return;
+    }
+
+    final targetIds = _state._selectedDiaryIds.toList(growable: false);
+    final confirmed = await feedback.showDeleteSelectedConfirmDialog(
+      targetIds.length,
+    );
+    if (!_state.mounted || !confirmed) {
+      return;
+    }
+    await _deleteDiaries(targetIds, fromSelection: true);
+  }
+
+  /// 删除一篇（桌面右键菜单、双栏里的 Delete 键）：确认（与预览页同一个
+  /// 对话框）后与多选删除同一条链路（收起动画 → 写库 → 撤销），不动多选
+  /// 状态。正在右栏阅读的是它时，选中先移到下一篇（与右栏里删除一致）。
+  Future<void> deleteDiary(String diaryId) async {
+    final confirmed = await confirmDiaryPreviewDelete(_state.context);
+    if (!_state.mounted || !confirmed) {
+      return;
+    }
+    _state._readingSelection.moveAwayFrom(diaryId);
+    await _deleteDiaries(<String>[diaryId], fromSelection: false);
+  }
+
+  /// 删除主流程：[fromSelection] 为多选入口（先清空选择，失败时恢复选择）。
+  Future<void> _deleteDiaries(
+    List<String> targetIds, {
+    required bool fromSelection,
+  }) async {
+    // 先在 UI 层启动“收起并隐藏”动画，再执行真实删除。
+    if (fromSelection) {
+      _state.setState(() {
+        _state._selectedDiaryIds.clear();
+      });
+    }
+    transitionCoordinator.startHideAnimations(targetIds);
+
+    // 删除流程不更新 modified 时间，避免撤销后排序错位。
+    final db = _state.ref.read(appDatabaseProvider);
+    final failedIds = <String>[];
+    for (final diaryId in targetIds) {
+      try {
+        await db.softDeleteDiary(diaryId, touchUpdatedAt: false);
+      } catch (_) {
+        failedIds.add(diaryId);
+      }
+    }
+
+    if (!_state.mounted) {
+      return;
+    }
+
+    // 任意失败则回滚已成功删除项，并恢复原选择态。
+    if (failedIds.isNotEmpty) {
+      final succeededIds = targetIds
+          .where((id) => !failedIds.contains(id))
+          .toList(growable: false);
+      for (final diaryId in succeededIds) {
+        await db.restoreDiary(diaryId, touchUpdatedAt: false);
+      }
+      if (!_state.mounted) {
+        return;
+      }
+      transitionCoordinator.revealDiaries(targetIds, animate: true);
+      if (fromSelection) {
+        _state.setState(() {
+          _state._selectedDiaryIds.addAll(targetIds);
+        });
+      }
+      await feedback.showInfoSnackBar(_state.context.l10n.autoT0073);
+      return;
+    }
+
+    final l10n = _state.context.l10n;
+    final undoRequested = await feedback.showUndoSnackBar(
+      message: fromSelection
+          ? l10n.autoT0074(targetIds.length.toString())
+          : l10n.autoT0075,
+      duration: _DiariesPage._deleteUndoSnackDuration,
+    );
+
+    if (!_state.mounted) {
+      return;
+    }
+
+    if (undoRequested) {
+      for (final diaryId in targetIds) {
+        await db.restoreDiary(diaryId, touchUpdatedAt: false);
+      }
+      if (!_state.mounted) {
+        return;
+      }
+      transitionCoordinator.revealDiaries(targetIds, animate: true);
+      await feedback.showInfoSnackBar(l10n.autoT0076);
+      return;
+    }
+
+    _state.setState(() {
+      _state._optimisticHiddenDiaryIds.removeAll(targetIds);
+      _state._pendingHideDiaryIds.removeAll(targetIds);
+      _state._appearingDiaryIds.removeAll(targetIds);
+    });
+    transitionCoordinator.clearTransitionTimers(targetIds);
+  }
+
+  /// 桌面右键菜单的动作：编辑、置顶、日记本、归档与删除，各自接到与多选栏、
+  /// 右栏相同的写入与撤销。日记本功能关闭时没有日记本一项；在普通日记本里
+  /// 是“移动到日记本…”，其他范围是“收进日记本…”。
+  DiaryCardMenuActions menuActions({required bool notebooksEnabled}) {
+    final inManualNotebook =
+        _state._membershipController.currentManualNotebook != null;
+    return DiaryCardMenuActions(
+      onEdit: (diary) => unawaited(editDiary(diary.diary.diaryId)),
+      onTogglePin: (diary) => unawaited(
+        setDiaryPinned(
+          _state.context,
+          _state.ref,
+          diary.diary.diaryId,
+          pinned: !diary.diary.isPinned,
+        ),
+      ),
+      onNotebooks: notebooksEnabled
+          ? (diary) => unawaited(
+              _state._membershipController.pickNotebooksForDiary(
+                diary.diary.diaryId,
+              ),
+            )
+          : null,
+      notebooksMovesDiary: notebooksEnabled && inManualNotebook,
+      onToggleArchive: (diary) => unawaited(
+        _archiveDiaries(
+          <String>[diary.diary.diaryId],
+          clearSelection: false,
+          showUndoSnack: true,
+        ),
+      ),
+      onDelete: (diary) => unawaited(deleteDiary(diary.diary.diaryId)),
+    );
+  }
+
+  /// 编辑一篇（右键菜单）：与右栏的“编辑”、Enter 同一流程，编辑页里删除时
+  /// 按右栏删除收尾（选中移到下一篇，给撤销）。
+  Future<void> editDiary(String diaryId) async {
+    final deleted = await openDiaryEditorFromPreview(
+      _state.context,
+      _state.ref,
+      diaryId,
+    );
+    if (_state.mounted && deleted) {
+      _state._readingSelection.handleDeleted(diaryId);
+    }
+  }
+
+  /// 导出所选日记：按 id 从库中取最新的完整详情（列表项可能只是分页
+  /// 快照），交给共用导出流程；导出不改动数据，保持多选状态，方便接着
+  /// 归档或再导出成别的格式。
+  Future<void> exportSelectedDiaries() async {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return;
+    }
+    final db = _state.ref.read(appDatabaseProvider);
+    final diaries = <DiaryWithTags>[];
+    for (final diaryId in _state._selectedDiaryIds.toList(growable: false)) {
+      final detail = await db.getDiaryWithTagsByDiaryId(diaryId);
+      if (detail != null) {
+        diaries.add(detail);
+      }
+    }
+    if (!_state.mounted) {
+      return;
+    }
+    await runDiaryExportFlow(
+      _state.context,
+      _state.ref,
+      diaries: diaries,
+      showHint: (String message) =>
+          unawaited(feedback.showInfoSnackBar(message)),
+    );
+  }
+
+  /// 批量归档所选日记并提供撤销。
+  Future<void> archiveSelectedDiaries() async {
+    if (_state._selectedDiaryIds.isEmpty) {
+      return;
+    }
+    await _archiveDiaries(
+      _state._selectedDiaryIds.toList(growable: false),
+      clearSelection: true,
+      showUndoSnack: true,
+    );
+  }
+
+  /// 列表左滑单条归档入口。
+  Future<void> archiveDiaryBySwipe(String diaryId) async {
+    await _archiveDiaries(
+      <String>[diaryId],
+      clearSelection: false,
+      showUndoSnack: true,
+      animateHide: false,
+    );
+  }
+
+  /// 执行归档主流程，复用多选与左滑两种入口。
+  Future<void> _archiveDiaries(
+    List<String> diaryIds, {
+    required bool clearSelection,
+    required bool showUndoSnack,
+    bool animateHide = true,
+  }) async {
+    // 做 ID 去重与清洗，避免后续数据库操作出现重复请求。
+    final targetIds = diaryIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (targetIds.isEmpty) {
+      return;
+    }
+    if (targetIds.any(_state._archivingDiaryIds.contains)) {
+      return;
+    }
+
+    _state.setState(() {
+      // 仅多选入口需要同步退出选择模式；左滑入口保持当前选择态不变。
+      if (clearSelection) {
+        _state._selectedDiaryIds.removeAll(targetIds);
+      }
+      _state._archivingDiaryIds.addAll(targetIds);
+    });
+    if (animateHide) {
+      transitionCoordinator.startHideAnimations(targetIds);
+    } else {
+      transitionCoordinator.hideDiariesImmediately(targetIds);
+    }
+
+    final db = _state.ref.read(appDatabaseProvider);
+    final failedIds = <String>[];
+    for (final diaryId in targetIds) {
+      try {
+        await db.archiveDiary(diaryId, touchUpdatedAt: false);
+      } catch (_) {
+        failedIds.add(diaryId);
+      }
+    }
+
+    if (!_state.mounted) {
+      return;
+    }
+
+    // 发生部分失败时回滚 UI + 数据，保证用户感知的一致性。
+    if (failedIds.isNotEmpty) {
+      final succeededIds = targetIds
+          .where((id) => !failedIds.contains(id))
+          .toList(growable: false);
+      for (final diaryId in succeededIds) {
+        await db.unarchiveDiary(diaryId, touchUpdatedAt: false);
+      }
+      if (!_state.mounted) {
+        return;
+      }
+      _state.setState(() {
+        _state._archivingDiaryIds.removeAll(targetIds);
+        if (clearSelection) {
+          _state._selectedDiaryIds.addAll(targetIds);
+        }
+      });
+      transitionCoordinator.revealDiaries(targetIds, animate: true);
+      await feedback.showInfoSnackBar(_state.context.l10n.autoT0078);
+      return;
+    }
+
+    if (showUndoSnack) {
+      final l10n = _state.context.l10n;
+      final undoRequested = await feedback.showUndoSnackBar(
+        message: l10n.autoT0079(targetIds.length.toString()),
+        duration: _DiariesPage._archiveUndoSnackDuration,
+      );
+
+      if (!_state.mounted) {
+        return;
+      }
+
+      if (undoRequested) {
+        for (final diaryId in targetIds) {
+          await db.unarchiveDiary(diaryId, touchUpdatedAt: false);
+        }
+        if (!_state.mounted) {
+          return;
+        }
+        _state.setState(() {
+          _state._archivingDiaryIds.removeAll(targetIds);
+        });
+        transitionCoordinator.revealDiaries(targetIds, animate: true);
+        await feedback.showInfoSnackBar(l10n.autoT0080);
+        return;
+      }
+    }
+
+    _state.setState(() {
+      _state._optimisticHiddenDiaryIds.removeAll(targetIds);
+      _state._pendingHideDiaryIds.removeAll(targetIds);
+      _state._appearingDiaryIds.removeAll(targetIds);
+      _state._archivingDiaryIds.removeAll(targetIds);
+    });
+    transitionCoordinator.clearTransitionTimers(targetIds);
+  }
+
+  /// 切换单条选中状态，支持强制选中（长按进入选择模式时使用）。
+  void toggleSelection(String noteId, {bool forceSelect = false}) {
+    _state.setState(() {
+      if (forceSelect) {
+        _state._selectedDiaryIds.add(noteId);
+        return;
+      }
+      if (_state._selectedDiaryIds.contains(noteId)) {
+        _state._selectedDiaryIds.remove(noteId);
+      } else {
+        _state._selectedDiaryIds.add(noteId);
+      }
+    });
+  }
+
+  /// 打开归档页。
+  void openArchivedPage() {
+    Navigator.of(_state.context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const ArchivedDiariesPage(),
+      ),
+    );
+  }
+
+  /// 打开草稿箱（顶栏入口）。
+  void openDraftsPage() {
+    Navigator.of(_state.context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const DiaryDraftsPage(),
+      ),
+    );
+  }
+
+  /// 打开视图选项面板（排序依据、正/倒序与布局），选项即点即生效。
+  ///
+  /// 在日记本里时排序换成本子的排序（写回本子，布局仍是全局的）；面板里
+  /// 另有打开书架的入口。
+  void openViewOptions() {
+    final scope = _state._scopeController.resolution;
+    final notebook = scope.notebook;
+    // 日记本功能关闭时隐藏入口，数据保留：没有书架入口与本子排序。
+    final notebooksEnabled = _state.ref.read(appFeaturesProvider).notebooks;
+    unawaited(
+      showDiaryViewOptionsSheet(
+        _state.context,
+        sortMode: _state._sortMode,
+        layoutMode: _state._layoutMode,
+        onSortModeChanged: _changeSortMode,
+        onLayoutModeChanged: _changeLayoutMode,
+        onOpenCardStyle: openCardStyleEditor,
+        onOpenNotebookShelf: notebooksEnabled
+            ? () => unawaited(_state._scopeController.openShelf())
+            : null,
+        notebookSort: notebooksEnabled ? scope.sort : null,
+        allowBookOrder: notebook != null && !notebook.isSmart,
+        onNotebookSortChanged: _state._scopeController.changeNotebookSort,
+      ),
+    );
+  }
+
+  /// 从视图选项面板进入卡片样式页，预览并编辑当前所用的布局。
+  void openCardStyleEditor() {
+    final settingsService = _state.ref
+        .read(settingsServiceProvider)
+        .asData
+        ?.value;
+    if (settingsService == null) {
+      return;
+    }
+    Navigator.of(_state.context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => DiaryCardStylePage(
+          settingsService: settingsService,
+          initialMode: _state._layoutMode == DiaryLayoutMode.waterfall
+              ? DiaryCardMode.waterfall
+              : DiaryCardMode.list,
+        ),
+      ),
+    );
+  }
+
+  /// 切换排序：与标签筛选走同一套过渡——旧列表冻结并淡出，新排序的分页数据
+  /// 到齐后再淡入。此前直接 setState，本地缓存先按新规则重排（卡片瞬间换位），
+  /// 新窗口数据到达后又变一次。
+  ///
+  /// 新顺序从头展示：分页窗口随排序重置为首屏，停在原滚动位置只会落到新顺序
+  /// 中的任意一段（常常直接贴底又触发加载更多），所以换入新数据时回到顶部。
+  void _changeSortMode(DiarySortMode mode) {
+    if (_state._sortMode == mode) {
+      return;
+    }
+    transitionCoordinator.queueFilterMutation(() {
+      _state.setState(() => _state._sortMode = mode);
+    }, scrollToTop: true);
+    _persistViewPreferences();
+  }
+
+  /// 切换列表/瀑布流：先整体淡出，再换布局并淡入，而不是整表硬切成另一种排布。
+  void _changeLayoutMode(DiaryLayoutMode mode) {
+    if (_state._layoutMode == mode) {
+      return;
+    }
+    unawaited(
+      transitionCoordinator.switchLayout(() {
+        _state.setState(() => _state._layoutMode = mode);
+        _persistViewPreferences();
+      }),
+    );
+  }
+
+  /// 持久化当前视图偏好，确保下次打开页面仍保持同样展示方式。
+  void _persistViewPreferences() {
+    final settingsService = _state.ref
+        .read(settingsServiceProvider)
+        .asData
+        ?.value;
+    if (settingsService == null) {
+      return;
+    }
+    unawaited(settingsService.setDiarySortModeRaw(_state._sortMode.name));
+    unawaited(settingsService.setDiaryLayoutModeRaw(_state._layoutMode.name));
+  }
+
+  /// 首次进入页面时加载视图偏好，仅执行一次。
+  void loadViewPreferencesIfNeeded(SettingsService settingsService) {
+    if (_state._viewPreferencesLoaded) {
+      return;
+    }
+    final prefs = DiaryViewPreferences.fromRaw(
+      sortRaw: settingsService.diarySortModeRaw,
+      layoutRaw: settingsService.diaryLayoutModeRaw,
+    );
+    _state._sortMode = prefs.sortMode;
+    _state._layoutMode = prefs.layoutMode;
+    _state._viewPreferencesLoaded = true;
+  }
+
+  /// 生成当前可见日记列表：排除正在归档/删除过渡中的项。
+  ///
+  /// 顺序以 SQL 为准（`watchDiaries` 的排序子句），这里不再二次排序：两处
+  /// 口径稍有出入（同值次序、大小写折叠），分页窗口扩大重新查询时卡片就会
+  /// 换位，而且每次数据回推都要在 UI 线程上重排整个窗口。
+  List<DiaryWithTags> buildVisibleItems(List<DiaryWithTags> items) {
+    final hiddenIds = _state._optimisticHiddenDiaryIds;
+    if (hiddenIds.isEmpty) {
+      return items;
+    }
+    return items
+        .where((DiaryWithTags item) => !hiddenIds.contains(item.diary.diaryId))
+        .toList(growable: false);
+  }
+
+  /// 构建顶部标签筛选可见项。
+  ///
+  /// 规则：若有关键词，仅展示“在当前搜索结果中出现过”的标签。
+  List<Tag> buildTagFiltersForDisplay({
+    required List<Tag> allTags,
+    required List<DiaryWithTags> visibleItems,
+    required String keyword,
+  }) {
+    final normalizedKeyword = keyword.trim();
+    if (normalizedKeyword.isEmpty) {
+      return allTags;
+    }
+
+    final visibleTagIds = <int>{};
+    for (final item in visibleItems) {
+      for (final tag in item.tags) {
+        visibleTagIds.add(tag.id);
+      }
+    }
+
+    return allTags.where((tag) => visibleTagIds.contains(tag.id)).toList();
+  }
+}

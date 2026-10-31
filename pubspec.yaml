@@ -1,0 +1,129 @@
+name: node_diary
+description: "A new Flutter project."
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 0.10.0+23
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.2.1
+  font_awesome_flutter: ^11.0.0
+  drift: ^2.32.0
+  sqlite3_flutter_libs: ^0.6.0+eol
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  shared_preferences: ^2.5.4
+  intl: ^0.20.2
+  flutter_staggered_grid_view: ^0.7.0
+  # 块编辑器（嵌套块、/ 菜单、Markdown 输入、拖动排序）。pub 上的 6.2.0 在
+  # Flutter ≥ 3.44 上编译不过（TextInputClient.onFocusReceived，上游 #1204），
+  # 修复只在 main 上，因此固定到 main 的提交。
+  appflowy_editor:
+    git:
+      url: https://github.com/AppFlowy-IO/appflowy-editor.git
+      ref: 01eccc6ee36bd07698bd80915289fe7070478cd2
+  file_picker: ^10.3.10
+  smooth_sheets: ^0.17.0
+  geolocator: ^14.0.2
+  loading_indicator_m3e: ^0.1.1
+  share_plus: ^10.1.4
+  widget_screenshot_plus: ^0.0.7
+  table_calendar: ^3.2.0
+  flutter_svg: ^2.2.4
+  url_launcher: ^6.3.2
+  package_info_plus: ^9.0.0
+  archive: ^3.6.1
+  local_auth: ^3.0.1
+  pdf: ^3.11.3
+  xml: ^6.6.1
+  meta: ^1.15.0
+  gal: ^2.3.2
+  record: ^6.2.0
+  audioplayers: ^6.5.0
+  open_filex: ^4.7.0
+  video_player: ^2.11.1
+  # 以下均为已有传递依赖的显式声明，用于导入其他日记应用的导出：
+  # html 解析 HTML 正文，markdown 解析 Day One 的行内语法，crypto 生成稳定
+  # 的导入日记 ID，sqlite3 只读打开 Diarium 的 .diary 备份；highlight 为正文
+  # 代码块做语法高亮与语言识别（只注册应用支持的语言）。
+  crypto: ^3.0.7
+  highlight: ^0.7.0
+  html: ^0.15.6
+  markdown: ^7.3.0
+  sqlite3: ^3.2.0
+  tyme: ^1.5.0
+  # 从手机厂商与 WPS 云端导入笔记：在官方网页中登录，登录状态（Cookie）只用
+  # 于本次读取笔记。
+  webview_flutter: ^4.14.1
+  # OPPO、vivo 网页版的请求信封：随机 AES 会话密钥经厂商公开的 RSA 公钥
+  # 包装（PKCS#1 v1.5），正文 AES-CBC 加密。
+  pointycastle: ^4.0.0
+  # 网盘备份：装有 Google Play 服务的 Android 设备经系统账号选择器授权
+  # Google Drive（没有 Play 服务时回落到设备码授权）。
+  google_sign_in: ^7.2.0
+  photo_manager: ^3.12.0
+  photo_manager_image_provider: ^2.2.0
+  pasteboard: ^0.5.0
+  dart_quill_delta: ^10.8.3
+  # 桌面上把文件拖进编辑页正文（Linux / Windows / macOS 的原生拖放）。0.9 起要求
+  # Flutter 3.47.7，暂停在 0.8.x。
+  desktop_drop: ^0.8.4
+  # 局域网同步：设备身份（Ed25519）、密钥交换（X25519）、HKDF 与
+  # ChaCha20-Poly1305 加密。
+  cryptography: ^2.9.0
+  # 局域网同步：自绘配对二维码（只用编码器）。
+  qr: ^3.0.2
+  # 局域网同步：手机扫码配对。Android 用内置的 ML Kit 模型（默认），不开启
+  # unbundled 模式：多数国内手机没有 Google Play 服务。
+  mobile_scanner: ^7.4.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  build_runner: ^2.12.2
+  drift_dev: ^2.32.0
+  flutter_launcher_icons: ^0.14.4
+  # 模拟备份恢复时偏好写入返回 false 或异常，验证跨数据库/媒体回滚。
+  shared_preferences_platform_interface: ^2.4.1
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/app_icon/mingcute_icon.png
+    - assets/weather_icons/qweather/
+    # 设置页“日记卡片样式”预览用的示例封面，不出现在用户数据里。
+    - assets/img/diary_card_samples/
+    # 关于页“支持开发者”面板的收款码，与 README 共用同一份图片。
+    - assets/img/support/
+    # 关于页“更新日志”离线读取的各版本中英文说明，与发布流程共用同一份文件。
+    - docs/releases/
+  fonts:
+    - family: HarmonyOSSansSC
+      fonts:
+        - asset: assets/fonts/harmonyos_sans_sc/HarmonyOS_Sans_SC_Regular.ttf
+          weight: 400
+        - asset: assets/fonts/harmonyos_sans_sc/HarmonyOS_Sans_SC_Medium.ttf
+          weight: 500
+        - asset: assets/fonts/harmonyos_sans_sc/HarmonyOS_Sans_SC_Bold.ttf
+          weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/app_icon/mingcute_icon.png

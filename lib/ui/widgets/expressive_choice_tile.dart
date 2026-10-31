@@ -1,0 +1,119 @@
+import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
+import '../../app/theme/app_spacing.dart';
+import 'expressive_icon_swap.dart';
+import 'expressive_state_blend.dart';
+
+/// 面板中的单选项：单选圆点 + 文案，可带说明（可折成多行）。
+///
+/// 选中项只换容器色、字重与单选图标颜色，文字保持 onSurface：部分配色下
+/// onSecondaryContainer 偏浅，会让选中项看起来比其他项更弱（与地址层级菜单
+/// 一致）。面板保持打开，选中态变化会被看到：容器色与图标颜色经
+/// [ExpressiveStateBlend] 补间（ListTile 的 tileColor 不做隐式动画），单选图标
+/// 缩放淡入切换。容器色经 ListTile 的 tileColor（Ink 绘制）给出，外层不包
+/// 不透明容器，避免盖住水波纹；`selected` 同时为读屏暴露选中态。
+///
+/// 单选圆点始终相对整个选项垂直居中（DESIGN.md §5.4）：圆点代表整项，
+/// 对齐标题行时，说明一折行圆点就贴到选项上沿，与没有说明的选项错位。
+///
+/// [destructive] 标记会永久改写数据的选项：标题常驻 error 色，选中时底色换成
+/// errorContainer、圆点换成 error 色，选到的那一刻就能看出风险。
+///
+/// [onTap] 为 null 时选项不可选（如设备不支持系统验证时的“上锁”）：标题与
+/// 圆点按 Material 停用态降到 38% 不透明度，说明保持原色，用来写明原因。
+class ExpressiveChoiceTile extends StatelessWidget {
+  const ExpressiveChoiceTile({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.description,
+    this.destructive = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  /// 选项后果的简短说明，显示在标题下方。
+  final String? description;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accent = destructive ? colorScheme.error : colorScheme.primary;
+    final container = destructive
+        ? colorScheme.errorContainer
+        : colorScheme.secondaryContainer;
+    final description = this.description;
+    final enabled = onTap != null;
+    Color disabled(Color color) =>
+        enabled ? color : color.withValues(alpha: 0.38);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: ExpressiveStateBlend(
+        active: selected,
+        builder: (BuildContext context, double t, Widget? child) {
+          final tileColor = container.withValues(alpha: t);
+          return ListTile(
+            selected: selected,
+            tileColor: tileColor,
+            selectedTileColor: tileColor,
+            dense: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            minLeadingWidth: 24,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.l,
+            ),
+            // 显式居中而不依赖主题默认的 threeLine：日后某处开启 isThreeLine
+            // 或主题改了对齐方式，圆点也不会跑到上沿。
+            titleAlignment: ListTileTitleAlignment.center,
+            enabled: enabled,
+            onTap: onTap,
+            leading: ExpressiveIconSwap(
+              switchKey: selected,
+              child: FaIcon(
+                selected ? FontAwesomeIcons.circleDot : FontAwesomeIcons.circle,
+                size: 16,
+                color: disabled(
+                  Color.lerp(colorScheme.onSurfaceVariant, accent, t)!,
+                ),
+              ),
+            ),
+            title: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: disabled(
+                  destructive ? colorScheme.error : colorScheme.onSurface,
+                ),
+              ),
+            ),
+            // 危险项选中后底色是 errorContainer，说明随之过渡到配套的
+            // onErrorContainer，暗色下灰字压在深红底上会发闷。
+            subtitle: description == null
+                ? null
+                : Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: destructive
+                          ? Color.lerp(
+                              colorScheme.onSurfaceVariant,
+                              colorScheme.onErrorContainer,
+                              t,
+                            )
+                          : colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+}

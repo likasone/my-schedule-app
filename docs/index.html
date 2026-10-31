@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!--
+    Jotsy 官网首页（GitHub Pages，源目录 docs/）。
+    双语：中文直接写在标签里；英文写在同一元素的 data-en（文本）、data-en-html（含标记）
+    与 data-en-<属性>（alt、aria-label、src……）里，由 assets/js/i18n.js 切换。
+    改文案时两种语言一起改。
+  -->
+  <title data-en="Jotsy · A private diary that lives on your phone">Jotsy · 一本只属于你的本地日记</title>
+  <meta name="description" content="Jotsy 是免费、开源、无广告、无需注册的 Android 本地日记：富文本与多媒体、日记本与模板、农历日历与纪念日、网盘备份与多格式导出，数据只存在你的手机里。" data-en-content="Jotsy is a free, open-source Android diary with no ads and no account: rich text and media, notebooks and templates, a lunar calendar with anniversaries, cloud backup and export, and your data never leaves your phone.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="canonical" href="https://jotsy.sisct.xyz/">
+  <link rel="alternate" hreflang="zh-CN" href="https://jotsy.sisct.xyz/">
+  <link rel="alternate" hreflang="en" href="https://jotsy.sisct.xyz/?lang=en">
+  <link rel="alternate" hreflang="x-default" href="https://jotsy.sisct.xyz/">
+  <link rel="icon" href="assets/img/brand/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/img/brand/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="assets/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Jotsy">
+  <meta property="og:url" content="https://jotsy.sisct.xyz/">
+  <meta property="og:title" content="Jotsy · 一本只属于你的本地日记">
+  <meta property="og:description" content="免费 · 开源 · 无广告 · 无需注册，数据只存在你的手机里。">
+  <meta property="og:image" content="https://jotsy.sisct.xyz/assets/img/brand/og-zh.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Jotsy",
+    "alternateName": "Jotsy 日记",
+    "description": "免费、开源、无广告、无需注册的本地日记应用，数据只存在你的手机里。",
+    "operatingSystem": "Android 7.0+, Windows 10+ (x64), Linux (x64)",
+    "applicationCategory": "LifestyleApplication",
+    "url": "https://jotsy.sisct.xyz/",
+    "downloadUrl": "https://github.com/CikeSeven/jotsy/releases/latest",
+    "image": "https://jotsy.sisct.xyz/assets/img/brand/icon-512.png",
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" }
+  }
+  </script>
+  <link rel="stylesheet" href="assets/css/site.css">
+  <!-- 首帧前恢复访客的明暗、主题色与语言偏好，避免闪烁；放在样式表之后，注入的主题色才能覆盖默认值。 -->
+  <script>
+    (function () {
+      var d = document.documentElement;
+      function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      var t = get('jotsy.theme');
+      if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+      var s = get('jotsy.seedCss');
+      if (s) { var st = document.createElement('style'); st.id = 'seed-theme'; st.textContent = s; document.head.appendChild(st); }
+      var ua = navigator.userAgent || '';
+      var q = /[?&]lang=(en|zh)\b/.exec(location.search);
+      var l = q ? q[1] : get('jotsy.lang');
+      if (!l && !/bot|spider|crawl|slurp|lighthouse/i.test(ua)) {
+        var n = (navigator.languages && navigator.languages[0]) || navigator.language || 'zh';
+        l = /^zh\b/i.test(n) ? 'zh' : 'en';
+      }
+      if (l === 'en') { d.lang = 'en'; d.classList.add('lang-pending'); }
+      var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+      d.setAttribute('data-os', ios ? 'ios' : /Android/.test(ua) ? 'android' : 'desktop');
+    })();
+  </script>
+  <link rel="modulepreload" href="assets/js/i18n.js">
+  <link rel="modulepreload" href="assets/js/theme.js">
+  <script type="module" src="assets/js/site.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-en="Skip to content">跳到正文</a>
+
+  <header class="site-header" data-elevated="false">
+    <div class="container header-inner">
+      <a class="brand" href="#top" aria-label="Jotsy 首页" data-en-aria-label="Jotsy home">
+        <span class="brand-mark"><svg viewBox="0 0 80 92" aria-hidden="true"><use href="assets/img/icons.svg#i-brand"></use></svg></span>
+        <span>Jotsy</span>
+      </a>
+      <nav class="nav" aria-label="主导航" data-en-aria-label="Main">
+        <a href="#features" data-en="Features">功能</a>
+        <a href="#personalize" data-en="Customize">定制</a>
+        <a href="#privacy" data-en="Privacy">隐私</a>
+        <a href="#updates" data-en="What's new">更新</a>
+        <a href="#download" data-en="Download">下载</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn lang-btn" type="button" data-lang-toggle aria-label="Switch to English" data-en-aria-label="切换到中文">
+          <span data-en="中">EN</span>
+        </button>
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="切换明暗主题" data-en-aria-label="Switch light or dark theme">
+          <svg class="i ic-system" aria-hidden="true"><use href="assets/img/icons.svg#i-circle-half-stroke"></use></svg>
+          <svg class="i ic-light" aria-hidden="true"><use href="assets/img/icons.svg#i-sun"></use></svg>
+          <svg class="i ic-dark" aria-hidden="true"><use href="assets/img/icons.svg#i-moon"></use></svg>
+        </button>
+        <a class="icon-btn hide-sm" href="https://github.com/CikeSeven/jotsy" aria-label="GitHub 源代码" data-en-aria-label="Source code on GitHub">
+          <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-github"></use></svg>
+        </a>
+        <a class="btn btn--filled btn--sm hide-sm" href="#download" data-en="Download">下载</a>
+        <button class="icon-btn menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="菜单" data-en-aria-label="Menu">
+          <svg class="i ic-open" aria-hidden="true"><use href="assets/img/icons.svg#i-bars"></use></svg>
+          <svg class="i ic-close" aria-hidden="true"><use href="assets/img/icons.svg#i-xmark"></use></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="mobile-menu" id="mobile-menu" hidden>
+    <nav aria-label="主导航" data-en-aria-label="Main">
+      <a href="#features" data-en="Features">功能</a>
+      <a href="#personalize" data-en="Customize">定制</a>
+      <a href="#privacy" data-en="Privacy">隐私</a>
+      <a href="#data" data-en="Backup &amp; import">备份与导入</a>
+      <a href="#updates" data-en="What's new">更新日志</a>
+      <a href="#faq" data-en="FAQ">常见问题</a>
+      <a href="https://github.com/CikeSeven/jotsy">GitHub</a>
+    </nav>
+    <a class="btn btn--filled btn--lg" href="#download">
+      <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg>
+      <span data-en="Get it free">免费下载</span>
+    </a>
+  </div>
+
+  <main id="main">
+    <!-- ============ 首屏 ============ -->
+    <section class="hero" id="top">
+      <div class="container hero-copy">
+        <a class="release-pill rise" href="#updates" data-release-pill>
+          <span class="release-pill__badge" data-en="New">新版本</span>
+          <span data-release-text data-en="v0.7.0 · Notebooks, templates and drafts">v0.7.0 · 日记本、模板与草稿箱</span>
+          <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-angle-right"></use></svg>
+        </a>
+        <h1 class="hero-title rise" style="--slot:1" data-en-html="A private diary&lt;br&gt;that stays with you">一本只属于你的<br>本地日记</h1>
+        <p class="hero-lead rise" style="--slot:2" data-en="Open it and write. No sign-in, no ads. Your words, photos and voice notes stay on your own phone.">打开就能写，不用登录，没有广告。文字、照片和录音，都只留在你自己的手机里。</p>
+        <div class="hero-cta rise" style="--slot:3">
+          <a class="btn btn--filled btn--lg" href="#download">
+            <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-android"></use></svg>
+            <span data-en="Get it free">免费下载</span>
+          </a>
+          <a class="btn btn--tonal btn--lg" href="https://github.com/CikeSeven/jotsy">
+            <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-github"></use></svg>
+            <span data-en="Source code">源代码</span>
+            <span class="star-count" data-stars hidden><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-star"></use></svg><span data-stars-value></span></span>
+          </a>
+        </div>
+        <p class="hero-meta rise" style="--slot:4" data-en="Free &amp; open source · No ads · No account · Android 7.0+">开源免费 · 没有广告 · 无需注册 · Android 7.0+</p>
+      </div>
+
+      <div class="hero-stage" role="img" aria-label="Jotsy 截图：日记详情、日记列表与日历" data-en-aria-label="Jotsy screenshots: diary detail, diary list and calendar">
+        <figure class="phone phone--side phone--left rise" style="--slot:5">
+          <img src="assets/img/screens/zh/preview.webp" data-en-src="assets/img/screens/en/preview.webp" width="720" height="1600" alt="" fetchpriority="low">
+        </figure>
+        <figure class="phone phone--hero rise" style="--slot:4">
+          <picture>
+            <source srcset="assets/img/screens/zh/dark.webp" data-en-srcset="assets/img/screens/en/dark.webp" media="(prefers-color-scheme: dark)" data-dark-source>
+            <img src="assets/img/screens/zh/home.webp" data-en-src="assets/img/screens/en/home.webp" width="720" height="1600" alt="" fetchpriority="high">
+          </picture>
+        </figure>
+        <figure class="phone phone--side phone--right rise" style="--slot:6">
+          <img src="assets/img/screens/zh/calendar.webp" data-en-src="assets/img/screens/en/calendar.webp" width="720" height="1600" alt="" fetchpriority="low">
+        </figure>
+      </div>
+    </section>
+
+    <!-- ============ 功能：选项卡切换截图（site.js 的 [data-tabs]）；不自动轮播 ============ -->
+    <section class="section" id="features">
+      <div class="container">
+        <header class="section-head center reveal">
+          <p class="eyebrow" data-en="Features">功能</p>
+          <h2 class="display" data-en="Easy to write, lovely to read back">写下来，也读得回去</h2>
+        </header>
+
+        <div class="features reveal" data-tabs>
+          <div class="ft-tabs" role="tablist" aria-label="功能" data-en-aria-label="Features">
+            <button class="ft-tab" type="button" role="tab" id="ft-write" aria-controls="fp-write" aria-selected="true" data-en="Write">写作</button>
+            <button class="ft-tab" type="button" role="tab" id="ft-notebooks" aria-controls="fp-notebooks" aria-selected="false" tabindex="-1" data-en="Notebooks">日记本</button>
+            <button class="ft-tab" type="button" role="tab" id="ft-calendar" aria-controls="fp-calendar" aria-selected="false" tabindex="-1" data-en="Calendar">日历</button>
+            <button class="ft-tab" type="button" role="tab" id="ft-recall" aria-controls="fp-recall" aria-selected="false" tabindex="-1" data-en="Look back">回顾</button>
+          </div>
+
+          <div class="ft-stage" aria-hidden="true">
+            <figure class="phone phone--feature">
+              <img class="is-active" data-shot="ft-write" src="assets/img/screens/zh/editor.webp" data-en-src="assets/img/screens/en/editor.webp" width="720" height="1600" alt="" loading="lazy">
+              <img data-shot="ft-notebooks" src="assets/img/screens/zh/notebook.webp" data-en-src="assets/img/screens/en/notebook.webp" width="720" height="1600" alt="" loading="lazy">
+              <img data-shot="ft-calendar" src="assets/img/screens/zh/calendar.webp" data-en-src="assets/img/screens/en/calendar.webp" width="720" height="1600" alt="" loading="lazy">
+              <img data-shot="ft-recall" src="assets/img/screens/zh/explore.webp" data-en-src="assets/img/screens/en/explore.webp" width="720" height="1600" alt="" loading="lazy">
+            </figure>
+          </div>
+
+          <div class="ft-copy">
+            <div class="ft-panel" role="tabpanel" id="fp-write" aria-labelledby="ft-write">
+              <h3 data-en="Write the way you think">想写什么，随手就写</h3>
+              <p data-en="Rich text, photos, videos and voice notes, with the toolbar right above the keyboard. Start from one of eight templates, and every new entry keeps its own draft that saves itself.">富文本、照片、视频和录音随手插入，工具栏就贴在键盘上方。可以从 8 个内置模板开始写，每篇新日记都有自己的草稿，自动保存，不怕丢稿。</p>
+              <ul class="keys">
+                <li data-en="23 editing tools">23 种编辑工具</li>
+                <li data-en="Diary templates">日记模板</li>
+                <li data-en="Drafts">草稿箱</li>
+                <li data-en="Mood, weather &amp; place">心情、天气与地点</li>
+              </ul>
+            </div>
+            <div class="ft-panel" role="tabpanel" id="fp-notebooks" aria-labelledby="ft-notebooks">
+              <h3 data-en="Notebooks, like real books">分本收纳，像一本本书</h3>
+              <p data-en="Put an entry in as many notebooks as you like. Add chapters, arrange the order, set a writing goal and export the whole notebook as a book. Private notebooks can be hidden or locked.">一篇日记可以同时放进几本。分章节、排书序、设写作目标，还能整本导出成带目录的书；私密的本子可以隐藏或上锁。</p>
+              <ul class="keys">
+                <li data-en="Smart notebooks">智能日记本</li>
+                <li data-en="Chapters &amp; book order">章节与书序</li>
+                <li data-en="Hide or lock">隐藏与上锁</li>
+                <li data-en="Export as a book">导出成书</li>
+              </ul>
+            </div>
+            <div class="ft-panel" role="tabpanel" id="fp-calendar" aria-labelledby="ft-calendar">
+              <h3 data-en="Lunar dates, holidays and anniversaries">农历、节假日与纪念日</h3>
+              <p data-en="Lunar dates, solar terms, public holidays and each day's mood, all on one month. Anniversaries and countdowns can repeat every year by the solar or lunar calendar.">一张月历上看得到农历、节气、休班和每天的心情；纪念日与倒数日可以按公历或农历每年重复。</p>
+              <ul class="keys">
+                <li data-en="Year heatmap">年度热力图</li>
+                <li data-en="Stats for any date range">任意区间统计</li>
+                <li data-en="Photo calendar">照片日历</li>
+              </ul>
+            </div>
+            <div class="ft-panel" role="tabpanel" id="fp-recall" aria-labelledby="ft-recall">
+              <h3 data-en="Let time do the remembering">时间会替你记得</h3>
+              <p data-en="On this day brings back the same date from past years, and your mood and energy trends show at a glance. Write a time capsule and it stays sealed until its day comes.">那年今日自动翻出往年的同一天，心情与精力的变化一目了然；写一颗时间胶囊，到了那天才能打开。</p>
+              <ul class="keys">
+                <li data-en="On this day">那年今日</li>
+                <li data-en="Time capsules">时间胶囊</li>
+                <li data-en="Media gallery">媒体画廊</li>
+                <li data-en="Tag cloud">标签云</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 定制：主题色（palette.js 驱动，换的是整个网页） ============ -->
+    <section class="section section--alt" id="personalize">
+      <div class="container split">
+        <div class="split-copy reveal">
+          <p class="eyebrow" data-en="Make it yours">定制</p>
+          <h2 class="display" data-en="80 theme colors. The whole app follows.">80 种主题色，整个应用跟着换</h2>
+          <p class="lead" data-en="Diary cards, the reading page and body fonts can be fine-tuned too. Don't need a feature? Switch it off in Feature management and the app shows only what you use.">日记卡片、阅读页和正文字体也都能细调。用不到的功能，可以在「功能管理」里关掉，界面只留下你要的。</p>
+
+          <div class="palette" data-palette>
+            <p class="palette-hint" data-en="Try it: this page changes too">试试看，这个网页也会跟着换色</p>
+            <div class="swatches swatches--families" role="radiogroup" aria-label="色系" data-en-aria-label="Color family" data-families></div>
+            <div class="swatches swatches--shades" role="radiogroup" aria-label="主题色" data-en-aria-label="Theme color" data-shades></div>
+            <div class="palette-foot">
+              <div class="seg" role="radiogroup" aria-label="明暗" data-en-aria-label="Appearance" data-mode-seg>
+                <button type="button" role="radio" aria-checked="true" data-value="system" data-en="Auto">跟随系统</button>
+                <button type="button" role="radio" aria-checked="false" data-value="light" data-en="Light">浅色</button>
+                <button type="button" role="radio" aria-checked="false" data-value="dark" data-en="Dark">深色</button>
+              </div>
+              <button class="text-btn" type="button" data-seed-reset data-en="Reset">恢复默认</button>
+            </div>
+          </div>
+        </div>
+        <div class="duo reveal" style="--d:1" aria-hidden="true">
+          <figure class="phone phone--duo phone--back">
+            <img src="assets/img/screens/zh/theme-b.webp" data-en-src="assets/img/screens/en/theme-b.webp" width="720" height="1600" alt="" loading="lazy">
+          </figure>
+          <figure class="phone phone--duo phone--front">
+            <img src="assets/img/screens/zh/theme-a.webp" data-en-src="assets/img/screens/en/theme-a.webp" width="720" height="1600" alt="" loading="lazy">
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 隐私 ============ -->
+    <section class="section band" id="privacy">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-en="Privacy">隐私</p>
+          <h2 class="display" data-en="Your diary stays on your phone">你的日记，只在你的手机里</h2>
+          <p class="lead" data-en="There's no account system and no server of ours. Entries, photos and settings are kept on the device.">没有账号体系，也没有自己的服务器。日记、照片和设置都只保存在本机。</p>
+        </header>
+        <ul class="pillars">
+          <li class="reveal">
+            <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-user-slash"></use></svg>
+            <h3 data-en="No account, no server">无账号，无服务器</h3>
+            <p data-en="Nothing is collected, and there are no third-party analytics SDKs.">不收集任何数据，也不含任何第三方统计 SDK。</p>
+          </li>
+          <li class="reveal" style="--d:1">
+            <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-fingerprint"></use></svg>
+            <h3 data-en="App lock &amp; private notebooks">应用锁与私密日记本</h3>
+            <p data-en="Unlock with your fingerprint, face or screen lock. Entries in a private notebook never show up anywhere else.">用指纹、面容或锁屏密码解锁；私密本子里的日记，不会出现在别的地方。</p>
+          </li>
+          <li class="reveal" style="--d:2">
+            <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-key"></use></svg>
+            <h3 data-en="Encrypted backups">加密备份</h3>
+            <p data-en="A full backup can be protected with a password and AES-256 encryption.">完整备份可以设密码，使用 AES-256 加密。</p>
+          </li>
+        </ul>
+        <a class="more-link reveal" href="privacy.html" data-en="Read the full privacy policy">阅读完整隐私政策</a>
+      </div>
+    </section>
+
+    <!-- ============ 数据：备份 / 导出 / 导入 ============ -->
+    <section class="section" id="data">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-en="Your data">数据</p>
+          <h2 class="display" data-en="Your data goes where you go">数据随你带走</h2>
+          <p class="lead" data-en="Jotsy never locks you in.">Jotsy 不会把你锁在里面。</p>
+        </header>
+        <ul class="trio">
+          <li class="reveal">
+            <h3 data-en="Cloud backup">网盘备份</h3>
+            <p data-en="Back up to your own cloud drive or server, and restore straight from it.">备份到你自己的网盘或服务器，也能直接从远端恢复。</p>
+            <p class="names" data-en="WebDAV · S3-compatible · Google Drive · OneDrive · Dropbox · Baidu · Aliyun Drive">WebDAV · S3 兼容存储 · Google Drive · OneDrive · Dropbox · 百度网盘 · 阿里云盘</p>
+          </li>
+          <li class="reveal" style="--d:1">
+            <h3 data-en="Export anywhere">多格式导出</h3>
+            <p data-en="Export one entry, a selection or a whole notebook. Markdown drops straight into Obsidian.">单篇、多选或整本导出；Markdown 可以直接放进 Obsidian。</p>
+            <p class="names" data-en="PDF · Word · Markdown · HTML · TXT · CSV">PDF · Word · Markdown · 网页 · TXT · CSV</p>
+          </li>
+          <li class="reveal" style="--d:2">
+            <h3 data-en="Move in from 18 apps">从 18 款应用搬过来</h3>
+            <p data-en="Preview before anything is written, then merge or replace. Colors, sizes and attachments come along.">写入前先预检，再选合并或覆盖；颜色、字号和附件都会保留。</p>
+            <p class="names" data-en="Day One · Journey · Diarium · Daylio · Evernote · Google Keep · phone-maker cloud notes…">Day One · Journey · Diarium · Daylio · 印象笔记 · Google Keep · 手机厂商云笔记…</p>
+            <a class="more-link" href="https://github.com/CikeSeven/jotsy#-从其他应用搬家" data-en-href="https://github.com/CikeSeven/jotsy/blob/main/docs/README.en.md#-moving-from-another-app" data-en="Supported apps">支持的应用与导出方法</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ 更新日志：比这里写死的版本更新的发布由 download.js 自动补在最前（data-tag 标出版本） ============ -->
+    <section class="section section--alt" id="updates">
+      <div class="container split split--top">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-en="What's new">更新</p>
+          <h2 class="display" data-en="Getting better all the time">一直在变得更好</h2>
+          <p class="lead" data-en="Every release comes with notes in Chinese and English, and new versions show up right inside the app.">每个版本都附中英文更新说明；装好之后，新版本会直接在应用里提示。</p>
+          <a class="more-link" href="https://github.com/CikeSeven/jotsy/releases" data-en="All releases">查看全部版本</a>
+        </header>
+        <div>
+          <p class="newer-release" data-newer-release hidden></p>
+          <ol class="releases" data-timeline>
+            <li class="release reveal" data-tag="v0.7.0">
+              <header><h3>v0.7.0</h3><span class="badge" data-release-badge data-en="Latest">最新</span><time datetime="2026-10-20">2026-10-20</time></header>
+              <ul>
+                <li data-en="Notebooks: chapters and book order, smart notebooks, hiding and locking, and export as a book.">日记本：章节与书序、智能日记本、隐藏与上锁，还能整本导出成书。</li>
+                <li data-en="Templates and drafts: eight built-in templates that can apply by time of day, and a separate draft for every new entry.">日记模板与草稿箱：8 个内置模板，可按时间段自动套用；每次新建都是一份独立草稿。</li>
+                <li data-en="Feature management and a new color panel: switch off what you don't use, and pick any color right in the toolbar.">功能管理与新的颜色面板：不用的功能可以关掉，在工具栏里就能自由取色。</li>
+              </ul>
+              <a href="https://github.com/CikeSeven/jotsy/releases/tag/v0.7.0" data-en="Full release notes →">完整更新说明 →</a>
+            </li>
+            <li class="release reveal" data-tag="v0.6.1">
+              <header><h3>v0.6.1</h3><time datetime="2026-10-17">2026-10-17</time></header>
+              <ul>
+                <li data-en="In-app updates, rebuilt: download, verify and install inside the app, with the fastest route picked and dropped downloads resumed.">应用内更新全面重做：在应用内下载、校验并安装，多条线路测速择优、断线续传。</li>
+                <li data-en="Faster with big libraries: paging in time order is about 10× faster with 10,000 entries.">日记多了也更快：一万篇日记下，按时间排序翻页快约 10 倍。</li>
+              </ul>
+              <a href="https://github.com/CikeSeven/jotsy/releases/tag/v0.6.1" data-en="Full release notes →">完整更新说明 →</a>
+            </li>
+            <li class="release reveal" data-tag="v0.6.0">
+              <header><h3>v0.6.0</h3><time datetime="2026-10-17">2026-10-17</time></header>
+              <ul>
+                <li data-en="Cloud backup to WebDAV, S3-compatible storage and major cloud drives.">网盘备份：WebDAV、S3 兼容对象存储与主流网盘。</li>
+                <li data-en="Import from 18 apps, including cloud notes from six phone makers and WPS.">从 18 款应用导入，包括 6 家手机厂商与 WPS 的云端笔记。</li>
+                <li data-en="A richer calendar with anniversaries, plus deep customization of cards, the reading page and body text.">日历全面升级并加入纪念日；卡片、阅读页与正文排版可深度定制。</li>
+              </ul>
+              <a href="https://github.com/CikeSeven/jotsy/releases/tag/v0.6.0" data-en="Full release notes →">完整更新说明 →</a>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 常见问题 ============ -->
+    <section class="section" id="faq">
+      <div class="container split split--top">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-en="FAQ">常见问题</p>
+          <h2 class="display" data-en="Questions, answered">你可能想问</h2>
+          <p class="lead" data-en-html="Didn't find your answer? Open an &lt;a href=&quot;https://github.com/CikeSeven/jotsy/issues&quot;&gt;issue&lt;/a&gt; or join the QQ group 678136434.">没找到答案？欢迎提交 <a href="https://github.com/CikeSeven/jotsy/issues">Issue</a>，或者加入 QQ 交流群 678136434。</p>
+        </header>
+        <div class="faq-list">
+          <details class="faq reveal">
+            <summary><span data-en="How do I move my diary to a new phone?">换手机了，日记怎么迁移？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body"><p data-en-html="On the old phone, go to &lt;b&gt;Data Management › Export Data&lt;/b&gt; to create a backup ZIP. Copy it to the new phone and restore it with &lt;b&gt;Import Data&lt;/b&gt;, or pass it between the two with cloud backup.">在旧手机的 <b>数据管理 › 导出数据</b> 中生成备份 ZIP，传到新手机后用 <b>导入数据</b> 恢复即可；也可以用网盘备份在两台设备之间中转。</p></div>
+          </details>
+          <details class="faq reveal">
+            <summary><span data-en="Will uninstalling the app delete my data?">卸载应用会丢数据吗？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body"><p data-en="Yes. Your data only lives on the device, so uninstalling the app or clearing its data removes it. Export backups regularly, or set up cloud backup.">会。数据只存在本机，卸载或清除应用数据都会把它删掉。建议定期导出备份，或者使用网盘备份。</p></div>
+          </details>
+          <details class="faq reveal">
+            <summary><span data-en="Which package should I download?">该下载哪个安装包？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body"><p data-en="Almost every modern phone needs arm64-v8a. Older 32-bit devices need armeabi-v7a, and x86_64 is for emulators. If you're not sure, pick arm64-v8a.">绝大多数手机选 arm64-v8a；较老的 32 位设备选 armeabi-v7a；x86_64 用于模拟器。不确定时选 arm64-v8a。</p><p data-en="On a computer: Windows 10 or later (x64) takes the installer, or the portable zip if you'd rather not install. On Linux (x64, GTK 3), extract the .tar.gz and run install.sh to add Jotsy to your app menu; playing voice notes needs GStreamer.">电脑上：Windows 10 及以上（x64）选安装程序，不想安装可以用便携版 zip；Linux（x64，需要 GTK 3）下载 .tar.gz，解压后运行 install.sh 即可加入应用菜单，播放录音需要 GStreamer。</p></div>
+          </details>
+          <details class="faq reveal">
+            <summary><span data-en="Is the APK safe? How do updates work?">安装包安全吗？以后怎么更新？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body">
+              <p data-en="Release APKs are built and signed by GitHub Actions from the public source code, and each release includes SHA256SUMS.txt so you can check what you downloaded.">安装包由 GitHub Actions 从公开的源代码构建并签名，每个版本都附带 SHA256SUMS.txt，可以核对下载的文件。</p>
+              <p data-en="Once installed, Jotsy offers new versions inside the app and installs them directly: it picks the fastest route, resumes dropped downloads, and checks the size, SHA-256, package name and signature before installing.">装好之后，Jotsy 会在应用内提示新版本并直接安装：自动选择最快的线路、断线续传，安装前核对大小、SHA-256、包名与签名。</p>
+              <p data-en="On Windows and Linux, Jotsy also tells you about new versions and opens the new package in your browser through a mirror; install it over the old one and your diaries are kept. The Windows installer isn't code-signed yet, so SmartScreen may warn about an unknown publisher.">Windows 与 Linux 版同样会提示新版本，并在浏览器里经镜像下载新的安装包，覆盖安装即可，日记数据保留。Windows 安装程序暂未做代码签名，SmartScreen 可能提示“未知发布者”。</p>
+            </div>
+          </details>
+          <details class="faq reveal">
+            <summary><span data-en="Is it really free?">真的免费吗？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body"><p data-en="Yes. Jotsy is open source under GPL-3.0 and free to use, with no ads and no third-party analytics SDKs. All of its source code is on GitHub.">是的。Jotsy 以 GPL-3.0 协议开源，免费使用，没有广告，也不包含任何第三方统计 SDK；全部源代码都在 GitHub 上。</p></div>
+          </details>
+          <details class="faq reveal">
+            <summary><span data-en="Is there an iOS version?">有 iOS 版吗？</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-plus"></use></svg></summary>
+            <div class="faq-body"><p data-en="Not yet. Android (7.0 or later), Windows (10 or later, x64) and Linux (x64) builds are released for now.">暂时没有，目前发布 Android（7.0 及以上）、Windows（10 及以上，x64）与 Linux（x64）版本。</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 下载（兼作结尾号召） ============ -->
+    <section class="section section--alt" id="download">
+      <div class="container">
+        <div class="dl" data-download>
+          <div class="dl-main reveal">
+            <img class="dl-icon" src="assets/img/brand/icon-256.webp" width="96" height="96" alt="" loading="lazy">
+            <h2 class="display" data-en="Today is worth writing down">今天，也值得被记下来</h2>
+            <p class="lead" data-en="Free for Android 7.0+, Windows 10+ (x64) and Linux (x64). Once it's installed, new versions show up in the app.">免费下载，支持 Android 7.0+、Windows 10+（x64）与 Linux（x64）。装好之后，新版本会在应用里提示。</p>
+            <p class="dl-release" aria-live="polite">
+              <span data-dl-version>v0.7.0</span>
+              <span data-dl-date>2026-10-20</span>
+              <span data-dl-total hidden><span data-dl-total-value></span></span>
+            </p>
+            <!-- 三个平台按钮：主按钮（filled）由 download.js 按访客系统换成对应平台并排到最前，没有脚本时为 Android -->
+            <div class="dl-buttons" data-dl-platforms>
+              <a class="btn btn--filled btn--xl" data-dl-platform="android" data-dl-abi="arm64-v8a" href="https://github.com/CikeSeven/jotsy/releases/download/v0.7.0/jotsy-v0.7.0-arm64-v8a.apk">
+                <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-android"></use></svg>
+                <span class="btn-stack"><span data-en="Android APK">Android 安装包</span><small><span data-en="arm64-v8a · recommended">arm64-v8a · 推荐</span> <span data-dl-size></span></small></span>
+              </a>
+              <a class="btn btn--tonal btn--xl" data-dl-platform="windows" data-dl-pkg="windows-setup" href="https://github.com/CikeSeven/jotsy/releases/latest">
+                <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg>
+                <span class="btn-stack"><span data-en="Windows installer">Windows 安装程序</span><small>Windows 10+ · x64 <span data-dl-size></span></small></span>
+              </a>
+              <a class="btn btn--tonal btn--xl" data-dl-platform="linux" data-dl-pkg="linux" href="https://github.com/CikeSeven/jotsy/releases/latest">
+                <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg>
+                <span class="btn-stack"><span data-en="Linux package">Linux 压缩包</span><small>x64 · GTK 3 <span data-dl-size></span></small></span>
+              </a>
+            </div>
+            <p class="os-note os-note--ios"><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-apple"></use></svg><span data-en="There's no iOS version yet; Android, Windows and Linux builds are released for now.">暂时没有 iOS 版，目前发布 Android、Windows 与 Linux 版本。</span></p>
+
+            <details class="dl-more">
+              <summary><span data-en="Other packages and download routes">其他安装包与下载线路</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-chevron-down"></use></svg></summary>
+              <div class="dl-more__body">
+                <div class="dl-alt">
+                  <a data-dl-abi="armeabi-v7a" href="https://github.com/CikeSeven/jotsy/releases/download/v0.7.0/jotsy-v0.7.0-armeabi-v7a.apk"><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg><b>armeabi-v7a</b><small data-en="older 32-bit phones">较老的 32 位手机</small><small data-dl-size></small></a>
+                  <a data-dl-abi="x86_64" href="https://github.com/CikeSeven/jotsy/releases/download/v0.7.0/jotsy-v0.7.0-x86_64.apk"><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg><b>x86_64</b><small data-en="emulators">模拟器</small><small data-dl-size></small></a>
+                  <a data-dl-pkg="windows-zip" href="https://github.com/CikeSeven/jotsy/releases/latest"><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-download"></use></svg><b data-en="Windows portable">Windows 便携版</b><small data-en="zip, extract and run">zip，解压即用</small><small data-dl-size></small></a>
+                  <a href="https://github.com/CikeSeven/jotsy/releases/latest"><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-github"></use></svg><b>GitHub Releases</b><small data-en="every package and SHA256SUMS.txt">全部安装包与 SHA256SUMS.txt</small></a>
+                </div>
+                <div class="dl-line">
+                  <label for="dl-route" data-en="Download route">下载线路</label>
+                  <span class="select">
+                    <select id="dl-route" data-route>
+                      <option value="auto" data-en="Automatic (fastest)">自动选择（最快）</option>
+                      <option value="ghfast">ghfast.top</option>
+                      <option value="gh-proxy">gh-proxy.com</option>
+                      <option value="llkk">gh.llkk.cc</option>
+                      <option value="ghproxy-net">ghproxy.net</option>
+                      <option value="direct" data-en="GitHub direct">GitHub 直连</option>
+                    </select>
+                    <svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-chevron-down"></use></svg>
+                  </span>
+                  <span class="line-status" data-route-status aria-live="polite" data-en="Mirrors are usually faster in mainland China.">国内网络一般走镜像更快。</span>
+                </div>
+                <p class="route-note" data-en="Mirrors are third-party public services. If integrity matters to you, download from GitHub directly or compare the SHA-256 below; in-app updates always verify the signature.">镜像为第三方公共服务。对完整性有要求时，可以选 GitHub 直连，或对照下方从 GitHub 读取的 SHA-256；装好后的应用内更新都会核对签名。</p>
+                <div class="dl-sha" data-sha hidden>
+                  <p data-en="SHA-256 checksums">SHA-256 校验值</p>
+                  <ul class="sha-list" data-sha-list></ul>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <aside class="qr-card reveal" style="--d:1">
+            <div class="qr" aria-hidden="true"><svg viewBox="-1 -1 31 31" shape-rendering="crispEdges"><path d="M0 0h7v1h-7zM8 0h6v1h-6zM16 0h1v1h-1zM18 0h1v1h-1zM22 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM9 1h2v1h-2zM12 1h1v1h-1zM14 1h2v1h-2zM17 1h1v1h-1zM20 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h5v1h-5zM14 2h1v1h-1zM16 2h4v1h-4zM22 2h1v1h-1zM24 2h3v1h-3zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h1v1h-1zM10 3h3v1h-3zM14 3h2v1h-2zM18 3h3v1h-3zM22 3h1v1h-1zM24 3h3v1h-3zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM9 4h1v1h-1zM13 4h1v1h-1zM15 4h6v1h-6zM22 4h1v1h-1zM24 4h3v1h-3zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h3v1h-3zM14 5h1v1h-1zM18 5h2v1h-2zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h7v1h-7zM8 7h1v1h-1zM10 7h3v1h-3zM17 7h2v1h-2zM0 8h2v1h-2zM3 8h1v1h-1zM6 8h2v1h-2zM9 8h1v1h-1zM11 8h2v1h-2zM14 8h1v1h-1zM17 8h2v1h-2zM21 8h3v1h-3zM25 8h2v1h-2zM28 8h1v1h-1zM2 9h1v1h-1zM9 9h2v1h-2zM12 9h7v1h-7zM21 9h1v1h-1zM25 9h1v1h-1zM27 9h1v1h-1zM0 10h1v1h-1zM4 10h3v1h-3zM10 10h1v1h-1zM12 10h1v1h-1zM14 10h2v1h-2zM17 10h3v1h-3zM22 10h2v1h-2zM27 10h1v1h-1zM1 11h2v1h-2zM5 11h1v1h-1zM7 11h2v1h-2zM12 11h1v1h-1zM15 11h1v1h-1zM18 11h5v1h-5zM25 11h1v1h-1zM27 11h2v1h-2zM0 12h2v1h-2zM4 12h1v1h-1zM6 12h3v1h-3zM11 12h2v1h-2zM16 12h3v1h-3zM21 12h1v1h-1zM25 12h4v1h-4zM2 13h1v1h-1zM4 13h1v1h-1zM7 13h2v1h-2zM11 13h1v1h-1zM13 13h1v1h-1zM15 13h1v1h-1zM17 13h1v1h-1zM20 13h3v1h-3zM25 13h1v1h-1zM27 13h2v1h-2zM1 14h2v1h-2zM5 14h4v1h-4zM10 14h2v1h-2zM14 14h1v1h-1zM21 14h1v1h-1zM24 14h3v1h-3zM28 14h1v1h-1zM0 15h3v1h-3zM9 15h3v1h-3zM15 15h1v1h-1zM17 15h2v1h-2zM23 15h1v1h-1zM25 15h1v1h-1zM27 15h2v1h-2zM0 16h1v1h-1zM3 16h1v1h-1zM6 16h1v1h-1zM8 16h2v1h-2zM14 16h2v1h-2zM18 16h1v1h-1zM20 16h3v1h-3zM25 16h3v1h-3zM0 17h1v1h-1zM3 17h1v1h-1zM5 17h1v1h-1zM7 17h2v1h-2zM12 17h2v1h-2zM17 17h4v1h-4zM24 17h1v1h-1zM26 17h1v1h-1zM3 18h1v1h-1zM5 18h3v1h-3zM9 18h1v1h-1zM11 18h1v1h-1zM14 18h3v1h-3zM19 18h2v1h-2zM22 18h2v1h-2zM26 18h3v1h-3zM0 19h1v1h-1zM2 19h4v1h-4zM9 19h1v1h-1zM12 19h3v1h-3zM19 19h2v1h-2zM22 19h1v1h-1zM25 19h4v1h-4zM0 20h1v1h-1zM3 20h1v1h-1zM6 20h6v1h-6zM13 20h1v1h-1zM15 20h1v1h-1zM17 20h8v1h-8zM27 20h2v1h-2zM11 21h2v1h-2zM14 21h7v1h-7zM24 21h2v1h-2zM27 21h2v1h-2zM0 22h7v1h-7zM8 22h4v1h-4zM13 22h1v1h-1zM15 22h1v1h-1zM19 22h2v1h-2zM22 22h1v1h-1zM24 22h1v1h-1zM27 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM9 23h1v1h-1zM12 23h1v1h-1zM15 23h1v1h-1zM17 23h2v1h-2zM20 23h1v1h-1zM24 23h3v1h-3zM28 23h1v1h-1zM0 24h1v1h-1zM2 24h3v1h-3zM6 24h1v1h-1zM9 24h2v1h-2zM15 24h2v1h-2zM19 24h7v1h-7zM28 24h1v1h-1zM0 25h1v1h-1zM2 25h3v1h-3zM6 25h1v1h-1zM8 25h1v1h-1zM12 25h1v1h-1zM16 25h2v1h-2zM20 25h4v1h-4zM25 25h1v1h-1zM27 25h1v1h-1zM0 26h1v1h-1zM2 26h3v1h-3zM6 26h1v1h-1zM10 26h1v1h-1zM12 26h3v1h-3zM17 26h5v1h-5zM24 26h1v1h-1zM26 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM10 27h1v1h-1zM13 27h5v1h-5zM21 27h4v1h-4zM27 27h2v1h-2zM0 28h7v1h-7zM8 28h2v1h-2zM11 28h1v1h-1zM13 28h2v1h-2zM21 28h1v1h-1zM23 28h1v1h-1zM25 28h2v1h-2z"/></svg></div>
+            <p><b data-en="Scan to download">用手机扫码下载</b><span data-en="Opens this page on your phone.">在手机上打开这个页面</span></p>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <a class="brand" href="#top">
+            <span class="brand-mark"><svg viewBox="0 0 80 92" aria-hidden="true"><use href="assets/img/icons.svg#i-brand"></use></svg></span>
+            <span>Jotsy</span>
+          </a>
+          <p data-en="A private diary that lives on your phone.">一本只属于你的本地日记。</p>
+        </div>
+        <nav class="footer-links" aria-label="页脚" data-en-aria-label="Footer">
+          <a href="https://github.com/CikeSeven/jotsy" data-en="Source code">源代码</a>
+          <a href="#updates" data-en="What's new">更新日志</a>
+          <a href="privacy.html" data-en="Privacy policy">隐私政策</a>
+          <a href="https://github.com/CikeSeven/jotsy/issues" data-en="Feedback">问题反馈</a>
+          <button type="button" data-copy="678136434" data-copied="QQ 群号已复制" data-en-data-copied="QQ group number copied"><span data-en="QQ group 678136434">QQ 群 678136434</span><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-copy"></use></svg></button>
+        </nav>
+        <div class="seg seg--sm" role="radiogroup" aria-label="语言" data-en-aria-label="Language" data-lang-seg>
+          <button type="button" role="radio" aria-checked="true" data-value="zh">中文</button>
+          <button type="button" role="radio" aria-checked="false" data-value="en">English</button>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span data-en="© 2026 Jotsy · Open source under GPL-3.0">© 2026 Jotsy · 以 GPL-3.0 协议开源</span>
+        <span data-en="Diaries, photos and places in screenshots are demo data · Icons: Font Awesome Free (CC BY 4.0)">截图中的日记、照片和地点均为演示数据 · 图标：Font Awesome Free（CC BY 4.0）</span>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast" role="status" aria-live="polite" data-toast><svg class="i" aria-hidden="true"><use href="assets/img/icons.svg#i-circle-check"></use></svg><span data-toast-text></span></div>
+</body>
+</html>

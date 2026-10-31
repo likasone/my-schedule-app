@@ -1,0 +1,159 @@
+import 'package:flutter/material.dart';
+
+import '../../app/theme/expressive_motion.dart';
+import '../app_surface/widgets/app_glass_field.dart';
+
+/// 单选连接按钮组：输入选项/当前值，输出用户选择，不保存业务状态。
+/// 利用原生按钮保留键盘、焦点与 disabled 行为；窄屏和大字体时改为纵向连接，
+/// 避免 SegmentedButton 固定横排挤掉标签。方向圆角同时适配 RTL。
+///
+/// 材质：未选中的段落按 [AppGlassField] 取色——“控件”为玻璃时为玻璃底色 +
+/// 玻璃描边，经典控件画在玻璃表面上时为半透明凹槽色；选中段始终是主色。
+/// 与输入框一样不模糊：按钮组多在面板、卡片或另一块玻璃上，直接放在页面
+/// 上的（如探索页统计范围条）也只透出半透明底色，不另加一层模糊。经典且
+/// 不在玻璃上时与原来逐像素一致。
+class ExpressiveButtonGroup<T> extends StatelessWidget {
+  const ExpressiveButtonGroup({
+    super.key,
+    required this.segments,
+    required this.selected,
+    required this.onSelectionChanged,
+    this.minSegmentWidth = 104,
+    this.dense = false,
+    this.segmentPadding,
+  }) : assert(segments.length > 0),
+       assert(selected.length == 1);
+
+  final List<ButtonSegment<T>> segments;
+  final Set<T> selected;
+  final ValueChanged<Set<T>>? onSelectionChanged;
+
+  /// 每段横排所需的最小宽度，放不下时改为纵向连接。默认按较长的标签估算；
+  /// 标签很短（两三个字）时可调小，避免窄屏下无谓地堆成三行。
+  final double minSegmentWidth;
+
+  /// 紧凑横排：36dp 高、每段按标签自身宽度排列、始终不改为纵向，用于放进
+  /// 固定高度的一行（如编辑器颜色面板的 40dp 表头）。宽度可能不够时由调用方
+  /// 整体缩放（如 `FittedBox`），标签不省略。
+  final bool dense;
+
+  /// 每段的内边距，为 null 时按 [dense] 取默认（横向 12）。段数多、整排要塞进
+  /// 一行窄面板时（如编辑器标题面板的 7 段）调小，标签才有位置。
+  final EdgeInsetsGeometry? segmentPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final glassField = AppGlassField.of(context);
+    final unselectedSide = glassField?.border;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked =
+            !dense &&
+            (constraints.maxWidth < segments.length * minSegmentWidth ||
+                MediaQuery.textScalerOf(context).scale(14) > 20);
+        final children = <Widget>[];
+        for (var index = 0; index < segments.length; index++) {
+          final segment = segments[index];
+          final isSelected = selected.contains(segment.value);
+          final button = Semantics(
+            selected: isSelected,
+            inMutuallyExclusiveGroup: true,
+            child: FilledButton.tonal(
+              onPressed: onSelectionChanged != null && segment.enabled
+                  ? () => onSelectionChanged!({segment.value})
+                  : null,
+              style: ButtonStyle(
+                animationDuration: ExpressiveMotion.duration(
+                  context,
+                  ExpressiveMotion.fast,
+                ),
+                minimumSize: WidgetStatePropertyAll(
+                  dense ? const Size(48, 36) : const Size(48, 48),
+                ),
+                tapTargetSize: dense ? MaterialTapTargetSize.shrinkWrap : null,
+                padding: WidgetStatePropertyAll(
+                  segmentPadding ??
+                      (dense
+                          ? const EdgeInsets.symmetric(horizontal: 12)
+                          : const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            )),
+                ),
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.disabled)) return null;
+                  return isSelected
+                      ? colors.primary
+                      : glassField?.fill ?? colors.surfaceContainerHighest;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.disabled)) return null;
+                  return isSelected ? colors.onPrimary : colors.onSurface;
+                }),
+                side: unselectedSide == null
+                    ? null
+                    : WidgetStatePropertyAll(
+                        isSelected ? BorderSide.none : unselectedSide,
+                      ),
+                shape: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.pressed) || isSelected) {
+                    return RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(isSelected ? 24 : 12),
+                    );
+                  }
+                  const inner = Radius.circular(4);
+                  const outer = Radius.circular(24);
+                  final first = index == 0;
+                  final last = index == segments.length - 1;
+                  final radius = stacked
+                      ? BorderRadius.vertical(
+                          top: first ? outer : inner,
+                          bottom: last ? outer : inner,
+                        )
+                      : BorderRadiusDirectional.horizontal(
+                          start: first ? outer : inner,
+                          end: last ? outer : inner,
+                        );
+                  return RoundedRectangleBorder(borderRadius: radius);
+                }),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (segment.icon != null) ...[
+                    segment.icon!,
+                    const SizedBox(width: 8),
+                  ],
+                  // 紧凑横排的宽度不受限（按标签排列），不能用 Flexible。
+                  if (segment.label != null)
+                    dense ? segment.label! : Flexible(child: segment.label!),
+                ],
+              ),
+            ),
+          );
+          if (index > 0) {
+            children.add(
+              SizedBox(width: stacked ? 0 : 4, height: stacked ? 4 : 0),
+            );
+          }
+          children.add(stacked || dense ? button : Expanded(child: button));
+        }
+        return FocusTraversalGroup(
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: children,
+                )
+              : Row(
+                  mainAxisSize: dense ? MainAxisSize.min : MainAxisSize.max,
+                  children: children,
+                ),
+        );
+      },
+    );
+  }
+}

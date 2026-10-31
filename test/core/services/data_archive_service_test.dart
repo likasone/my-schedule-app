@@ -1,0 +1,418 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:archive/archive.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:node_diary/core/database/diary_blocks/diary_blocks_media.dart';
+import 'package:node_diary/core/database/app_database.dart';
+import 'package:node_diary/core/database/audio_embed_codec.dart';
+import 'package:node_diary/core/services/backup_import_models.dart';
+import 'package:node_diary/core/services/data_archive_service.dart';
+import 'package:node_diary/core/services/settings_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../support/diary_content_test_helpers.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+
+  late Directory testRoot;
+  late Directory temporaryDirectory;
+  late Directory documentsDirectory;
+  late AppDatabase database;
+  late SettingsService settingsService;
+
+  setUp(() async {
+    testRoot = await Directory.systemTemp.createTemp(
+      'jotsy_data_archive_test_',
+    );
+    temporaryDirectory = await Directory(
+      p.join(testRoot.path, 'temporary'),
+    ).create();
+    documentsDirectory = await Directory(
+      p.join(testRoot.path, 'documents'),
+    ).create();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+          return switch (call.method) {
+            'getTemporaryDirectory' => temporaryDirectory.path,
+            'getApplicationDocumentsDirectory' => documentsDirectory.path,
+            _ => null,
+          };
+        });
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    database = AppDatabase.forTesting(NativeDatabase.memory());
+    settingsService = await SettingsService.create();
+  });
+
+  tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
+    await database.close();
+    if (await testRoot.exists()) {
+      await testRoot.delete(recursive: true);
+    }
+  });
+
+  test('export and import round-trips the diary card tag limit', () async {
+    await settingsService.setDiaryCardTagLimit(7);
+    final backup = await DataArchiveService.exportToZip(
+      database: database,
+      settingsService: settingsService,
+    );
+
+    await settingsService.setDiaryCardTagLimit(2);
+    await DataArchiveService.importFromZip(
+      database: database,
+      settingsService: settingsService,
+      zipPath: backup.path,
+    );
+
+    expect(settingsService.diaryCardTagLimit, 7);
+    final recreatedSettings = await SettingsService.create();
+    expect(recreatedSettings.diaryCardTagLimit, 7);
+  });
+
+  test('覆盖恢复成功后通知 replacedAllListeners，合并导入不通知', () async {
+    var notified = 0;
+    Future<void> listener() async => notified++;
+    DataArchiveService.replacedAllListeners.add(listener);
+    addTearDown(() => DataArchiveService.replacedAllListeners.remove(listener));
+    final backup = await DataArchiveService.exportToZip(
+      database: database,
+      settingsService: settingsService,
+    );
+    await DataArchiveService.importFromZip(
+      database: database,
+      settingsService: settingsService,
+      zipPath: backup.path,
+      mode: BackupImportMode.merge,
+    );
+    expect(notified, 0);
+    await DataArchiveService.importFromZip(
+      database: database,
+      settingsService: settingsService,
+      zipPath: backup.path,
+    );
+    expect(notified, 1);
+  });
+
+  test('export and import round-trips the remembered address detail', () async {
+    await settingsService.setDiaryLocationPrecisionRaw('city');
+    final backup = await DataArchiveService.exportToZip(
+      database: database,
+      settingsService: settingsService,
+    );
+
+    await settingsService.setDiaryLocationPrecisionRaw('address');
+    await DataArchiveService.importFromZip(
+      database: database,
+      settingsService: settingsService,
+      zipPath: backup.path,
+    );
+
+    expect(settingsService.diaryLocationPrecisionRaw, 'city');
+    final recreatedSettings = await SettingsService.create();
+    expect(recreatedSettings.diaryLocationPrecisionRaw, 'city');
+  });
+
+  test('export and import round-trips the tag picker sort', () async {
+    await settingsService.setTagPickerSortRaw('alphabetical');
+    final backup = await DataArchiveService.exportToZip(
+      database: database,
+      settingsService: settingsService,
+    );
+
+    await settingsService.setTagPickerSortRaw('custom');
+    await DataArchiveService.importFromZip(
+      database: database,
+      settingsService: settingsService,
+      zipPath: backup.path,
+    );
+
+    expect(settingsService.tagPickerSortRaw, 'alphabetical');
+    final recreatedSettings = await SettingsService.create();
+    expect(recreatedSettings.tagPickerSortRaw, 'alphabetical');
+  });
+
+  test(
+    'backup restores recording bytes and rebinds diary and draft audio paths',
+    () async {
+      final audioDirectory = await Directory(
+        p.join(documentsDirectory.path, 'diary_recordings'),
+      ).create();
+      final oldPath = p.join(audioDirectory.path, 'entry.m4a');
+      const bytes = <int>[0, 0, 0, 24, 102, 116, 121, 112, 77, 52, 65];
+      await File(oldPath).writeAsBytes(bytes);
+      final audio = DiaryAudioAttachment(
+        path: oldPath,
+        duration: const Duration(seconds: 12),
+        name: '会议录音',
+        waveform: const [0.2, 0.8],
+      );
+      final content = jsonEncode([
+        {
+          'insert': {diaryAudioEmbedType: audio.encode()},
+        },
+        {'insert': '\n'},
+      ]);
+      await database.createDiary(
+        title: '',
+        contentDocJson: content,
+        contentText: '',
+        metadataJson: '{}',
+      );
+      await database.saveDiaryDraft(
+        title: '',
+        contentText: '',
+        payload: jsonEncode({
+          'title': '',
+          'contentDocJson': content,
+          'contentText': '',
+        }),
+      );
+      final backup = await DataArchiveService.exportToZip(
+        database: database,
+        settingsService: settingsService,
+      );
+      documentsDirectory = await Directory(
+        p.join(testRoot.path, 'audio_imported_documents'),
+      ).create();
+      await DataArchiveService.importFromZip(
+        database: database,
+        settingsService: settingsService,
+        zipPath: backup.path,
+      );
+      final restoredPath = p.join(
+        documentsDirectory.path,
+        'diary_recordings',
+        'entry.m4a',
+      );
+      final restoredDiary = await database.select(database.diaries).getSingle();
+      expect(extractDiaryAudioPaths(restoredDiary.content), {restoredPath});
+      expect(await File(restoredPath).readAsBytes(), bytes);
+      final restoredDraft =
+          jsonDecode(
+                (await database.select(database.diaryDrafts).getSingle())
+                    .payload,
+              )
+              as Map;
+      expect(
+        extractDiaryAudioPaths(restoredDraft['contentDocJson'] as String),
+        {restoredPath},
+      );
+      final inserted = diaryContentQuillOps(restoredDiary.content).first;
+      final restoredAudio = DiaryAudioAttachment.tryDecode(
+        (inserted['insert'] as Map)[diaryAudioEmbedType],
+      );
+      expect(restoredAudio?.name, '会议录音');
+      expect(restoredAudio?.waveform, [0.2, 0.8]);
+      expect(
+        DiaryAudioAttachment.tryDecode(
+          (inserted['insert'] as Map)[diaryAudioEmbedType],
+        )?.duration,
+        const Duration(seconds: 12),
+      );
+    },
+  );
+
+  test(
+    'import restores private image paths for a different app installation',
+    () async {
+      final oldImages = Directory(
+        p.join(documentsDirectory.path, 'diary_images'),
+      );
+      final oldCovers = Directory(
+        p.join(documentsDirectory.path, 'diary_covers'),
+      );
+      await oldImages.create();
+      await oldCovers.create();
+
+      final oldImagePath = p.join(oldImages.path, 'entry.png');
+      final missingImagePath = p.join(oldImages.path, 'missing.png');
+      final oldCoverPath = p.join(oldCovers.path, 'cover.png');
+      await File(oldImagePath).writeAsBytes(<int>[1, 2, 3]);
+      await File(oldCoverPath).writeAsBytes(<int>[4, 5, 6]);
+
+      await database
+          .into(database.diaries)
+          .insert(
+            DiariesCompanion.insert(
+              diaryId: 'quill-media',
+              title: const Value<String>('Quill media'),
+              content: jsonEncode(<Map<String, Object>>[
+                <String, Object>{
+                  'insert': <String, String>{'image': oldImagePath},
+                },
+                <String, Object>{
+                  'insert': <String, String>{'image': missingImagePath},
+                },
+                <String, Object>{
+                  'insert': <String, String>{
+                    'image': 'https://example.invalid/remote.jpg',
+                  },
+                },
+                <String, Object>{
+                  'insert': <String, String>{
+                    'image': 'data:image/png;base64,AA==',
+                  },
+                },
+                <String, Object>{'insert': '\n'},
+              ]),
+              contentText: '',
+              cover: Value<String?>(oldCoverPath),
+              createdAt: DateTime(2026, 10, 1),
+              updatedAt: DateTime(2026, 10, 1),
+            ),
+          );
+      await database
+          .into(database.diaries)
+          .insert(
+            DiariesCompanion.insert(
+              diaryId: 'legacy-media',
+              title: const Value<String>('Legacy media'),
+              content: jsonEncode(<String, Object>{
+                'root': <String, Object>{
+                  'children': <Object>[
+                    <String, Object>{
+                      'type': 'image',
+                      'attributes': <String, String>{'url': oldImagePath},
+                    },
+                  ],
+                },
+              }),
+              contentText: '',
+              createdAt: DateTime(2026, 10, 2),
+              updatedAt: DateTime(2026, 10, 2),
+            ),
+          );
+
+      final backup = await DataArchiveService.exportToZip(
+        database: database,
+        settingsService: settingsService,
+      );
+
+      documentsDirectory = await Directory(
+        p.join(testRoot.path, 'imported_documents'),
+      ).create();
+      await DataArchiveService.importFromZip(
+        database: database,
+        settingsService: settingsService,
+        zipPath: backup.path,
+      );
+
+      final imported = await database.select(database.diaries).get();
+      final quillDiary = imported.singleWhere(
+        (diary) => diary.diaryId == 'quill-media',
+      );
+      final importedImagePath = p.join(
+        documentsDirectory.path,
+        'diary_images',
+        'entry.png',
+      );
+      final importedCoverPath = p.join(
+        documentsDirectory.path,
+        'diary_covers',
+        'cover.png',
+      );
+      final images = extractDiaryImageSources(quillDiary.content).toList();
+      expect(images[0], importedImagePath);
+      expect(images[1], missingImagePath);
+      expect(images[2], 'https://example.invalid/remote.jpg');
+      expect(images[3], 'data:image/png;base64,AA==');
+      expect(quillDiary.cover, importedCoverPath);
+      expect(await File(importedImagePath).readAsBytes(), <int>[1, 2, 3]);
+      expect(await File(importedCoverPath).readAsBytes(), <int>[4, 5, 6]);
+
+      final legacy = imported.singleWhere(
+        (diary) => diary.diaryId == 'legacy-media',
+      );
+      expect(extractDiaryImageSources(legacy.content), [importedImagePath]);
+    },
+  );
+
+  test(
+    'missing or malformed tag limits preserve the current setting',
+    () async {
+      await settingsService.setDiaryCardTagLimit(9);
+      final missingLimitBackup = await _writeMinimalBackup(
+        directory: temporaryDirectory,
+        fileName: 'missing_limit.zip',
+        settings: <String, Object?>{},
+      );
+
+      await DataArchiveService.importFromZip(
+        database: database,
+        settingsService: settingsService,
+        zipPath: missingLimitBackup.path,
+      );
+      expect(settingsService.diaryCardTagLimit, 9);
+
+      final malformedLimitBackup = await _writeMinimalBackup(
+        directory: temporaryDirectory,
+        fileName: 'malformed_limit.zip',
+        settings: <String, Object?>{'diaryCardTagLimit': 'invalid'},
+      );
+      await DataArchiveService.importFromZip(
+        database: database,
+        settingsService: settingsService,
+        zipPath: malformedLimitBackup.path,
+      );
+      expect(settingsService.diaryCardTagLimit, 9);
+    },
+  );
+
+  test(
+    'numeric string tag limits restore through SettingsService clamping',
+    () async {
+      final backup = await _writeMinimalBackup(
+        directory: temporaryDirectory,
+        fileName: 'numeric_string_limit.zip',
+        settings: <String, Object?>{'diaryCardTagLimit': '99'},
+      );
+
+      await DataArchiveService.importFromZip(
+        database: database,
+        settingsService: settingsService,
+        zipPath: backup.path,
+      );
+
+      expect(settingsService.diaryCardTagLimit, 20);
+      final recreatedSettings = await SettingsService.create();
+      expect(recreatedSettings.diaryCardTagLimit, 20);
+    },
+  );
+}
+
+Future<File> _writeMinimalBackup({
+  required Directory directory,
+  required String fileName,
+  required Map<String, Object?> settings,
+}) async {
+  final payload = <String, Object?>{
+    'formatVersion': 1,
+    'database': <String, Object?>{
+      'diaries': <Object?>[],
+      'tags': <Object?>[],
+      'diaryTags': <Object?>[],
+    },
+    'settings': settings,
+  };
+  final payloadBytes = utf8.encode(jsonEncode(payload));
+  final archive = Archive()
+    ..addFile(
+      ArchiveFile('backup_data.json', payloadBytes.length, payloadBytes),
+    );
+  final zipBytes = ZipEncoder().encode(archive);
+  if (zipBytes == null) {
+    throw StateError('Failed to encode test backup.');
+  }
+  return File(
+    p.join(directory.path, fileName),
+  ).writeAsBytes(zipBytes, flush: true);
+}

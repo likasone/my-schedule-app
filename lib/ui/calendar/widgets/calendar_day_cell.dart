@@ -1,0 +1,512 @@
+import 'package:flutter/material.dart';
+
+import '../../../app/theme/expressive_motion.dart';
+import '../../../app/theme/expressive_surfaces.dart';
+import '../../../core/database/app_database.dart';
+import '../models/calendar_display_options.dart';
+import '../viewmodels/calendar_day_summary.dart';
+import '../viewmodels/calendar_holiday_day.dart';
+import '../viewmodels/calendar_lunar_day.dart';
+import 'calendar_cell_layout.dart';
+import 'calendar_cell_marks.dart';
+import 'calendar_day_cell_parts.dart';
+import 'calendar_mood_tile.dart';
+import 'day_mood_face.dart';
+
+/// 日历网格中的一个日期格。
+///
+/// 输入：日期状态（今天/选中/月外/周末）、当天汇总 [summary]、显示选项、
+/// 照片样式的代表图、农历信息 [lunar] 与放假安排 [holiday]；输出整格画面。
+/// 无副作用，点按由 TableCalendar 处理。
+///
+/// 两种高亮形态：
+/// - 填充（圆点/心情/标签色）：选中整格填 primary、今天填 tertiaryContainer，
+///   与旧版日历一致；
+/// - 描边（热力/照片，以及记了“这天的心情”的格子）：格子底色本身承载数据
+///   （热力色阶、照片、心情底色），整格填色会盖掉它，改为外圈描边——选中
+///   2dp primary、今天 tertiary。描边与内容之间留 2dp 间隙，深色热力格外的
+///   primary 描边依然可辨。
+///
+/// 记了心情（[dayMood]）的日子不论哪种日期格样式都整格画成心情（
+/// [CalendarMoodTile]）：那是用户为这一天亲手选的，比按日记推算的样式更
+/// 直接。设定、换掉或清除心情时内容交叉淡入，新出现的脸以 spatial 曲线
+/// 轻轻弹出。
+///
+/// 范围选择时首尾两天按“选中”绘制，中间的日子（[inRange]）铺一层浅
+/// primary 底（描边形态为半透明 primary 描边）。浅底而不是 primaryContainer：
+/// 后者在部分种子色下与 primary 相近，首尾和中间分不开，整段深色也太重；
+/// 浅底上的文字沿用普通格的配色。优先级：选中 > 今天 > 范围内 > 周末，
+/// 范围跨过今天时仍能认出今天。
+///
+/// 三种状态间的颜色经 AnimatedContainer 以 `fast` 补间；形状始终是同一
+/// 圆角矩形，补间中途不会换形（见 calendar_page 中的旧注释）。
+class CalendarDayCell extends StatelessWidget {
+  const CalendarDayCell({
+    super.key,
+    required this.day,
+    required this.options,
+    required this.isToday,
+    required this.isSelected,
+    required this.isOutside,
+    required this.isWeekend,
+    this.inRange = false,
+    this.summary,
+    this.image,
+    this.lunar,
+    this.holiday,
+    this.anniversary,
+    this.dayMood,
+    this.highlightMaxWidth,
+  });
+
+  static const double _radius = 14;
+  static const double _ringGap = 2;
+
+  final DateTime day;
+  final CalendarDisplayOptions options;
+  final bool isToday;
+  final bool isSelected;
+  final bool isOutside;
+  final bool isWeekend;
+
+  /// 位于所选日期范围之内（不含首尾两天，首尾按 [isSelected] 绘制）。
+  final bool inRange;
+  final CalendarDaySummary? summary;
+
+  /// 照片样式的代表图（本地路径或 http(s) 地址）。
+  final String? image;
+
+  /// 农历信息；不显示农历时为 null。
+  final CalendarLunarDay? lunar;
+
+  /// 法定节假日安排；普通日子或不显示节假日时为 null。
+  final CalendarHolidayDay? holiday;
+
+  /// 当天第一条纪念日的名称；没有或不显示纪念日时为 null。显示农历时写在
+  /// 小字行，否则在数字左上画心形。
+  final String? anniversary;
+
+  /// 这天的心情；没有记或不显示时为 null。
+  final DayMood? dayMood;
+
+  /// 高亮底块的最大宽度；格子更宽时底块居中、两侧留空。只在宽窗口给出，
+  /// 手机上为 null，整格绘制与原来一致。
+  final double? highlightMaxWidth;
+
+  /// 把 [child] 限制到 [maxWidth] 宽并在可用区域里居中，高度仍铺满。
+  static Widget limitWidth(Widget child, {required double maxWidth}) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: SizedBox.expand(child: child),
+      ),
+    );
+  }
+
+  /// 三层排版下为底部指示物预留的高度（见 [CalendarCellLayout]）；热力格
+  /// 没有指示物，数字组在整格居中。
+  double get _indicatorReserve =>
+      lunar == null || options.cellStyle == CalendarCellStyle.heat
+      ? 0
+      : CalendarCellLayout.indicatorBand;
+
+  /// 是否休息日：有放假安排时以安排为准——工作日放假算休息日，调休上班
+  /// 的周末不算；否则就是周末。
+  bool get _restDay {
+    final holiday = this.holiday;
+    return holiday == null ? isWeekend : !holiday.isWork;
+  }
+
+  /// 当前格是否按“周末着色”铺灰底（相邻月份的日期不着色）。开启节假日
+  /// 时色带标的是休息日：国庆的工作日连成一片，调休上班的周六不着色。
+  bool get _weekendShaded =>
+      options.highlightWeekends && _restDay && !isOutside;
+
+  /// 周末底色：中性灰，与热力的 primary 色阶、今天的 tertiary、选中的
+  /// primary 都不同色相。只换数字颜色时 tertiary 与正文黑字在亮色主题下
+  /// 几乎分不出来，铺一层底色才能一眼看出周末那两列。
+  static Color weekendColor(ColorScheme colorScheme) =>
+      colorScheme.surfaceContainerHighest.withValues(
+        alpha: colorScheme.brightness == Brightness.light ? 0.9 : 0.75,
+      );
+
+  /// 范围内日期的浅底。
+  static Color rangeColor(ColorScheme colorScheme) =>
+      colorScheme.primary.withValues(alpha: 0.2);
+
+  bool get _ringMode =>
+      dayMood != null ||
+      options.cellStyle == CalendarCellStyle.heat ||
+      options.cellStyle == CalendarCellStyle.photo;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final duration = ExpressiveMotion.duration(context, ExpressiveMotion.fast);
+    final dayMood = this.dayMood;
+    final Widget content = dayMood != null
+        ? _buildMoodContent(colorScheme, dayMood)
+        : _ringMode
+        ? _buildRingContent(context, colorScheme, duration)
+        : _buildFillContent(context, colorScheme);
+
+    final Color fill;
+    final Color ring;
+    if (_ringMode) {
+      fill = Colors.transparent;
+      ring = isSelected
+          ? colorScheme.primary
+          : isToday
+          ? colorScheme.tertiary
+          : inRange
+          ? colorScheme.primary.withValues(alpha: 0.4)
+          : colorScheme.primary.withValues(alpha: 0);
+    } else {
+      fill = isSelected
+          ? colorScheme.primary
+          : isToday
+          ? colorScheme.tertiaryContainer
+          : inRange
+          ? rangeColor(colorScheme)
+          : _weekendShaded
+          ? weekendColor(colorScheme)
+          : colorScheme.primary.withValues(alpha: 0);
+      ring = Colors.transparent;
+    }
+
+    final cell = Padding(
+      padding: const EdgeInsets.all(2),
+      child: AnimatedContainer(
+        duration: duration,
+        curve: ExpressiveMotion.effects,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(_radius),
+          // 描边宽度恒定：宽度变化会让内容随选中/今天切换位移半个像素。
+          border: Border.all(color: ring, width: 2),
+        ),
+        child: _MoodSwitcher(
+          // 只在心情变化时换内容：选中、翻页数据刷新等不触发交叉淡入。
+          contentKey: ValueKey<DayMood?>(dayMood),
+          child: content,
+        ),
+      ),
+    );
+    final maxWidth = highlightMaxWidth;
+    // 外圈 2 的留白也算在内：底块本身最宽 maxWidth。
+    return maxWidth == null ? cell : limitWidth(cell, maxWidth: maxWidth + 4);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 填充形态：圆点 / 心情 / 标签色
+  // ---------------------------------------------------------------------------
+
+  Widget _buildFillContent(BuildContext context, ColorScheme colorScheme) {
+    final onFill = isSelected
+        ? colorScheme.onPrimary
+        : isToday
+        ? colorScheme.onTertiaryContainer
+        : null;
+    final indicator = CalendarCellIndicator.resolve(
+      colorScheme,
+      summary: summary,
+      options: options,
+      onFill: onFill,
+    );
+    return CalendarCellLayout(
+      number: _buildNumber(context, colorScheme, onFill: onFill),
+      indicator: indicator,
+      leadingBadge: _leadingBadge(colorScheme, onFill: onFill),
+      trailingBadge: CalendarCellCountMark.resolve(
+        summary: summary,
+        options: options,
+        color: onFill ?? colorScheme.primary,
+      ),
+      subtitle: _buildLunarLabel(colorScheme, onFill: onFill),
+      bottomReserve: _indicatorReserve,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 这天的心情：整格画成心情（描边形态）
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMoodContent(ColorScheme colorScheme, DayMood mood) {
+    final base = DayMoodColors.of(colorScheme, mood);
+    final colors = isOutside ? base.faded() : base;
+    // 心情格底部是脸，放不下普通格的指示物：两篇及以上照常标篇数上标，
+    // 只写了一篇时在同一位置画一个小圆点。
+    final count = CalendarCellCountMark.countFor(
+      summary: summary,
+      options: options,
+    );
+    final Widget? trailing = count != null
+        ? CalendarCellCountMark(count: count, color: colors.onTile)
+        : summary?.hasEntries ?? false
+        ? CalendarMoodTile.writtenDot(colors.onTile)
+        : null;
+    // 手机上的格子只有 36×40dp 左右，数字再加农历小字会把脸挤得认不出：
+    // 心情格不写小字，纪念日像不显示农历时那样以数字左上的心形标出。宽窗口
+    // 的格子放得下，照常写。
+    final showSubtitle = highlightMaxWidth != null;
+    return Padding(
+      padding: const EdgeInsets.all(_ringGap),
+      child: CalendarMoodTile(
+        day: day.day,
+        mood: mood,
+        colors: colors,
+        borderRadius: BorderRadius.circular(_radius - 2 - _ringGap),
+        leadingBadge: _leadingBadge(
+          colorScheme,
+          onFill: colors.onTile,
+          subtitleShown: showSubtitle,
+        ),
+        trailingBadge: trailing,
+        subtitle: showSubtitle
+            ? _buildLunarLabel(colorScheme, onFill: colors.onTile)
+            : null,
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 描边形态：热力 / 照片
+  // ---------------------------------------------------------------------------
+
+  Widget _buildRingContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    Duration duration,
+  ) {
+    final summary = this.summary;
+    final innerRadius = BorderRadius.circular(_radius - 2 - _ringGap);
+    if (options.cellStyle == CalendarCellStyle.photo) {
+      final image = this.image;
+      if (image != null) {
+        // 排版层放在裁切之外，挂在日期小底块外侧的锁/天气不被裁掉；篇数
+        // 与农历直接写进日期小底块，照片上的裸字看不清。
+        return Padding(
+          padding: const EdgeInsets.all(_ringGap),
+          child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: innerRadius,
+                child: ColoredBox(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: CalendarCellImage(source: image),
+                ),
+              ),
+              CalendarCellLayout(
+                number: CalendarCellPhotoNumber(
+                  day: day.day,
+                  selected: isSelected,
+                  count: CalendarCellCountMark.countFor(
+                    summary: summary,
+                    options: options,
+                  ),
+                  lunar: _buildLunarLabel(
+                    colorScheme,
+                    onFill: isSelected ? colorScheme.onPrimary : null,
+                  ),
+                ),
+                leadingBadge: _leadingBadge(colorScheme, onPhoto: true),
+                bottomReserve: _indicatorReserve,
+              ),
+            ],
+          ),
+        );
+      }
+      // 当天有日记但没有图片：退回圆点，仍能看出这天写过。
+      return Padding(
+        padding: const EdgeInsets.all(_ringGap),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _weekendShaded ? weekendColor(colorScheme) : null,
+            borderRadius: innerRadius,
+          ),
+          child: CalendarCellLayout(
+            number: _buildNumber(context, colorScheme),
+            indicator: CalendarCellIndicator.resolve(
+              colorScheme,
+              summary: summary,
+              options: options,
+            ),
+            leadingBadge: _leadingBadge(colorScheme),
+            trailingBadge: CalendarCellCountMark.resolve(
+              summary: summary,
+              options: options,
+              color: colorScheme.primary,
+              dotsShown: true,
+            ),
+            subtitle: _buildLunarLabel(colorScheme),
+            bottomReserve: _indicatorReserve,
+          ),
+        ),
+      );
+    }
+
+    final level = summary?.heatLevel(options.heatBasis) ?? 0;
+    final heatColor = heatColorFor(colorScheme, level);
+    final cardColor = ExpressiveSurfaces.cardColor(colorScheme);
+    final foreground = level == 0
+        ? null
+        : _contrastingForeground(
+            colorScheme,
+            Color.alphaBlend(heatColor, cardColor),
+          );
+    return Padding(
+      padding: const EdgeInsets.all(_ringGap),
+      child: AnimatedContainer(
+        duration: duration,
+        curve: ExpressiveMotion.effects,
+        // 有数据时以热力色为准；没写的周末铺周末底色。
+        decoration: BoxDecoration(
+          color: level == 0 && _weekendShaded
+              ? weekendColor(colorScheme)
+              : heatColor,
+          borderRadius: innerRadius,
+        ),
+        child: CalendarCellLayout(
+          number: _buildNumber(context, colorScheme, onFill: foreground),
+          leadingBadge: _leadingBadge(colorScheme, onFill: foreground),
+          trailingBadge: CalendarCellCountMark.resolve(
+            summary: summary,
+            options: options,
+            color: foreground ?? colorScheme.primary,
+          ),
+          subtitle: _buildLunarLabel(colorScheme, onFill: foreground),
+        ),
+      ),
+    );
+  }
+
+  /// 热力色阶：primary 的四档不透明度。按透明度分档而非渐变，符合 DESIGN.md
+  /// 禁用渐变的约束；0 档为全透明（与无记录同色）。
+  static Color heatColorFor(ColorScheme colorScheme, int level) {
+    const alphas = <double>[0, 0.16, 0.32, 0.56, 0.82];
+    return colorScheme.primary.withValues(alpha: alphas[level.clamp(0, 4)]);
+  }
+
+  /// 在 onPrimary 与 onSurface 中取与实际底色对比度更高的一个：明暗主题下
+  /// primary 的深浅相反，固定用某一个总有一档看不清。
+  static Color _contrastingForeground(
+    ColorScheme colorScheme,
+    Color background,
+  ) {
+    final bg = background.computeLuminance();
+    double contrast(Color color) {
+      final fg = color.computeLuminance();
+      final hi = fg > bg ? fg : bg;
+      final lo = fg > bg ? bg : fg;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    return contrast(colorScheme.onPrimary) >= contrast(colorScheme.onSurface)
+        ? colorScheme.onPrimary
+        : colorScheme.onSurface;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 公共元素
+  // ---------------------------------------------------------------------------
+
+  Widget _buildNumber(
+    BuildContext context,
+    ColorScheme colorScheme, {
+    Color? onFill,
+  }) {
+    final textTheme = Theme.of(context).textTheme;
+    final Color color;
+    if (onFill != null) {
+      color = onFill;
+    } else if (isOutside) {
+      color = colorScheme.onSurfaceVariant.withValues(alpha: 0.45);
+    } else {
+      color = colorScheme.onSurface;
+    }
+    return Text(
+      '${day.day}',
+      style: textTheme.bodyMedium?.copyWith(
+        color: color,
+        fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w400,
+        height: 1.1,
+      ),
+    );
+  }
+
+  /// 数字下方的小字（纪念日名称或农历）；不显示农历时为 null。
+  Widget? _buildLunarLabel(ColorScheme colorScheme, {Color? onFill}) {
+    return CalendarCellSubtitle.resolve(
+      colorScheme,
+      lunar: lunar,
+      anniversary: anniversary,
+      onFill: onFill,
+      isOutside: isOutside,
+    );
+  }
+
+  /// 数字左上方的角标（锁 > 休/班 > 心形 > 天气），见
+  /// [CalendarCellLeadingBadge]。纪念日在没有小字行时（不显示农历，或心情格
+  /// 省掉了小字，[subtitleShown] 为 false）画成心形。
+  Widget? _leadingBadge(
+    ColorScheme colorScheme, {
+    Color? onFill,
+    bool onPhoto = false,
+    bool subtitleShown = true,
+  }) {
+    return CalendarCellLeadingBadge.resolve(
+      colorScheme,
+      options: options,
+      summary: summary,
+      holiday: holiday,
+      isOutside: isOutside,
+      anniversaryHeart:
+          (lunar == null || !subtitleShown) && anniversary != null,
+      onFill: onFill,
+      onPhoto: onPhoto,
+    );
+  }
+}
+
+/// 设定、换掉或清除心情时的内容过渡：旧内容淡出，新内容淡入；新出现的心情
+/// 格从 0.8 倍以 spatial 曲线弹到原大，像贴上一张贴纸。减少动画时直接切换。
+///
+/// 默认的 AnimatedSwitcher 布局让子项按松约束排版，日期格内容需要铺满整格，
+/// 这里改用撑满的 Stack。
+class _MoodSwitcher extends StatelessWidget {
+  const _MoodSwitcher({required this.contentKey, required this.child});
+
+  final Key contentKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: ExpressiveMotion.duration(context, ExpressiveMotion.medium),
+      switchInCurve: ExpressiveMotion.effects,
+      switchOutCurve: ExpressiveMotion.exit,
+      layoutBuilder: (Widget? current, List<Widget> previous) => Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: <Widget>[...previous, ?current],
+      ),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        final scale = child.key == const ValueKey<DayMood?>(null)
+            ? const AlwaysStoppedAnimation<double>(1)
+            : Tween<double>(begin: 0.8, end: 1).animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: ExpressiveMotion.spatial,
+                ),
+              );
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(scale: scale, child: child),
+        );
+      },
+      child: KeyedSubtree(key: contentKey, child: child),
+    );
+  }
+}

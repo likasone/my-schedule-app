@@ -1,0 +1,540 @@
+name: Release APK
+
+# 文件名与 workflow 名沿用（AGENTS.md 引用文件名，download-stats.yml 的
+# workflow_run 按名称 Release APK 触发），实际发布三个平台：
+# 签名分包 APK（build-release-apk）、Linux 压缩包（build-linux）、Windows 安装
+# 程序与便携版（build-windows），由 publish 汇总生成校验文件与更新清单后上传。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      # 装机测试用：代码已在 PR / main 上过了门禁，这里只要尽快拿到与正式版同签名、
+      # 可覆盖安装的包。只对手动触发生效，Release 事件始终走完整流程。测试包只有
+      # Android：桌面 job 与 publish 都跳过。
+      test-build:
+        description: 'Test build (Android only): skip the CI gate, build arm64 only, no desktop packages, no update manifest'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# 同一个 tag 的发布不并行，也不互相取消：上传到 Release 的文件只能来自一次完整构建。
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 发布 tag 必须与 pubspec.yaml 的版本一致：否则“关于”页显示的版本与 Release 对
+  # 不上，versionCode 没递增时用户还无法覆盖升级。tag 可省略构建号（v0.6.0 对应
+  # 0.6.0+17）。单独成 job，版本不符时立即失败，不必等门禁跑完。
+  check-version:
+    name: Check tag matches pubspec version
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compare release tag with pubspec.yaml
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | tr -d "\"'[:space:]")"
+          if [[ -z "$version" ]]; then
+            echo "::error file=pubspec.yaml::Cannot read the version from pubspec.yaml"
+            exit 1
+          fi
+          if [[ "$TAG" != "v${version}" && "$TAG" != "v${version%%+*}" ]]; then
+            echo "::error file=pubspec.yaml::Release tag $TAG does not match pubspec.yaml version $version (expected v${version%%+*} or v${version})"
+            exit 1
+          fi
+          echo "Release $TAG builds version $version"
+
+  # 与 PR / main 相同的门禁（格式、analyze、生成代码、测试、工作流 lint）。签名 APK
+  # 与桌面安装包由下面的 job 自己构建，所以跳过 CI 里那几次只验证编译的构建。
+  # 测试包不跑门禁。
+  ci:
+    name: CI
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test-build) }}
+    uses: ./.github/workflows/ci.yml
+    with:
+      skip-android-build: true
+      skip-desktop-builds: true
+    permissions:
+      contents: read
+
+  build-release-apk:
+    name: Build signed split release APKs
+    needs: [check-version, ci]
+    # check-version 只在 release 事件运行；手动触发时它被跳过，不应连带跳过构建。
+    # 门禁只有测试包可以跳过，其余情况必须通过。
+    if: >-
+      ${{ !cancelled() &&
+      (needs.ci.result == 'success' ||
+      (github.event_name == 'workflow_dispatch' && inputs.test-build && needs.ci.result == 'skipped')) &&
+      (needs.check-version.result == 'success' || needs.check-version.result == 'skipped') }}
+    # Pin the image instead of `ubuntu-latest`: the label migrates to Ubuntu 26 on
+    # 2026-10-19 while Flutter is pinned in .github/actions/setup-flutter, so an unplanned
+    # image jump could break signed release builds mid-window. Move deliberately.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # 只构建签名 APK；上传 Release 附件的写权限只在 publish job。
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Flutter 版本与 CI 同源，定义在 .github/actions/setup-flutter。
+      - name: Set up Flutter
+        uses: ./.github/actions/setup-flutter
+        with:
+          java: 'true'
+
+      - name: Restore Android release signing files
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Missing secret ANDROID_KEYSTORE_BASE64"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "::error::Missing secret ANDROID_KEY_ALIAS"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "::error::Missing secret ANDROID_KEY_PASSWORD"; exit 1; }
+          test -n "$ANDROID_STORE_PASSWORD" || { echo "::error::Missing secret ANDROID_STORE_PASSWORD"; exit 1; }
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          {
+            printf 'storePassword=%s\n' "$ANDROID_STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
+          } > android/key.properties
+
+      - name: Write Android runtime secrets
+        env:
+          AMAP_WEB_API_KEY: ${{ secrets.AMAP_WEB_API_KEY }}
+          QWEATHER_CREDENTIAL_ID: ${{ secrets.QWEATHER_CREDENTIAL_ID }}
+          QWEATHER_API_KEY: ${{ secrets.QWEATHER_API_KEY }}
+          QWEATHER_API_HOST: ${{ secrets.QWEATHER_API_HOST }}
+        run: |
+          set -euo pipefail
+
+          fail_runtime_secret() {
+            local message="$1"
+            echo "Runtime secret validation failed: $message"
+            echo "::error::$message"
+            exit 1
+          }
+
+          require_single_line_secret() {
+            local name="$1"
+            local value="$2"
+
+            if [[ -z "$value" ]]; then
+              fail_runtime_secret "Missing secret $name"
+            fi
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              fail_runtime_secret "Secret $name must contain exactly one line"
+            fi
+            if [[ "$value" =~ ^[[:space:]] || "$value" =~ [[:space:]]$ ]]; then
+              fail_runtime_secret "Secret $name must not contain leading or trailing whitespace"
+            fi
+            return 0
+          }
+
+          printf 'Runtime secret lengths: AMAP=%d QWEATHER_CREDENTIAL=%d QWEATHER_KEY=%d QWEATHER_HOST=%d\n' \
+            "${#AMAP_WEB_API_KEY}" \
+            "${#QWEATHER_CREDENTIAL_ID}" \
+            "${#QWEATHER_API_KEY}" \
+            "${#QWEATHER_API_HOST}"
+
+          require_single_line_secret AMAP_WEB_API_KEY "$AMAP_WEB_API_KEY"
+          require_single_line_secret QWEATHER_CREDENTIAL_ID "$QWEATHER_CREDENTIAL_ID"
+          require_single_line_secret QWEATHER_API_KEY "$QWEATHER_API_KEY"
+          require_single_line_secret QWEATHER_API_HOST "$QWEATHER_API_HOST"
+
+          if [[ ! "$AMAP_WEB_API_KEY" =~ ^[A-Za-z0-9]{32}$ ]]; then
+            fail_runtime_secret "Secret AMAP_WEB_API_KEY must be a 32-character alphanumeric key"
+          fi
+
+          touch android/local.properties
+          {
+            printf '\n'
+            printf 'amap.web.api.key=%s\n' "$AMAP_WEB_API_KEY"
+            printf 'qweather.credential_id=%s\n' "$QWEATHER_CREDENTIAL_ID"
+            printf 'qweather.api_key=%s\n' "$QWEATHER_API_KEY"
+            printf 'qweather.api_host=%s\n' "$QWEATHER_API_HOST"
+          } >> android/local.properties
+
+          grep -Eq '^amap\.web\.api\.key=.+$' android/local.properties ||
+            fail_runtime_secret 'Failed to write amap.web.api.key'
+          grep -Eq '^qweather\.credential_id=.+$' android/local.properties ||
+            fail_runtime_secret 'Failed to write qweather.credential_id'
+          grep -Eq '^qweather\.api_key=.+$' android/local.properties ||
+            fail_runtime_secret 'Failed to write qweather.api_key'
+          grep -Eq '^qweather\.api_host=.+$' android/local.properties ||
+            fail_runtime_secret 'Failed to write qweather.api_host'
+
+      # 网盘备份的应用密钥经 --dart-define-from-file 注入（见 docs/cloud_backup.md）。
+      # 校验与写入只在 tool/write_cloud_backup_keys.dart（Android 与 Linux / Windows
+      # 构建共用，三个平台的安装包配置一致；只打印变量名，不打印值）：每个网盘都是
+      # 可选的，未配置的只告警、安装包里不显示该网盘；配置了但格式不对、或成对的值
+      # 只配了一半时构建失败，避免发布授权必然失败的包。
+      - name: Write cloud backup app keys
+        env:
+          JOTSY_GOOGLE_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_CLIENT_ID }}
+          JOTSY_GOOGLE_CLIENT_SECRET: ${{ secrets.JOTSY_GOOGLE_CLIENT_SECRET }}
+          JOTSY_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_WEB_CLIENT_ID }}
+          JOTSY_DROPBOX_APP_KEY: ${{ secrets.JOTSY_DROPBOX_APP_KEY }}
+          JOTSY_MICROSOFT_CLIENT_ID: ${{ secrets.JOTSY_MICROSOFT_CLIENT_ID }}
+          JOTSY_MICROSOFT_TENANT: ${{ vars.JOTSY_MICROSOFT_TENANT }}
+          JOTSY_BAIDU_APP_KEY: ${{ secrets.JOTSY_BAIDU_APP_KEY }}
+          JOTSY_BAIDU_SECRET_KEY: ${{ secrets.JOTSY_BAIDU_SECRET_KEY }}
+          JOTSY_BAIDU_APP_DIR: ${{ vars.JOTSY_BAIDU_APP_DIR }}
+          JOTSY_ALIYUN_CLIENT_ID: ${{ secrets.JOTSY_ALIYUN_CLIENT_ID }}
+          JOTSY_ALIYUN_CLIENT_SECRET: ${{ secrets.JOTSY_ALIYUN_CLIENT_SECRET }}
+        run: dart run tool/write_cloud_backup_keys.dart cloud_backup_keys.json
+
+      # 测试包只编译 arm64（真机装机测试够用），省掉另外两种 ABI 的 AOT 编译；
+      # 分包方式不变，arm64 包的 versionCode 与正式版同一算法，可直接覆盖安装。
+      - name: Build split release APKs
+        env:
+          TARGET_PLATFORMS: >-
+            ${{ github.event_name == 'workflow_dispatch' && inputs.test-build &&
+            'android-arm64' || 'android-arm,android-arm64,android-x64' }}
+        run: flutter build apk --release --split-per-abi --target-platform "$TARGET_PLATFORMS" --dart-define-from-file=cloud_backup_keys.json
+
+      - name: Prepare release artifacts
+        id: artifact
+        env:
+          TEST_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.test-build }}
+        run: |
+          safe_ref="${GITHUB_REF_NAME//\//-}"
+          mkdir -p release-artifacts
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            apk="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            if [[ -f "$apk" ]]; then
+              cp "$apk" "release-artifacts/jotsy-${safe_ref}-${abi}.apk"
+            elif [[ "$TEST_BUILD" != 'true' || "$abi" == 'arm64-v8a' ]]; then
+              # 正式构建三种 ABI 缺一不可；测试包至少要有 arm64。
+              echo "::error::Missing $apk"
+              exit 1
+            fi
+          done
+          # 测试包的校验和随包交付（装机前可用 `sha256sum -c` 核对）；正式构建的
+          # 校验文件由 publish job 汇总所有平台的安装包后统一生成。
+          if [[ "$TEST_BUILD" == 'true' ]]; then
+            (cd release-artifacts && sha256sum -- *.apk > SHA256SUMS.txt)
+            cat release-artifacts/SHA256SUMS.txt
+          fi
+          echo "test_artifact_name=test-apk-${safe_ref}" >> "$GITHUB_OUTPUT"
+
+      # 测试包只上传为 workflow artifact，不生成更新清单、不发布。
+      - name: Upload test build
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test-build }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.artifact.outputs.test_artifact_name }}
+          path: |
+            release-artifacts/*.apk
+            release-artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+
+      # 正式构建：APK 交给 publish job，与桌面安装包一起生成校验文件与清单。
+      - name: Hand APKs to the publish job
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.test-build) }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-part-android
+          path: release-artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  # 桌面安装包只随正式流程构建：测试包（test-build）只为 Android 装机测试，
+  # 跳过门禁时这两个 job 也一并跳过。桌面构建只读取网盘应用密钥（与 APK 相同），
+  # 不读取签名材料；权限保持只读。
+  build-linux:
+    name: Build Linux release tarball
+    needs: [check-version, ci]
+    if: >-
+      ${{ !cancelled() && needs.ci.result == 'success' &&
+      (needs.check-version.result == 'success' || needs.check-version.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 与 CI 的 Linux 构建相同：GTK 3 与 audioplayers_linux 需要的 GStreamer 开发包。
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: Set up Flutter
+        uses: ./.github/actions/setup-flutter
+
+      # 与 APK 相同的网盘应用密钥（桌面经设备码 / 粘贴授权码授权，见
+      # docs/cloud_backup.md）；同一个脚本校验与写入，不打印值，构建后删除。
+      - name: Write cloud backup app keys
+        env:
+          JOTSY_GOOGLE_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_CLIENT_ID }}
+          JOTSY_GOOGLE_CLIENT_SECRET: ${{ secrets.JOTSY_GOOGLE_CLIENT_SECRET }}
+          JOTSY_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_WEB_CLIENT_ID }}
+          JOTSY_DROPBOX_APP_KEY: ${{ secrets.JOTSY_DROPBOX_APP_KEY }}
+          JOTSY_MICROSOFT_CLIENT_ID: ${{ secrets.JOTSY_MICROSOFT_CLIENT_ID }}
+          JOTSY_MICROSOFT_TENANT: ${{ vars.JOTSY_MICROSOFT_TENANT }}
+          JOTSY_BAIDU_APP_KEY: ${{ secrets.JOTSY_BAIDU_APP_KEY }}
+          JOTSY_BAIDU_SECRET_KEY: ${{ secrets.JOTSY_BAIDU_SECRET_KEY }}
+          JOTSY_BAIDU_APP_DIR: ${{ vars.JOTSY_BAIDU_APP_DIR }}
+          JOTSY_ALIYUN_CLIENT_ID: ${{ secrets.JOTSY_ALIYUN_CLIENT_ID }}
+          JOTSY_ALIYUN_CLIENT_SECRET: ${{ secrets.JOTSY_ALIYUN_CLIENT_SECRET }}
+        run: dart run tool/write_cloud_backup_keys.dart cloud_backup_keys.json
+
+      - name: Build Linux release bundle
+        run: flutter build linux --release --dart-define-from-file=cloud_backup_keys.json
+
+      - name: Remove cloud backup app keys
+        if: always()
+        run: rm -f cloud_backup_keys.json
+
+      # 压缩包顶层是 jotsy/：bundle（可直接运行 ./jotsy）、桌面入口、hicolor 图标与
+      # install.sh（装到 ~/.local，见 linux/packaging/install.sh）。属主写成 root，
+      # 不把 runner 的用户名带进包里。
+      - name: Package tarball
+        run: |
+          safe_ref="${GITHUB_REF_NAME//\//-}"
+          stage="$RUNNER_TEMP/linux-package"
+          mkdir -p "$stage/jotsy" release-artifacts
+          cp -R build/linux/x64/release/bundle/. "$stage/jotsy/"
+          cp linux/packaging/com.jotsy.diary.desktop linux/packaging/install.sh "$stage/jotsy/"
+          cp -R linux/packaging/icons "$stage/jotsy/"
+          chmod 755 "$stage/jotsy/jotsy" "$stage/jotsy/install.sh"
+          archive="release-artifacts/jotsy-${safe_ref}-linux-x64.tar.gz"
+          tar --owner=0 --group=0 --numeric-owner -C "$stage" -czf "$archive" jotsy
+          listing="$(tar -tzf "$archive")"
+          for entry in jotsy/jotsy jotsy/install.sh jotsy/com.jotsy.diary.desktop; do
+            grep -Fxq "$entry" <<<"$listing" || { echo "::error::$entry is missing from $archive"; exit 1; }
+          done
+          stat --format=%s "$archive" |
+            awk -v name="${archive##*/}" '{ printf "### Linux package\n\n%s: %.1f MiB\n", name, $1 / 1048576 }' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hand the tarball to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-part-linux
+          path: release-artifacts/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  build-windows:
+    name: Build Windows installer and portable zip
+    needs: [check-version, ci]
+    if: >-
+      ${{ !cancelled() && needs.ci.result == 'success' &&
+      (needs.check-version.result == 'success' || needs.check-version.result == 'skipped') }}
+    # 与 CI 同一镜像；Visual Studio / MSVC 仍会更新，打包使用 Inno Setup 与 7-Zip。
+    runs-on: windows-2025
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter
+        uses: ./.github/actions/setup-flutter
+
+      # 与 APK 相同的网盘应用密钥（桌面经设备码 / 粘贴授权码授权，见
+      # docs/cloud_backup.md）；同一个脚本校验与写入，不打印值，构建后删除。
+      - name: Write cloud backup app keys
+        env:
+          JOTSY_GOOGLE_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_CLIENT_ID }}
+          JOTSY_GOOGLE_CLIENT_SECRET: ${{ secrets.JOTSY_GOOGLE_CLIENT_SECRET }}
+          JOTSY_GOOGLE_WEB_CLIENT_ID: ${{ secrets.JOTSY_GOOGLE_WEB_CLIENT_ID }}
+          JOTSY_DROPBOX_APP_KEY: ${{ secrets.JOTSY_DROPBOX_APP_KEY }}
+          JOTSY_MICROSOFT_CLIENT_ID: ${{ secrets.JOTSY_MICROSOFT_CLIENT_ID }}
+          JOTSY_MICROSOFT_TENANT: ${{ vars.JOTSY_MICROSOFT_TENANT }}
+          JOTSY_BAIDU_APP_KEY: ${{ secrets.JOTSY_BAIDU_APP_KEY }}
+          JOTSY_BAIDU_SECRET_KEY: ${{ secrets.JOTSY_BAIDU_SECRET_KEY }}
+          JOTSY_BAIDU_APP_DIR: ${{ vars.JOTSY_BAIDU_APP_DIR }}
+          JOTSY_ALIYUN_CLIENT_ID: ${{ secrets.JOTSY_ALIYUN_CLIENT_ID }}
+          JOTSY_ALIYUN_CLIENT_SECRET: ${{ secrets.JOTSY_ALIYUN_CLIENT_SECRET }}
+        run: dart run tool/write_cloud_backup_keys.dart cloud_backup_keys.json
+
+      - name: Build Windows release
+        run: flutter build windows --release --dart-define-from-file=cloud_backup_keys.json
+
+      - name: Remove cloud backup app keys
+        if: always()
+        shell: pwsh
+        run: Remove-Item -Force -ErrorAction SilentlyContinue cloud_backup_keys.json
+
+      # 便携版：Release 文件夹的内容原样打包，解压即可运行。安装程序：Inno Setup
+      # 脚本 windows/packaging/jotsy.iss，版本经 /D 传入——tag 是版本号时取 tag
+      # （去掉 v），手动触发（tag 是分支名）时取 pubspec.yaml；VersionInfo 只能是
+      # 数字，去掉构建号与预发布后缀。镜像里没有 Inno Setup 时（换镜像后）才经
+      # Chocolatey 安装。
+      - name: Package portable zip and installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $safeRef = $env:GITHUB_REF_NAME -replace '/', '-'
+          if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+\S*)$') {
+            $version = $Matches[1]
+          } else {
+            $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*["'']?([^\s"'']+)' | Select-Object -First 1
+            if (-not $line) { throw 'Cannot read the version from pubspec.yaml' }
+            $version = $line.Matches[0].Groups[1].Value
+          }
+          $numeric = ($version -split '[+-]')[0]
+          $out = Join-Path $PWD 'release-artifacts'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $release = 'build\windows\x64\runner\Release'
+          if (-not (Test-Path (Join-Path $release 'jotsy.exe'))) { throw "Missing $release\jotsy.exe" }
+          & 7z a -tzip -mx=9 (Join-Path $out "jotsy-$safeRef-windows-x64.zip") ".\$release\*"
+          if ($LASTEXITCODE -ne 0) { throw "7z failed with exit code $LASTEXITCODE" }
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            Write-Output '::warning::Inno Setup is not on this runner image; installing it with Chocolatey'
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed with exit code $LASTEXITCODE" }
+          }
+          & $iscc "/DAppVersion=$version" "/DVersionInfo=$numeric" `
+            "/DOutputBaseFilename=jotsy-$safeRef-windows-x64-setup" "/O$out" 'windows\packaging\jotsy.iss'
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+          $summary = @('### Windows packages', '')
+          foreach ($file in Get-ChildItem $out) {
+            $summary += ('{0}: {1:N1} MiB' -f $file.Name, ($file.Length / 1MB))
+          }
+          $summary -join "`n" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+
+      - name: Hand the Windows packages to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-part-windows
+          path: |
+            release-artifacts/*.exe
+            release-artifacts/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  # 汇总三个平台的安装包：生成校验文件与应用内更新清单，再按顺序上传到 Release。
+  # 只有这个 job 需要写权限（上传 Release 附件）。
+  publish:
+    name: Checksums, update manifest and release upload
+    needs: [build-release-apk, build-linux, build-windows]
+    if: >-
+      ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.test-build) &&
+      needs.build-release-apk.result == 'success' &&
+      needs.build-linux.result == 'success' &&
+      needs.build-windows.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # 清单脚本引用应用里的 AppUpdateManifest，需要按锁文件取得依赖。
+      - name: Set up Flutter
+        uses: ./.github/actions/setup-flutter
+
+      - name: Download platform packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-part-*
+          path: release-artifacts
+          merge-multiple: true
+
+      # 校验和随包一起发布，下载后可用 `sha256sum -c SHA256SUMS.txt` 核对完整性。
+      # 每个平台的安装包缺一不可：少了的话应用与官网会指向不存在的文件。
+      - name: Write checksums
+        id: checksums
+        run: |
+          safe_ref="${GITHUB_REF_NAME//\//-}"
+          cd release-artifacts
+          expected=(
+            "jotsy-${safe_ref}-armeabi-v7a.apk"
+            "jotsy-${safe_ref}-arm64-v8a.apk"
+            "jotsy-${safe_ref}-x86_64.apk"
+            "jotsy-${safe_ref}-linux-x64.tar.gz"
+            "jotsy-${safe_ref}-windows-x64-setup.exe"
+            "jotsy-${safe_ref}-windows-x64.zip"
+          )
+          for file in "${expected[@]}"; do
+            [[ -f "$file" ]] || { echo "::error::Missing $file"; exit 1; }
+          done
+          sha256sum -- "${expected[@]}" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "artifact_name=release-${safe_ref}" >> "$GITHUB_OUTPUT"
+
+      # 应用内更新清单：版本（含构建号）、各安装包（APK 与桌面安装包）的大小与
+      # SHA-256、中英文更新说明。应用经镜像读取 releases/latest/download/jotsy-update.json，
+      # 一个小请求拿全信息（国内网络下 api.github.com 常不可用或被限流），见
+      # lib/core/services/app_update_checker.dart；桌面版之前的应用只认 .apk，
+      # 其余附件跳过。Release 正文经环境变量传入，不直接展开进脚本。
+      - name: Write in-app update manifest
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/release-body.md"
+          dart run tool/write_update_manifest.dart \
+            --tag "$GITHUB_REF_NAME" \
+            --artifacts release-artifacts \
+            --published-at "$PUBLISHED_AT" \
+            --notes-fallback "$RUNNER_TEMP/release-body.md" \
+            --out release-artifacts/jotsy-update.json
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.checksums.outputs.artifact_name }}
+          path: |
+            release-artifacts/*.apk
+            release-artifacts/*.tar.gz
+            release-artifacts/*.exe
+            release-artifacts/*.zip
+            release-artifacts/SHA256SUMS.txt
+            release-artifacts/jotsy-update.json
+          if-no-files-found: error
+
+      # 应用（与官网）读到清单或校验文件即认为安装包已就绪，所以它们必须在
+      # 安装包全部传完后才出现。同一步里的多个文件会并发上传，顺序没有保证，
+      # 因此分成两步：先传各平台安装包，再传校验文件与清单。
+      - name: Upload packages to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: |
+            release-artifacts/*.apk
+            release-artifacts/*.tar.gz
+            release-artifacts/*.exe
+            release-artifacts/*.zip
+          fail_on_unmatched_files: true
+          overwrite_files: true
+
+      - name: Upload checksums and update manifest to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: |
+            release-artifacts/SHA256SUMS.txt
+            release-artifacts/jotsy-update.json
+          fail_on_unmatched_files: true
+          overwrite_files: true

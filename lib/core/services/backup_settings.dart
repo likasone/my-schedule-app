@@ -1,0 +1,360 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+
+import 'settings_service.dart';
+
+/// 备份设置的映射与应用，复用 SettingsService 的归一化和通知逻辑。
+/// 仅修改备份支持的设置；媒体路径在校验阶段已经重绑，失败回滚由服务负责。
+class BackupSettings {
+  const BackupSettings._();
+
+  static Map<String, Object?> capture(SettingsService settingsService) => {
+    'themeMode': settingsService.themeModeNotifier.value.name,
+    'themeSeedColorValue': settingsService.themeSeedColorValue,
+    'homeTabSwitchCurveType': settingsService.homeTabSwitchCurveTypeValue,
+    'diaryTypography': settingsService.diaryTypography.toJson(),
+    'fontScale': settingsService.fontScaleValue,
+    'appLocaleCode': settingsService.appLocaleCode,
+    'appLockEnabled': settingsService.isAppLockEnabled,
+    'diarySortModeRaw': settingsService.diarySortModeRaw,
+    'diaryLayoutModeRaw': settingsService.diaryLayoutModeRaw,
+    'diaryCardTagLimit': settingsService.diaryCardTagLimit,
+    'calendarDisplayOptionsRaw': settingsService.calendarDisplayOptionsRaw,
+    'diaryCardStyleRaw': settingsService.diaryCardStyleRaw,
+    'diaryPreviewStyleRaw': settingsService.diaryPreviewStyleRaw,
+    'diaryCodeBlockStyleRaw': settingsService.diaryCodeBlockStyleRaw,
+    'homeBarStyleRaw': settingsService.homeBarStyleRaw,
+    'appSurfaceRaw': settingsService.appSurfaceRaw,
+    'diaryTemplatePrefsRaw': settingsService.diaryTemplatePrefsRaw,
+    // 我的颜色：字段名沿用早先的“最近颜色”，新旧版本的备份互相认得。
+    'diaryRecentColorsRaw': settingsService.diarySavedColorsRaw,
+    'diaryShareOptionsRaw': settingsService.diaryShareOptionsRaw,
+    'diaryExportOptionsRaw': settingsService.diaryExportOptionsRaw,
+    'appFeaturesRaw': settingsService.appFeaturesRaw,
+    'exploreLayoutRaw': settingsService.exploreLayoutRaw,
+    'diaryToolbarOrderRaw': settingsService.diaryToolbarOrderRaw,
+    'diaryToolbarHiddenItemsRaw': settingsService.diaryToolbarHiddenItemsRaw,
+    'diaryToolbarCurrentTimeFormatRaw':
+        settingsService.diaryToolbarCurrentTimeFormatRaw,
+    'tagOrderRaw': settingsService.tagOrderRaw,
+    'tagPickerSortRaw': settingsService.tagPickerSortRaw,
+    'tagFilterMemoryEnabled': settingsService.isTagFilterMemoryEnabled,
+    'rememberedTagFilterIdsRaw': settingsService.rememberedTagFilterIdsRaw,
+    'diaryLocationPrecisionRaw': settingsService.diaryLocationPrecisionRaw,
+  };
+
+  /// 按 [settingsNode] 应用设置；只含部分键的节点只改这些键。
+  ///
+  /// [clearLegacyDraft] 为 true（覆盖恢复）时顺带清掉没迁移的旧版单份草稿，
+  /// 见末尾的说明；局域网同步只应用设置变化，传 false，不碰本机草稿。
+  static Future<void> restore(
+    SettingsService settingsService,
+    Map<String, dynamic>? settingsNode, {
+    bool clearLegacyDraft = true,
+  }) async {
+    if (settingsNode == null) return;
+    final themeRaw = settingsNode['themeMode']?.toString();
+    if (themeRaw != null) {
+      await settingsService.setThemeMode(_parseThemeMode(themeRaw));
+    }
+
+    final themeSeedColorRaw = settingsNode['themeSeedColorValue'];
+    final themeSeedColorValue = switch (themeSeedColorRaw) {
+      int value => value,
+      num value => value.toInt(),
+      String value => int.tryParse(value),
+      _ => null,
+    };
+    if (themeSeedColorValue != null) {
+      await settingsService.setThemeSeedColor(Color(themeSeedColorValue));
+    }
+
+    final tabSwitchCurveTypeRaw = settingsNode['homeTabSwitchCurveType'];
+    if (tabSwitchCurveTypeRaw is String && tabSwitchCurveTypeRaw.isNotEmpty) {
+      await settingsService.setHomeTabSwitchCurveType(
+        switch (tabSwitchCurveTypeRaw) {
+          'easeOutCubic' => HomeTabSwitchCurveType.easeOutCubic,
+          'linear' => HomeTabSwitchCurveType.linear,
+          'easeOutCirc' => HomeTabSwitchCurveType.easeOutCirc,
+          _ => SettingsService.defaultHomeTabSwitchCurveType,
+        },
+      );
+    }
+
+    final diaryTypography = _parseDiaryTypography(settingsNode);
+    if (diaryTypography != null) {
+      await settingsService.setDiaryTypography(diaryTypography);
+    }
+
+    final fontScaleRaw = settingsNode['fontScale'];
+    final fontScale = switch (fontScaleRaw) {
+      double value => value,
+      int value => value.toDouble(),
+      String value => double.tryParse(value),
+      _ => null,
+    };
+    if (fontScale != null) {
+      await settingsService.setFontScale(fontScale);
+    }
+
+    final localeRaw = settingsNode['appLocaleCode']?.toString();
+    if (localeRaw != null && localeRaw.trim().isNotEmpty) {
+      await settingsService.setAppLocaleCode(localeRaw);
+    }
+
+    final appLockRaw = settingsNode['appLockEnabled'];
+    if (appLockRaw is bool) {
+      await settingsService.setAppLockEnabled(appLockRaw);
+    }
+
+    final sortRaw = settingsNode['diarySortModeRaw']?.toString();
+    if (sortRaw != null && sortRaw.isNotEmpty) {
+      await settingsService.setDiarySortModeRaw(sortRaw);
+    }
+
+    final layoutRaw = settingsNode['diaryLayoutModeRaw']?.toString();
+    if (layoutRaw != null && layoutRaw.isNotEmpty) {
+      await settingsService.setDiaryLayoutModeRaw(layoutRaw);
+    }
+
+    final diaryCardTagLimitRaw = settingsNode['diaryCardTagLimit'];
+    final diaryCardTagLimit = switch (diaryCardTagLimitRaw) {
+      int value => value,
+      num value => value.toInt(),
+      String value => int.tryParse(value),
+      _ => null,
+    };
+    if (diaryCardTagLimit != null) {
+      await settingsService.setDiaryCardTagLimit(diaryCardTagLimit);
+    }
+
+    // 旧版备份没有该键时保留本机选项；有键（含 null）时按备份还原。
+    if (settingsNode.containsKey('calendarDisplayOptionsRaw')) {
+      await settingsService.setCalendarDisplayOptionsRaw(
+        settingsNode['calendarDisplayOptionsRaw']?.toString(),
+      );
+    }
+
+    // 同上：旧版备份没有卡片样式时保留本机样式。值是 JSON 字符串；手工
+    // 编辑过的备份若写成了对象，按 JSON 重新编码后交给日记模块容错解析。
+    if (settingsNode.containsKey('diaryCardStyleRaw')) {
+      final cardStyleRaw = settingsNode['diaryCardStyleRaw'];
+      await settingsService.setDiaryCardStyleRaw(switch (cardStyleRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 预览页设置同上：旧版备份没有时保留本机设置，显式 null 时恢复默认。
+    if (settingsNode.containsKey('diaryPreviewStyleRaw')) {
+      final previewStyleRaw = settingsNode['diaryPreviewStyleRaw'];
+      await settingsService.setDiaryPreviewStyleRaw(switch (previewStyleRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 代码块样式同上：旧版备份没有时保留本机样式，显式 null 时恢复默认。
+    if (settingsNode.containsKey('diaryCodeBlockStyleRaw')) {
+      final codeBlockStyleRaw = settingsNode['diaryCodeBlockStyleRaw'];
+      await settingsService.setDiaryCodeBlockStyleRaw(
+        switch (codeBlockStyleRaw) {
+          null => null,
+          String value => value,
+          Map<dynamic, dynamic> value => jsonEncode(value),
+          _ => null,
+        },
+      );
+    }
+
+    // 首页栏样式同上：旧版备份没有时保留本机样式，显式 null 时恢复默认。
+    if (settingsNode.containsKey('homeBarStyleRaw')) {
+      final homeBarStyleRaw = settingsNode['homeBarStyleRaw'];
+      await settingsService.setHomeBarStyleRaw(switch (homeBarStyleRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 背景与材质同上：旧版备份没有时保留本机设置，显式 null 时恢复默认。
+    // 设置里的背景图只有文件名；图片文件由完整备份的 `app_backgrounds/`
+    // 一并落回（见 backupSettingsMediaDirectories），文件名不变，恢复后直接有效。
+    if (settingsNode.containsKey('appSurfaceRaw')) {
+      final appSurfaceRaw = settingsNode['appSurfaceRaw'];
+      await settingsService.setAppSurfaceRaw(switch (appSurfaceRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 模板偏好同上：旧版备份没有时保留本机偏好，显式 null 时恢复默认。
+    if (settingsNode.containsKey('diaryTemplatePrefsRaw')) {
+      final templatePrefsRaw = settingsNode['diaryTemplatePrefsRaw'];
+      await settingsService.setDiaryTemplatePrefsRaw(switch (templatePrefsRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 旧版备份没有我的颜色时保留本机的；值按 JSON 字符串交给日记模块解析。
+    if (settingsNode.containsKey('diaryRecentColorsRaw')) {
+      final savedColorsRaw = settingsNode['diaryRecentColorsRaw'];
+      await settingsService.setDiarySavedColorsRaw(switch (savedColorsRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 旧版备份没有分享开关时保留本机选项；值同样按 JSON 字符串交给日记模块。
+    if (settingsNode.containsKey('diaryShareOptionsRaw')) {
+      final shareOptionsRaw = settingsNode['diaryShareOptionsRaw'];
+      await settingsService.setDiaryShareOptionsRaw(switch (shareOptionsRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 同上：旧版备份没有导出选项时保留本机选项。
+    if (settingsNode.containsKey('diaryExportOptionsRaw')) {
+      final exportOptionsRaw = settingsNode['diaryExportOptionsRaw'];
+      await settingsService.setDiaryExportOptionsRaw(switch (exportOptionsRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 功能管理同上：旧版备份没有时保留本机开关，显式 null 时回到默认（之后
+    // 按库里有没有纪念日决定是否保留纪念日，见 keepLegacyAnniversariesVisible）。
+    if (settingsNode.containsKey('appFeaturesRaw')) {
+      final appFeaturesRaw = settingsNode['appFeaturesRaw'];
+      await settingsService.setAppFeaturesRaw(switch (appFeaturesRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    // 探索页布局同上：旧版备份没有时保留本机布局，显式 null 时回到默认。
+    if (settingsNode.containsKey('exploreLayoutRaw')) {
+      final exploreLayoutRaw = settingsNode['exploreLayoutRaw'];
+      await settingsService.setExploreLayoutRaw(switch (exploreLayoutRaw) {
+        null => null,
+        String value => value,
+        Map<dynamic, dynamic> value => jsonEncode(value),
+        _ => null,
+      });
+    }
+
+    final toolbarRaw = settingsNode['diaryToolbarOrderRaw']?.toString();
+    if (toolbarRaw != null && toolbarRaw.isNotEmpty) {
+      await settingsService.setDiaryToolbarOrderRaw(toolbarRaw);
+    }
+
+    if (settingsNode.containsKey('diaryToolbarHiddenItemsRaw')) {
+      final toolbarHiddenRaw =
+          settingsNode['diaryToolbarHiddenItemsRaw']?.toString() ?? '';
+      await settingsService.setDiaryToolbarHiddenItemsRaw(toolbarHiddenRaw);
+    }
+
+    if (settingsNode.containsKey('diaryToolbarCurrentTimeFormatRaw')) {
+      final toolbarCurrentTimeFormatRaw =
+          settingsNode['diaryToolbarCurrentTimeFormatRaw']?.toString() ?? '';
+      await settingsService.setDiaryToolbarCurrentTimeFormatRaw(
+        toolbarCurrentTimeFormatRaw,
+      );
+    }
+
+    final tagOrderRaw = settingsNode['tagOrderRaw']?.toString();
+    if (tagOrderRaw != null && tagOrderRaw.isNotEmpty) {
+      await settingsService.setTagOrderRaw(tagOrderRaw);
+    }
+
+    // 旧版备份没有标签子页排序时保留本机选择；未知值由日记模块回退为默认。
+    final tagPickerSortRaw = settingsNode['tagPickerSortRaw'];
+    if (tagPickerSortRaw is String && tagPickerSortRaw.isNotEmpty) {
+      await settingsService.setTagPickerSortRaw(tagPickerSortRaw);
+    }
+
+    final tagFilterMemoryEnabledRaw = settingsNode['tagFilterMemoryEnabled'];
+    final tagFilterMemoryEnabled = switch (tagFilterMemoryEnabledRaw) {
+      bool value => value,
+      String value => value.toLowerCase() == 'true',
+      _ => null,
+    };
+    if (tagFilterMemoryEnabled != null) {
+      await settingsService.setTagFilterMemoryEnabled(tagFilterMemoryEnabled);
+    }
+    if (settingsNode.containsKey('rememberedTagFilterIdsRaw')) {
+      final rememberedTagFilterIdsRaw =
+          settingsNode['rememberedTagFilterIdsRaw']?.toString() ?? '';
+      if (settingsService.isTagFilterMemoryEnabled &&
+          rememberedTagFilterIdsRaw.isNotEmpty) {
+        await settingsService.setRememberedTagFilterIdsRaw(
+          rememberedTagFilterIdsRaw,
+        );
+      } else {
+        await settingsService.clearRememberedTagFilterIds();
+      }
+    }
+
+    // 草稿随数据库的草稿表恢复（旧备份设置里的那份已在解析时转成草稿行）。
+    // 本机若还留着没迁移的旧版单份草稿，覆盖恢复时一并清掉，否则下次启动
+    // 会把它迁进刚恢复的草稿箱，多出一份不属于这份备份的草稿。
+    if (clearLegacyDraft) await settingsService.clearCreateDiaryDraft();
+
+    final locationPrecisionRaw = settingsNode['diaryLocationPrecisionRaw']
+        ?.toString();
+    if (locationPrecisionRaw != null && locationPrecisionRaw.isNotEmpty) {
+      await settingsService.setDiaryLocationPrecisionRaw(locationPrecisionRaw);
+    }
+  }
+
+  /// 新备份带 `diaryTypography` 对象；旧备份只有编辑器字号 / 行距三档预设，
+  /// 按本机迁移同一规则换算。两者都没有时返回 null，保留本机排版。
+  /// 导入字体只记 id 不含字体文件：目标设备没有该字体时正文按内置字体显示。
+  static DiaryTypography? _parseDiaryTypography(Map<String, dynamic> node) {
+    final typographyRaw = node['diaryTypography'];
+    if (typographyRaw is Map) {
+      return DiaryTypography.fromJson(typographyRaw.cast<String, Object?>());
+    }
+    final legacyFontSize = node['editorBodyFontSizePreset']?.toString();
+    final legacyLineHeight = node['editorBodyLineHeightPreset']?.toString();
+    if (legacyFontSize == null && legacyLineHeight == null) {
+      return null;
+    }
+    return DiaryTypography.fromLegacyPresets(
+      fontSizePreset: legacyFontSize,
+      lineHeightPreset: legacyLineHeight,
+    );
+  }
+
+  static ThemeMode _parseThemeMode(String value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+}
