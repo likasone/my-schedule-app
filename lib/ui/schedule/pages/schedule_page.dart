@@ -976,12 +976,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // 标签选择行（采用防闪烁 AnimatedContainer 独立胶囊，杜绝 ChoiceChip 的动画抖动与重叠）
-                    Wrap(
+                // 响应式底部工具栏：移动端/安卓窄屏自适应分层，桌面端宽屏两端对齐，彻底消除安卓端“记一笔”按钮挤压变形
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 520;
+
+                    // 1. 快速便签标签胶囊列表
+                    final tagsBlock = Wrap(
                       spacing: 6,
+                      runSpacing: 6,
                       children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
                         final isSel = _selectedNewMemoTag == tag;
                         return _buildQuickMemoTagCapsule(
@@ -993,40 +996,104 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           },
                         );
                       }).toList(),
-                    ),
-                    // 置顶与添加按钮
-                    Row(
-                      children: [
-                        IconButton(
-                          tooltip: _isNewMemoPinned ? '取消置顶' : '置顶本条',
-                          icon: Icon(
-                            _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                            size: 18,
-                            color: _isNewMemoPinned ? Colors.amber : colorScheme.outline,
+                    );
+
+                    // 2. 置顶开关按钮组件
+                    final pinButton = InkWell(
+                      onTap: () {
+                        setState(() => _isNewMemoPinned = !_isNewMemoPinned);
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _isNewMemoPinned
+                              ? Colors.amber.withValues(alpha: 0.15)
+                              : colorScheme.surfaceContainerLow.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _isNewMemoPinned
+                                ? Colors.amber.withValues(alpha: 0.6)
+                                : colorScheme.outlineVariant.withValues(alpha: 0.35),
                           ),
-                          onPressed: () {
-                            setState(() => _isNewMemoPinned = !_isNewMemoPinned);
-                          },
                         ),
-                        FilledButton.icon(
-                          onPressed: () {
-                            final text = _quickMemoController.text.trim();
-                            if (text.isNotEmpty) {
-                              notifier.addQuickMemo(
-                                text,
-                                tag: _selectedNewMemoTag,
-                                isPinned: _isNewMemoPinned,
-                              );
-                              _quickMemoController.clear();
-                              setState(() => _isNewMemoPinned = false);
-                            }
-                          },
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('记一笔'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                              size: 15,
+                              color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _isNewMemoPinned ? '已置顶' : '置顶',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
+                                fontWeight: _isNewMemoPinned ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+
+                    // 3. 记一笔核心添加按钮组件
+                    final submitButton = FilledButton.icon(
+                      onPressed: () {
+                        final text = _quickMemoController.text.trim();
+                        if (text.isNotEmpty) {
+                          notifier.addQuickMemo(
+                            text,
+                            tag: _selectedNewMemoTag,
+                            isPinned: _isNewMemoPinned,
+                          );
+                          _quickMemoController.clear();
+                          setState(() => _isNewMemoPinned = false);
+                        }
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('记一笔'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+
+                    if (isCompact) {
+                      // 安卓等小屏设备：标签胶囊在上，操作栏（置顶 + 记一笔）在下整齐两端对齐，彻底杜绝混乱溢出
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          tagsBlock,
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              pinButton,
+                              submitButton,
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    // Windows 等宽屏设备：保持一行优雅两端对齐
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        tagsBlock,
+                        Row(
+                          children: [
+                            pinButton,
+                            const SizedBox(width: 8),
+                            submitButton,
+                          ],
                         ),
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ],
             ),
