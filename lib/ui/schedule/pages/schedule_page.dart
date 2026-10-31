@@ -137,10 +137,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            // 响应式顶部操作栏：在移动端/安卓竖屏时自适应换行，避免拥挤溢出；在桌面端优雅横向平铺
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 640;
+                final titleBlock = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -150,6 +151,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,
+                            fontSize: isCompact ? 18 : 22,
                           ),
                         ),
                         if (!isToday) ...[
@@ -179,30 +181,86 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                       ),
                     ),
                   ],
-                ),
-                // 新建快捷按钮组与提醒测试
-                Row(
+                );
+
+                if (isCompact) {
+                  // 安卓等小屏设备：标题栏独立置顶，操作按钮整齐平铺于下方，彻底杜绝混乱溢出
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: titleBlock),
+                          IconButton.outlined(
+                            tooltip: '立即测试提醒弹窗',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                            onPressed: () => notifier.triggerTestReminder(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () => _showCreateScheduleDialog(context, state, notifier),
+                              icon: const FaIcon(FontAwesomeIcons.calendarPlus, size: 14),
+                              label: const Text('加日程'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => _showCreatePlanDialog(context, state, notifier),
+                              icon: const FaIcon(FontAwesomeIcons.brain, size: 14),
+                              label: const Text('建计划'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                // Windows 等大屏设备：横向两端对齐展示
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton.outlined(
-                      tooltip: '立即测试提醒弹窗',
-                      icon: const Icon(Icons.notifications_active_outlined, size: 18),
-                      onPressed: () => notifier.triggerTestReminder(),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _showCreateScheduleDialog(context, state, notifier),
-                      icon: const FaIcon(FontAwesomeIcons.calendarPlus, size: 14),
-                      label: const Text('加日程'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: () => _showCreatePlanDialog(context, state, notifier),
-                      icon: const FaIcon(FontAwesomeIcons.brain, size: 14),
-                      label: const Text('建计划'),
+                    titleBlock,
+                    Row(
+                      children: [
+                        IconButton.outlined(
+                          tooltip: '立即测试提醒弹窗',
+                          icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                          onPressed: () => notifier.triggerTestReminder(),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          onPressed: () => _showCreateScheduleDialog(context, state, notifier),
+                          icon: const FaIcon(FontAwesomeIcons.calendarPlus, size: 14),
+                          label: const Text('加日程'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () => _showCreatePlanDialog(context, state, notifier),
+                          icon: const FaIcon(FontAwesomeIcons.brain, size: 14),
+                          label: const Text('建计划'),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(height: 16),
             // 完成度进度条
@@ -517,6 +575,13 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         ),
                       ),
                     ),
+                    // 删除日程待办按钮
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: theme.hintColor,
+                      tooltip: '删除日程',
+                      onPressed: () => _confirmDeleteScheduleEntry(context, entry, notifier),
+                    ),
                   ],
                 ),
                 if (entry.notes.isNotEmpty) ...[
@@ -795,10 +860,12 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      plan.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        plan.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     Text(
@@ -807,6 +874,13 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: theme.hintColor,
+                      tooltip: '删除计划',
+                      onPressed: () => _confirmDeletePlan(context, plan, notifier),
                     ),
                   ],
                 ),
@@ -885,6 +959,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         return ChoiceChip(
                           label: Text(tag, style: const TextStyle(fontSize: 11)),
                           selected: isSel,
+                          showCheckmark: false,
                           visualDensity: VisualDensity.compact,
                           onSelected: (selected) {
                             if (selected) {
@@ -976,6 +1051,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                       return ChoiceChip(
                         label: Text(tag, style: const TextStyle(fontSize: 12)),
                         selected: isSelected,
+                        showCheckmark: false,
                         visualDensity: VisualDensity.compact,
                         onSelected: (val) {
                           if (val) notifier.setSelectedMemoTag(tag);
@@ -1205,6 +1281,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     return ChoiceChip(
                       label: Text(tag),
                       selected: isSel,
+                      showCheckmark: false,
                       onSelected: (selected) {
                         if (selected) {
                           setDialogState(() => currentTag = tag);
@@ -1460,6 +1537,80 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
+  /// 确认删除指定单项日程待办弹窗
+  void _confirmDeleteScheduleEntry(
+    BuildContext context,
+    ScheduleEntry entry,
+    ScheduleNotifier notifier,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('删除日程待办'),
+          ],
+        ),
+        content: Text('确定要删除日程「${entry.title}」吗？\n若已配置高穿透强提醒，该提醒也将一并取消。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              notifier.deleteScheduleEntry(entry.id);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 确认删除艾宾浩斯复习计划弹窗
+  void _confirmDeletePlan(
+    BuildContext context,
+    PlanItem plan,
+    ScheduleNotifier notifier,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text('删除复习计划'),
+          ],
+        ),
+        content: Text('确定要删除计划「${plan.title}」吗？\n注意：此操作将级联删除该计划生成的所有复习日程节点！'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              notifier.deletePlan(plan.id);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 弹窗：新建单项日程提醒（采用现代化卡片视窗，分区清晰明了，杜绝拥挤杂乱）
   void _showCreateScheduleDialog(
     BuildContext context,
@@ -1582,7 +1733,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
                       // 3. 执行时间规划卡片
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(14),
@@ -1592,62 +1743,21 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.schedule_rounded, size: 16, color: colorScheme.primary),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '执行时间',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                // 快捷时间预设
-                                Row(
-                                  children: [
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(6),
-                                      onTap: () {
-                                        setDialogState(() {
-                                          scheduleTime = DateTime.now().add(const Duration(hours: 1));
-                                        });
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        child: Text(
-                                          '1小时后',
-                                          style: TextStyle(fontSize: 11, color: colorScheme.primary),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(6),
-                                      onTap: () {
-                                        final tomorrow = DateTime.now().add(const Duration(days: 1));
-                                        setDialogState(() {
-                                          scheduleTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
-                                        });
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        child: Text(
-                                          '明天09:00',
-                                          style: TextStyle(fontSize: 11, color: colorScheme.primary),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                Icon(Icons.schedule_rounded, size: 16, color: colorScheme.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '执行时间',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 10),
+                            // 日期与时间选择按钮
                             Row(
                               children: [
                                 // 日期按钮
@@ -1743,6 +1853,43 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 10),
+                            // 快捷时间选项
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                _buildTimeShortcutPill(
+                                  label: '1小时后',
+                                  colorScheme: colorScheme,
+                                  onTap: () {
+                                    setDialogState(() {
+                                      scheduleTime = DateTime.now().add(const Duration(hours: 1));
+                                    });
+                                  },
+                                ),
+                                _buildTimeShortcutPill(
+                                  label: '今晚 20:00',
+                                  colorScheme: colorScheme,
+                                  onTap: () {
+                                    final now = DateTime.now();
+                                    setDialogState(() {
+                                      scheduleTime = DateTime(now.year, now.month, now.day, 20, 0);
+                                    });
+                                  },
+                                ),
+                                _buildTimeShortcutPill(
+                                  label: '明天 09:00',
+                                  colorScheme: colorScheme,
+                                  onTap: () {
+                                    final tomorrow = DateTime.now().add(const Duration(days: 1));
+                                    setDialogState(() {
+                                      scheduleTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -1750,7 +1897,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
                       // 4. 强提醒与重复周期卡片
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: enableReminder
                               ? colorScheme.primaryContainer.withValues(alpha: 0.16)
@@ -1808,87 +1955,118 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                             ),
 
                             if (enableReminder) ...[
-                              const Divider(height: 18),
+                              const Divider(height: 20),
                               // 提前量选项
-                              Row(
-                                children: [
-                                  const Text('提前量:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        children: [0, 5, 15, 30, 60].map((mins) {
-                                          final isSel = advanceMinutes == mins;
-                                          final label = mins == 0 ? '准时' : '$mins分前';
-                                          return Padding(
-                                            padding: const EdgeInsets.only(right: 6),
-                                            child: ChoiceChip(
-                                              label: Text(label),
-                                              labelStyle: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                              ),
-                                              selected: isSel,
-                                              visualDensity: VisualDensity.compact,
-                                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                                              onSelected: (selected) {
-                                                if (selected) {
-                                                  setDialogState(() {
-                                                    advanceMinutes = mins;
-                                                  });
-                                                }
-                                              },
-                                            ),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              // 重复周期选项
-                              Row(
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 6),
-                                    child: Text('周期:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const Text(
+                                    '提前提醒时间:',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
-                                      children: ScheduleRepeatRule.values.map((rule) {
-                                        final isSel = selectedRepeatRule == rule;
-                                        return ChoiceChip(
-                                          avatar: rule != ScheduleRepeatRule.none
-                                              ? const Icon(Icons.repeat, size: 12)
-                                              : null,
-                                          label: Text(rule.label),
-                                          labelStyle: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                          ),
-                                          selected: isSel,
-                                          visualDensity: VisualDensity.compact,
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                                          onSelected: (selected) {
-                                            if (selected) {
-                                              setDialogState(() {
-                                                selectedRepeatRule = rule;
-                                              });
-                                            }
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      (0, '准时'),
+                                      (5, '提前5分'),
+                                      (15, '提前15分'),
+                                      (30, '提前30分'),
+                                      (60, '提前1小时'),
+                                    ].map((item) {
+                                      final isSel = advanceMinutes == item.$1;
+                                      return Material(
+                                        color: isSel ? colorScheme.primary : colorScheme.surface,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(8),
+                                          onTap: () {
+                                            setDialogState(() => advanceMinutes = item.$1);
                                           },
-                                        );
-                                      }).toList(),
-                                    ),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: isSel ? colorScheme.primary : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              item.$2,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                                color: isSel ? colorScheme.onPrimary : colorScheme.onSurface,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 14),
+                              // 重复周期选项
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '重复周期:',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: ScheduleRepeatRule.values.map((rule) {
+                                      final isSel = selectedRepeatRule == rule;
+                                      return Material(
+                                        color: isSel ? colorScheme.primary : colorScheme.surface,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(8),
+                                          onTap: () {
+                                            setDialogState(() => selectedRepeatRule = rule);
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: isSel ? colorScheme.primary : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (rule != ScheduleRepeatRule.none) ...[
+                                                  Icon(
+                                                    Icons.repeat,
+                                                    size: 13,
+                                                    color: isSel ? colorScheme.onPrimary : colorScheme.primary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                Text(
+                                                  rule.label,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                                    color: isSel ? colorScheme.onPrimary : colorScheme.onSurface,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
                               // 底部动态预告条
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1962,6 +2140,37 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// 快捷时间微按钮
+  Widget _buildTimeShortcutPill({
+    required String label,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.primary,
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -225,5 +225,47 @@ void main() {
       expect(nextInstance.isCompleted, isFalse);
       expect(nextInstance.repeatRule, equals(ScheduleRepeatRule.daily));
     });
+
+    test('日程待办与艾宾浩斯复习计划的删除与级联清理', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final notifier = container.read(scheduleProvider.notifier);
+      final today = DateTime.now();
+
+      // 1. 测试单项日程待办的创建与删除
+      await notifier.createSingleSchedule(
+        title: '临时测试待办',
+        time: DateTime(today.year, today.month, today.day, 15, 0),
+      );
+      var state = container.read(scheduleProvider);
+      final scheduleEntry = state.entries.firstWhere((e) => e.title == '临时测试待办');
+      expect(scheduleEntry, isNotNull);
+
+      await notifier.deleteScheduleEntry(scheduleEntry.id);
+      state = container.read(scheduleProvider);
+      expect(state.entries.any((e) => e.id == scheduleEntry.id), isFalse);
+
+      // 2. 测试艾宾浩斯复习计划的创建与级联删除
+      await notifier.createPlan(
+        title: 'Flutter 架构设计计划',
+        dayCount: 1,
+      );
+      state = container.read(scheduleProvider);
+      final plan = state.plans.firstWhere((p) => p.title == 'Flutter 架构设计计划');
+      expect(plan, isNotNull);
+      // 确认生成了该计划关联的复习日程
+      expect(state.entries.any((e) => e.planId == plan.id), isTrue);
+
+      // 执行删除计划
+      await notifier.deletePlan(plan.id);
+      state = container.read(scheduleProvider);
+      // 计划本体被删除
+      expect(state.plans.any((p) => p.id == plan.id), isFalse);
+      // 关联的所有复习日程节点被级联清理
+      expect(state.entries.any((e) => e.planId == plan.id), isFalse);
+    });
   });
 }

@@ -646,4 +646,47 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       hasReminder: hasReminder,
     );
   }
+
+  /// 删除指定单项日程待办（并同步取消相关的系统/桌面强提醒）
+  Future<void> deleteScheduleEntry(String entryId) async {
+    ScheduleEntry? targetEntry;
+    for (final e in state.entries) {
+      if (e.id == entryId) {
+        targetEntry = e;
+        break;
+      }
+    }
+
+    // 若存在已绑定的提醒，通知提醒调度器取消该条目的定时通知
+    if (targetEntry != null && targetEntry.hasReminder && targetEntry.reminderTime != null) {
+      try {
+        final reminderService = ref.read(reminderServiceProvider);
+        await reminderService.cancelReminder(
+          ReminderItem(
+            id: targetEntry.id,
+            title: targetEntry.title,
+            reminderTime: targetEntry.reminderTime!,
+          ),
+        );
+      } catch (e) {
+        debugPrint('取消待办日程提醒异常: $e');
+      }
+    }
+
+    // 从列表中过滤剔除该日程条目
+    final updatedEntries = state.entries.where((e) => e.id != entryId).toList();
+    state = state.copyWith(entries: updatedEntries, isLoading: false);
+    await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 删除指定艾宾浩斯复习计划（级联删除该计划创建的所有复习日程节点）
+  Future<void> deletePlan(String planId) async {
+    // 移除计划本体
+    final updatedPlans = state.plans.where((p) => p.id != planId).toList();
+    // 级联清理属于该计划的所有复习节点条目
+    final updatedEntries = state.entries.where((e) => e.planId != planId).toList();
+
+    state = state.copyWith(plans: updatedPlans, entries: updatedEntries, isLoading: false);
+    await _persist(updatedPlans, updatedEntries, state.memos);
+  }
 }
