@@ -39,6 +39,42 @@ enum ScheduleEntryKind {
   task,
 }
 
+/// 日程重复周期规则（Schedule Repeat Rule）
+enum ScheduleRepeatRule {
+  /// 不重复（单次任务）
+  none,
+
+  /// 每天重复（日常习惯、每日例行任务）
+  daily,
+
+  /// 工作日重复（周一至周五，工作会议、上班待办）
+  workdays,
+
+  /// 每周重复（按周循环）
+  weekly,
+
+  /// 每月重复（按月循环，如每月账单、月度报告）
+  monthly;
+
+  /// 中文展示文案
+  String get label => switch (this) {
+    ScheduleRepeatRule.none => '不重复',
+    ScheduleRepeatRule.daily => '每天',
+    ScheduleRepeatRule.workdays => '工作日(周一至周五)',
+    ScheduleRepeatRule.weekly => '每周',
+    ScheduleRepeatRule.monthly => '每月',
+  };
+
+  /// RFC 5545 格式的 RRULE 规则字符串，供写入安卓系统原生日历与小米 HyperOS
+  String? get rrule => switch (this) {
+    ScheduleRepeatRule.none => null,
+    ScheduleRepeatRule.daily => 'FREQ=DAILY',
+    ScheduleRepeatRule.workdays => 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+    ScheduleRepeatRule.weekly => 'FREQ=WEEKLY',
+    ScheduleRepeatRule.monthly => 'FREQ=MONTHLY',
+  };
+}
+
 /// 单项计划实体模型（Plan Item）
 @immutable
 class PlanItem {
@@ -100,6 +136,7 @@ class ScheduleEntry {
     this.reminderTime,
     this.hasReminder = false,
     this.reminderMinutesBefore = 0,
+    this.repeatRule = ScheduleRepeatRule.none,
   });
 
   /// 排程节点唯一标识
@@ -144,6 +181,9 @@ class ScheduleEntry {
   /// 提前多少分钟发起提醒（默认 0 为准时提醒）
   final int reminderMinutesBefore;
 
+  /// 重复周期规则（不重复、每天、工作日、每周、每月）
+  final ScheduleRepeatRule repeatRule;
+
   /// 复制并更新部分属性
   ScheduleEntry copyWith({
     bool? isCompleted,
@@ -155,6 +195,7 @@ class ScheduleEntry {
     DateTime? reminderTime,
     bool? hasReminder,
     int? reminderMinutesBefore,
+    ScheduleRepeatRule? repeatRule,
   }) {
     return ScheduleEntry(
       id: id,
@@ -171,6 +212,7 @@ class ScheduleEntry {
       reminderTime: reminderTime ?? this.reminderTime,
       hasReminder: hasReminder ?? this.hasReminder,
       reminderMinutesBefore: reminderMinutesBefore ?? this.reminderMinutesBefore,
+      repeatRule: repeatRule ?? this.repeatRule,
     );
   }
 }
@@ -206,6 +248,37 @@ class PlanScheduler {
     // 依据 Duration 计算跨月跨年平滑偏移
     final next = base.add(Duration(days: days));
     return formatIsoDate(next);
+  }
+
+  /// 计算下一个重复周期的有效日期（ISO 格式：YYYY-MM-DD）
+  static String calculateNextRepeatDate(String currentIsoDate, ScheduleRepeatRule rule) {
+    final current = parseIsoDate(currentIsoDate);
+    switch (rule) {
+      case ScheduleRepeatRule.none:
+        return currentIsoDate;
+      case ScheduleRepeatRule.daily:
+        // 每日重复：直接递增 1 天
+        return formatIsoDate(current.add(const Duration(days: 1)));
+      case ScheduleRepeatRule.workdays:
+        // 工作日重复：周五顺延到下周一，周六顺延到下周一，其余递增 1 天
+        var next = current.add(const Duration(days: 1));
+        if (next.weekday == DateTime.saturday) {
+          next = next.add(const Duration(days: 2));
+        } else if (next.weekday == DateTime.sunday) {
+          next = next.add(const Duration(days: 1));
+        }
+        return formatIsoDate(next);
+      case ScheduleRepeatRule.weekly:
+        // 每周重复：自然递增 7 天
+        return formatIsoDate(current.add(const Duration(days: 7)));
+      case ScheduleRepeatRule.monthly:
+        // 每月重复：自然递增 1 个月，并防止月末天数越界
+        final year = current.month == 12 ? current.year + 1 : current.year;
+        final month = current.month == 12 ? 1 : current.month + 1;
+        final daysInNextMonth = DateTime(year, month + 1, 0).day;
+        final day = current.day > daysInNextMonth ? daysInNextMonth : current.day;
+        return formatIsoDate(DateTime(year, month, day));
+    }
   }
 
   /// 计算两个 ISO 日期之间的绝对天数差值（后一个减前一个）

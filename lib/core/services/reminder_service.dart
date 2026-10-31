@@ -13,6 +13,7 @@ class ReminderItem {
     required this.reminderTime,
     this.durationMinutes = 30,
     this.calendarEventId,
+    this.rrule,
   });
 
   /// 业务层提醒标识
@@ -33,12 +34,16 @@ class ReminderItem {
   /// 关联的系统原生日历事件 ID（若已同步至日历）
   final int? calendarEventId;
 
+  /// RFC 5545 循环规则（如 FREQ=DAILY, FREQ=WEEKLY 等）
+  final String? rrule;
+
   /// 拷贝并更新字段
   ReminderItem copyWith({
     int? calendarEventId,
     DateTime? reminderTime,
     String? title,
     String? notes,
+    String? rrule,
   }) {
     return ReminderItem(
       id: id,
@@ -47,6 +52,7 @@ class ReminderItem {
       reminderTime: reminderTime ?? this.reminderTime,
       durationMinutes: durationMinutes,
       calendarEventId: calendarEventId ?? this.calendarEventId,
+      rrule: rrule ?? this.rrule,
     );
   }
 }
@@ -137,6 +143,7 @@ class ReminderService {
           'startTimeMillis': startTimeMillis,
           'durationMinutes': item.durationMinutes,
           'existingEventId': item.calendarEventId,
+          'rrule': item.rrule,
         },
       );
 

@@ -175,6 +175,10 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               reminderTime: reminderTimeStr != null ? DateTime.tryParse(reminderTimeStr) : null,
               hasReminder: map['hasReminder'] as bool? ?? (reminderTimeStr != null),
               reminderMinutesBefore: map['reminderMinutesBefore'] as int? ?? 0,
+              repeatRule: ScheduleRepeatRule.values.firstWhere(
+                (r) => r.name == (map['repeatRule'] as String?),
+                orElse: () => ScheduleRepeatRule.none,
+              ),
             );
           }).toList();
         } catch (e) {
@@ -262,6 +266,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               'reminderTime': e.reminderTime?.toIso8601String(),
               'hasReminder': e.hasReminder,
               'reminderMinutesBefore': e.reminderMinutesBefore,
+              'repeatRule': e.repeatRule.name,
             },
           )
           .toList();
@@ -327,13 +332,14 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(updatedPlans, updatedEntries, state.memos);
   }
 
-  /// 创建单项日程待办项（支持指定具体日期和时间点，并可配置强提醒）
+  /// 创建单项日程待办项（支持指定具体日期和时间点，并可配置强提醒与周期性重复）
   Future<void> createSingleSchedule({
     required String title,
     required DateTime time,
     String notes = '',
     bool hasReminder = true,
     int reminderMinutesBefore = 0,
+    ScheduleRepeatRule repeatRule = ScheduleRepeatRule.none,
   }) async {
     final isoDate = PlanScheduler.formatIsoDate(time);
     final entry = ScheduleEntry(
@@ -347,11 +353,12 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       reminderTime: time,
       hasReminder: hasReminder,
       reminderMinutesBefore: reminderMinutesBefore,
+      repeatRule: repeatRule,
     );
 
     final updatedEntries = [...state.entries, entry];
 
-    // 若开启了强提醒，挂载系统日历与闹钟提醒（带异常保护）
+    // 若开启了强提醒，挂载系统日历与闹钟提醒（带异常保护，支持 RFC 5545 周期重复）
     if (hasReminder) {
       try {
         final reminderService = ref.read(reminderServiceProvider);
@@ -362,6 +369,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
             title: entry.title,
             notes: entry.notes.isNotEmpty ? entry.notes : '日程提醒',
             reminderTime: actualAlertTime,
+            rrule: repeatRule.rrule,
           ),
         );
       } catch (e) {
@@ -405,13 +413,14 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     reminderService.triggerDesktopReminder(testItem);
   }
 
-  /// 标记条目打卡完成，并响应记忆反馈（牢固/模糊/遗忘）
+  /// 标记条目打卡完成，并响应记忆反馈（牢固/模糊/遗忘）与周期性任务自动流转
   Future<void> toggleEntryCompletion(
     String entryId, {
     ReviewFeedback? feedback,
   }) async {
     final todayIso = PlanScheduler.formatIsoDate(DateTime.now());
     ScheduleEntry? remedialCreated;
+    ScheduleEntry? recurringNextCreated;
 
     final updatedEntries = state.entries.map((entry) {
       if (entry.id == entryId) {
@@ -426,6 +435,40 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
           );
         }
 
+        // 若为周期性重复任务（如每日习惯、工作日例会等），打卡完成时自动推演并生成下一周期的执行节点
+        if (newCompleted && entry.repeatRule != ScheduleRepeatRule.none) {
+          final nextIso = PlanScheduler.calculateNextRepeatDate(entry.scheduledDate, entry.repeatRule);
+          final nextExists = state.entries.any(
+            (e) => e.planId == entry.planId && e.scheduledDate == nextIso && e.title == entry.title,
+          );
+          if (!nextExists) {
+            DateTime? nextReminderTime;
+            if (entry.reminderTime != null) {
+              final nextBase = PlanScheduler.parseIsoDate(nextIso);
+              nextReminderTime = DateTime(
+                nextBase.year,
+                nextBase.month,
+                nextBase.day,
+                entry.reminderTime!.hour,
+                entry.reminderTime!.minute,
+              );
+            }
+            recurringNextCreated = ScheduleEntry(
+              id: 'entry_${DateTime.now().millisecondsSinceEpoch}_repeat',
+              planId: entry.planId,
+              title: entry.title,
+              scheduledDate: nextIso,
+              stepIndex: entry.stepIndex + 1,
+              kind: entry.kind,
+              notes: entry.notes,
+              reminderTime: nextReminderTime,
+              hasReminder: entry.hasReminder,
+              reminderMinutesBefore: entry.reminderMinutesBefore,
+              repeatRule: entry.repeatRule,
+            );
+          }
+        }
+
         return entry.copyWith(
           isCompleted: newCompleted,
           completedAt: newCompleted ? DateTime.now() : null,
@@ -438,6 +481,11 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     // 如果自适应算法创建了补救复习条目，动态追加
     if (remedialCreated != null) {
       updatedEntries.add(remedialCreated!);
+    }
+
+    // 如果打卡完成触发了下一周期重复任务，动态追加
+    if (recurringNextCreated != null) {
+      updatedEntries.add(recurringNextCreated!);
     }
 
     state = state.copyWith(

@@ -132,5 +132,59 @@ void main() {
       state = container.read(scheduleProvider);
       expect(state.memos.contains('临时代办：给服务器更新证书'), isFalse);
     });
+
+    test('周期性重复任务创建与打卡后自动生成下一周期待办', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final notifier = container.read(scheduleProvider.notifier);
+      final today = DateTime.now();
+
+      // 验证算法计算下一个周期日期
+      expect(
+        PlanScheduler.calculateNextRepeatDate('2026-11-01', ScheduleRepeatRule.daily),
+        equals('2026-11-02'),
+      );
+      // 周五 (2026-11-06) 下一个工作日为周一 (2026-11-09)
+      expect(
+        PlanScheduler.calculateNextRepeatDate('2026-11-06', ScheduleRepeatRule.workdays),
+        equals('2026-11-09'),
+      );
+      // 每周循环 (7天后)
+      expect(
+        PlanScheduler.calculateNextRepeatDate('2026-11-01', ScheduleRepeatRule.weekly),
+        equals('2026-11-08'),
+      );
+
+      // 创建一个每日重复的任务
+      await notifier.createSingleSchedule(
+        title: '每日早起晨读打卡',
+        time: DateTime(today.year, today.month, today.day, 7, 30),
+        repeatRule: ScheduleRepeatRule.daily,
+      );
+
+      var state = container.read(scheduleProvider);
+      final createdEntry = state.entries.firstWhere((e) => e.title == '每日早起晨读打卡');
+      expect(createdEntry.repeatRule, equals(ScheduleRepeatRule.daily));
+
+      // 打卡完成当天的任务
+      await notifier.toggleEntryCompletion(createdEntry.id);
+      state = container.read(scheduleProvider);
+
+      // 验证当天的任务标记为已完成
+      final completedEntry = state.entries.firstWhere((e) => e.id == createdEntry.id);
+      expect(completedEntry.isCompleted, isTrue);
+
+      // 验证自动生成了次日的同名重复待办实例
+      final tomorrowIso = PlanScheduler.addDays(PlanScheduler.formatIsoDate(today), 1);
+      final nextInstance = state.entries.firstWhere(
+        (e) => e.title == '每日早起晨读打卡' && e.scheduledDate == tomorrowIso,
+      );
+      expect(nextInstance, isNotNull);
+      expect(nextInstance.isCompleted, isFalse);
+      expect(nextInstance.repeatRule, equals(ScheduleRepeatRule.daily));
+    });
   });
 }

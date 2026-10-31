@@ -548,52 +548,84 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   ),
                 ],
                 // 提醒时间与状态专属标签行
-                if (entry.reminderTime != null) ...[
+                if (entry.reminderTime != null || entry.repeatRule != ScheduleRepeatRule.none) ...[
                   const SizedBox(height: 6),
                   Padding(
                     padding: const EdgeInsets.only(left: 48.0),
-                    child: InkWell(
-                      onTap: () => notifier.toggleEntryReminder(entry.id),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: entry.hasReminder
-                              ? (entry.isCompleted
-                                  ? colorScheme.surfaceContainer
-                                  : colorScheme.primaryContainer.withValues(alpha: 0.7))
-                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: entry.hasReminder
-                                ? colorScheme.primary.withValues(alpha: 0.4)
-                                : colorScheme.outlineVariant.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              entry.hasReminder ? Icons.alarm_on : Icons.alarm_off,
-                              size: 13,
-                              color: entry.hasReminder
-                                  ? colorScheme.primary
-                                  : colorScheme.outline,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${DateFormat('HH:mm').format(entry.reminderTime!)} '
-                              '${entry.hasReminder ? '强提醒已就绪' : '提醒已暂停 (点击开启)'}',
-                              style: theme.textTheme.labelSmall?.copyWith(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (entry.reminderTime != null)
+                          InkWell(
+                            onTap: () => notifier.toggleEntryReminder(entry.id),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
                                 color: entry.hasReminder
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.outline,
-                                fontWeight: FontWeight.bold,
+                                    ? (entry.isCompleted
+                                        ? colorScheme.surfaceContainer
+                                        : colorScheme.primaryContainer.withValues(alpha: 0.7))
+                                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: entry.hasReminder
+                                      ? colorScheme.primary.withValues(alpha: 0.4)
+                                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    entry.hasReminder ? Icons.alarm_on : Icons.alarm_off,
+                                    size: 13,
+                                    color: entry.hasReminder
+                                        ? colorScheme.primary
+                                        : colorScheme.outline,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${DateFormat('HH:mm').format(entry.reminderTime!)} '
+                                    '${entry.hasReminder ? '强提醒已就绪' : '提醒已暂停 (点击开启)'}',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: entry.hasReminder
+                                          ? colorScheme.onPrimaryContainer
+                                          : colorScheme.outline,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        if (entry.repeatRule != ScheduleRepeatRule.none)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: colorScheme.secondary.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.repeat, size: 13, color: colorScheme.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '周期: ${entry.repeatRule.label}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSecondaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -990,6 +1022,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
     bool enableReminder = true; // 强提醒开关
     int advanceMinutes = 0; // 提前提醒分钟数（0: 准时, 5: 提前5分钟, 15: 提前15分钟, 30: 提前30分钟）
+    ScheduleRepeatRule selectedRepeatRule = ScheduleRepeatRule.none; // 重复周期规则（不重复、每天、工作日、每周、每月）
 
     showDialog<void>(
       context: context,
@@ -1128,6 +1161,30 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                       }).toList(),
                     ),
                     const SizedBox(height: 12),
+                    const Text('重复提醒周期:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: ScheduleRepeatRule.values.map((rule) {
+                        final isSel = selectedRepeatRule == rule;
+                        return ChoiceChip(
+                          avatar: rule != ScheduleRepeatRule.none
+                              ? const Icon(Icons.repeat, size: 14)
+                              : null,
+                          label: Text(rule.label),
+                          selected: isSel,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setDialogState(() {
+                                selectedRepeatRule = rule;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
                     // 提醒预告视窗
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -1138,11 +1195,19 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.notifications_active, size: 20, color: colorScheme.primary),
+                          Icon(
+                            selectedRepeatRule != ScheduleRepeatRule.none
+                                ? Icons.repeat_on
+                                : Icons.notifications_active,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '将于 ${DateFormat('M月d日 HH:mm').format(actualTriggerTime)} 发起高穿透强提醒',
+                              selectedRepeatRule == ScheduleRepeatRule.none
+                                  ? '将于 ${DateFormat('M月d日 HH:mm').format(actualTriggerTime)} 发起高穿透强提醒'
+                                  : '将于每个${selectedRepeatRule.label} ${DateFormat('HH:mm').format(actualTriggerTime)} 准时重复响铃提醒并同步系统日历',
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
@@ -1170,6 +1235,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                       notes: notesController.text,
                       hasReminder: enableReminder,
                       reminderMinutesBefore: advanceMinutes,
+                      repeatRule: selectedRepeatRule,
                     );
                     Navigator.of(ctx).pop();
                   }

@@ -69,6 +69,7 @@ class CalendarReminderChannel(
           val startTimeMillis = call.argument<Long>("startTimeMillis") ?: System.currentTimeMillis()
           val durationMinutes = call.argument<Int>("durationMinutes") ?: 30
           val existingEventId = call.argument<Long>("existingEventId")
+          val rrule = call.argument<String>("rrule")
 
           try {
             val eventId = createOrUpdateEvent(
@@ -76,7 +77,8 @@ class CalendarReminderChannel(
               notes = notes,
               startTimeMillis = startTimeMillis,
               durationMinutes = durationMinutes,
-              existingEventId = existingEventId
+              existingEventId = existingEventId,
+              rrule = rrule
             )
             result.success(eventId)
           } catch (e: Exception) {
@@ -185,7 +187,8 @@ class CalendarReminderChannel(
     notes: String,
     startTimeMillis: Long,
     durationMinutes: Int,
-    existingEventId: Long?
+    existingEventId: Long?,
+    rrule: String? = null
   ): Long {
     val calendarId = getOrCreateCalendarId()
     val endTimeMillis = startTimeMillis + (durationMinutes * 60 * 1000L)
@@ -199,6 +202,9 @@ class CalendarReminderChannel(
       put(CalendarContract.Events.DTEND, endTimeMillis)
       put(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
       put(CalendarContract.Events.HAS_ALARM, 1) // 开启闹钟警报标记
+      if (!rrule.isNullOrEmpty()) {
+        put(CalendarContract.Events.RRULE, rrule) // 写入 RFC 5545 重复规则（如 FREQ=DAILY, FREQ=WEEKLY）
+      }
     }
 
     val eventId: Long
