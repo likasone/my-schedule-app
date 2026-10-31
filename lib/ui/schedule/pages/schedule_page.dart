@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/services/app_service.dart';
 import '../../../core/services/device_auth_service.dart';
 import '../../../core/services/plan_scheduler.dart';
 import '../../../core/services/reminder_service.dart';
