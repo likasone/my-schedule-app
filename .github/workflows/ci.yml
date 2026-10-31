@@ -223,6 +223,15 @@ jobs:
             printf 'storeFile=ci-throwaway.jks\n'
           } > android/key.properties
 
+      # 挂载 6GB Swap 虚拟内存，防止 Gradle、Kotlin 和 R8 峰值内存超出 GitHub runner 7GB 限制导致 OOM 被杀
+      - name: Increase swap space
+        run: |
+          sudo fallocate -l 6G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=6144
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       # 选 release 而不是 debug：AOT 编译、图标字体 tree shaking 与 R8 混淆只在
       # release 里发生，插件升级后最常见的就是这几类只在发布时才暴露的失败。
       # 单一 ABI 足以覆盖 Gradle/R8 与 AOT，三种 ABI 的分包留给发布工作流。
@@ -242,6 +251,15 @@ jobs:
           stat --format=%s build/app/outputs/flutter-apk/app-release.apk |
             awk '{ printf "### Android build\n\napp-release.apk (arm64-v8a): %.1f MiB\n", $1 / 1048576 }' \
             >> "$GITHUB_STEP_SUMMARY"
+
+      # 自动归档并上传 Android Release APK 产物，供在 Actions 页面直接下载安装体验
+      - name: Upload Android release APK
+        if: ${{ !cancelled() && hashFiles('build/app/outputs/flutter-apk/app-release.apk') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
 
   # 桌面构建只验证能否编译（CMake、插件原生代码、AOT），产物不上传：发布包由
   # release-apk.yml 在同一套门禁之后构建、打包并附上校验值，CI 的包没有对应的
@@ -299,6 +317,15 @@ jobs:
           du -sb build/windows/x64/runner/Release |
             awk '{ printf "### Windows build\n\nRelease/: %.1f MiB\n", $1 / 1048576 }' \
             >> "$GITHUB_STEP_SUMMARY"
+
+      # 自动归档并上传 Windows 桌面端 Release 产物目录，供在 Actions 页面直接下载解压即用
+      - name: Upload Windows release bundle
+        if: ${{ !cancelled() && hashFiles('build/windows/x64/runner/Release') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-release-bundle
+          path: build/windows/x64/runner/Release/
+          retention-days: 7
 
   actionlint:
     name: Workflow lint
