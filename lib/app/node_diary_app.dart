@@ -487,7 +487,8 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
       return;
     }
     if (!supportsAuth) {
-      await settingsService.setAppLockEnabled(false);
+      // [修复关键]：当次检测未就绪或临时异常时，绝不能永久篡改或关闭用户的应用锁配置（移除 setAppLockEnabled(false)）
+      // 仅在当前会话安全放行，确保用户的指纹锁持久化配置始终有效
       if (!mounted) {
         return;
       }

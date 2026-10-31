@@ -89,8 +89,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             // 顶部核心看板（数据总览与新建按钮）
             _buildHeaderCard(context, state, notifier, dateDisplayStr),
 
-            // 水平交互式日历条（支持切换日期与完整月历选择）
-            _buildCalendarStrip(context, state, notifier),
+            // 水平交互式日历条（仅在日程与计划视图展示，灵感便签下隐藏，为安卓窄屏释放 64px 空间）
+            if (state.selectedTab != 2)
+              _buildCalendarStrip(context, state, notifier),
 
             // 分类导航标签（日程待办 / 全部计划 / 灵感便签）
             _buildSegmentedTabs(context, state, notifier),
@@ -1015,209 +1016,206 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final memos = state.filteredMemos;
+    final isSearching = state.memoSearchQuery.isNotEmpty;
     const availableTags = ['全部', '闪念', '灵感', '待办', '备忘', '随想'];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         children: [
-          // 1. 记事新建卡片（多行输入 + 标签快速选择 + 置顶开关）
-          Container(
-            padding: const EdgeInsets.all(14.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          // 1. 顶部独立全宽搜索栏（配置 scrollPadding 彻底防止软键盘与输入框遮挡）
+          SizedBox(
+            height: 40,
+            child: TextField(
+              scrollPadding: const EdgeInsets.only(bottom: 240),
+              decoration: InputDecoration(
+                hintText: '搜索便签内容或标签...',
+                hintStyle: const TextStyle(fontSize: 12),
+                prefixIcon: const Icon(Icons.search, size: 17),
+                suffixIcon: isSearching
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 15),
+                        onPressed: () => notifier.setMemoSearchQuery(''),
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onChanged: (val) => notifier.setMemoSearchQuery(val),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _quickMemoController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    hintText: '随时记下闪念、临时要点、工作灵感...',
-                    border: InputBorder.none,
-                    isDense: true,
+          ),
+
+          const SizedBox(height: 8),
+
+          // 2. 标签分类横向滚动条（自适应全宽展示，平滑切换）
+          SizedBox(
+            height: 34,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: availableTags.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, idx) {
+                final tag = availableTags[idx];
+                final isSelected = state.selectedMemoTag == tag;
+                return _buildMemoFilterTagCapsule(
+                  context: context,
+                  tag: tag,
+                  isSelected: isSelected,
+                  onTap: () => notifier.setSelectedMemoTag(tag),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // 3. 记事新建卡片（搜索中自动折叠收起，避免在安卓窄屏下遮挡搜索列表与软键盘；正常时展开输入）
+          if (!isSearching) ...[
+            Container(
+              padding: const EdgeInsets.all(14.0),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _quickMemoController,
+                    maxLines: 2,
+                    scrollPadding: const EdgeInsets.only(bottom: 240),
+                    decoration: const InputDecoration(
+                      hintText: '随时记下闪念、临时要点、工作灵感...',
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                // 响应式底部工具栏：移动端/安卓窄屏自适应分层，桌面端宽屏两端对齐，彻底消除安卓端“记一笔”按钮挤压变形
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 520;
+                  const SizedBox(height: 8),
+                  // 响应式底部工具栏：移动端/安卓窄屏自适应分层，桌面端宽屏两端对齐，彻底消除安卓端“记一笔”按钮挤压变形
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompact = constraints.maxWidth < 520;
 
-                    // 1. 快速便签标签胶囊列表
-                    final tagsBlock = Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
-                        final isSel = _selectedNewMemoTag == tag;
-                        return _buildQuickMemoTagCapsule(
-                          context: context,
-                          tag: tag,
-                          isSelected: isSel,
-                          onTap: () {
-                            setState(() => _selectedNewMemoTag = tag);
-                          },
-                        );
-                      }).toList(),
-                    );
+                      // 1. 快速便签标签胶囊列表
+                      final tagsBlock = Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
+                          final isSel = _selectedNewMemoTag == tag;
+                          return _buildQuickMemoTagCapsule(
+                            context: context,
+                            tag: tag,
+                            isSelected: isSel,
+                            onTap: () {
+                              setState(() => _selectedNewMemoTag = tag);
+                            },
+                          );
+                        }).toList(),
+                      );
 
-                    // 2. 置顶开关按钮组件
-                    final pinButton = InkWell(
-                      onTap: () {
-                        setState(() => _isNewMemoPinned = !_isNewMemoPinned);
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _isNewMemoPinned
-                              ? Colors.amber.withValues(alpha: 0.15)
-                              : colorScheme.surfaceContainerLow.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
+                      // 2. 置顶开关按钮组件
+                      final pinButton = InkWell(
+                        onTap: () {
+                          setState(() => _isNewMemoPinned = !_isNewMemoPinned);
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
                             color: _isNewMemoPinned
-                                ? Colors.amber.withValues(alpha: 0.6)
-                                : colorScheme.outlineVariant.withValues(alpha: 0.35),
+                                ? Colors.amber.withValues(alpha: 0.15)
+                                : colorScheme.surfaceContainerLow.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _isNewMemoPinned
+                                  ? Colors.amber.withValues(alpha: 0.6)
+                                  : colorScheme.outlineVariant.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                size: 15,
+                                color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isNewMemoPinned ? '已置顶' : '置顶',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
+                                  fontWeight: _isNewMemoPinned ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      );
+
+                      // 3. 记一笔核心添加按钮组件
+                      final submitButton = FilledButton.icon(
+                        onPressed: () {
+                          final text = _quickMemoController.text.trim();
+                          if (text.isNotEmpty) {
+                            notifier.addQuickMemo(
+                              text,
+                              tag: _selectedNewMemoTag,
+                              isPinned: _isNewMemoPinned,
+                            );
+                            _quickMemoController.clear();
+                            setState(() => _isNewMemoPinned = false);
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('记一笔'),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+
+                      if (isCompact) {
+                        // 安卓等小屏设备：标签胶囊在上，操作栏（置顶 + 记一笔）在下整齐两端对齐，彻底杜绝混乱溢出
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                              size: 15,
-                              color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _isNewMemoPinned ? '已置顶' : '置顶',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
-                                fontWeight: _isNewMemoPinned ? FontWeight.bold : FontWeight.normal,
-                              ),
+                            tagsBlock,
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                pinButton,
+                                submitButton,
+                              ],
                             ),
                           ],
-                        ),
-                      ),
-                    );
+                        );
+                      }
 
-                    // 3. 记一笔核心添加按钮组件
-                    final submitButton = FilledButton.icon(
-                      onPressed: () {
-                        final text = _quickMemoController.text.trim();
-                        if (text.isNotEmpty) {
-                          notifier.addQuickMemo(
-                            text,
-                            tag: _selectedNewMemoTag,
-                            isPinned: _isNewMemoPinned,
-                          );
-                          _quickMemoController.clear();
-                          setState(() => _isNewMemoPinned = false);
-                        }
-                      },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('记一笔'),
-                      style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    );
-
-                    if (isCompact) {
-                      // 安卓等小屏设备：标签胶囊在上，操作栏（置顶 + 记一笔）在下整齐两端对齐，彻底杜绝混乱溢出
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // Windows 等宽屏设备：保持一行优雅两端对齐
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           tagsBlock,
-                          const SizedBox(height: 10),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               pinButton,
+                              const SizedBox(width: 8),
                               submitButton,
                             ],
                           ),
                         ],
                       );
-                    }
-
-                    // Windows 等宽屏设备：保持一行优雅两端对齐
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        tagsBlock,
-                        Row(
-                          children: [
-                            pinButton,
-                            const SizedBox(width: 8),
-                            submitButton,
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // 2. 检索与分类筛选条
-          Row(
-            children: [
-              // 快速搜索栏
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 38,
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: '搜索便签...',
-                      hintStyle: const TextStyle(fontSize: 12),
-                      prefixIcon: const Icon(Icons.search, size: 16),
-                      suffixIcon: state.memoSearchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 14),
-                              onPressed: () => notifier.setMemoSearchQuery(''),
-                            )
-                          : null,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onChanged: (val) => notifier.setMemoSearchQuery(val),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // 标签分类横向滚动条（采用防闪烁胶囊，杜绝 Windows 焦点切换闪烁）
-              Expanded(
-                flex: 3,
-                child: SizedBox(
-                  height: 38,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: availableTags.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 6),
-                    itemBuilder: (context, idx) {
-                      final tag = availableTags[idx];
-                      final isSelected = state.selectedMemoTag == tag;
-                      return _buildMemoFilterTagCapsule(
-                        context: context,
-                        tag: tag,
-                        isSelected: isSelected,
-                        onTap: () => notifier.setSelectedMemoTag(tag),
-                      );
                     },
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 10),
+          ],
 
           const SizedBox(height: 12),
 
