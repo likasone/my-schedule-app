@@ -251,7 +251,7 @@ class ReminderService {
   }
 
   /// 供测试与即时预览验证桌面端提醒响应
-  @visibleForTesting
+  // @visibleForTesting 注释保留，允许UI测试触发
   void triggerDesktopReminder(ReminderItem item) {
     onDesktopReminderTriggered?.call(item);
   }

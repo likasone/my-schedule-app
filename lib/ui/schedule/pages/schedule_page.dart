@@ -5,6 +5,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/plan_scheduler.dart';
+import '../../../core/services/reminder_service.dart';
 import '../providers/schedule_provider.dart';
 
 /// 日程、计划、复习与便签核心页面（Schedule & Plan Page）
