@@ -1820,7 +1820,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                                       child: Row(
                                         children: [0, 5, 15, 30, 60].map((mins) {
                                           final isSel = advanceMinutes == mins;
-                                          final label = mins == 0 ? '准时' : '${mins}分前';
+                                          final label = mins == 0 ? '准时' : '$mins分前';
                                           return Padding(
                                             padding: const EdgeInsets.only(right: 6),
                                             child: ChoiceChip(
