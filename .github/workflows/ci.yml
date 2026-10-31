@@ -230,7 +230,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          # sudo rm -rf "$AGENT_TOOLSDIRECTORY" # 注释保留不启用：AGENT_TOOLSDIRECTORY包含Flutter和Java，避免被误删
           df -h
 
       # 挂载 2GB 额外 Swap 虚拟内存，防止 Gradle、Kotlin 和 R8 峰值内存超限，同时保留充足磁盘空间
