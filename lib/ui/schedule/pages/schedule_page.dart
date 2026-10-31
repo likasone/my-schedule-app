@@ -1460,7 +1460,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 弹窗：新建单项日程提醒（支持精确日历选择与时间设定）
+  /// 弹窗：新建单项日程提醒（采用现代化卡片视窗，分区清晰明了，杜绝拥挤杂乱）
   void _showCreateScheduleDialog(
     BuildContext context,
     ScheduleState state,
@@ -1469,7 +1469,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     final titleController = TextEditingController();
     final notesController = TextEditingController();
 
-    // 默认使用当前选定日期并配合当前时分
+    // 默认使用当前选定日期并配合当前时分推后 1 小时
     final baseDate = PlanScheduler.parseIsoDate(state.effectiveDateIso);
     final now = DateTime.now();
     DateTime scheduleTime = DateTime(
@@ -1478,11 +1478,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       baseDate.day,
       now.hour,
       now.minute,
-    ).add(const Duration(hours: 1)); // 默认设为 1 小时后
+    ).add(const Duration(hours: 1));
 
     bool enableReminder = true; // 强提醒开关
-    int advanceMinutes = 0; // 提前提醒分钟数（0: 准时, 5: 提前5分钟, 15: 提前15分钟, 30: 提前30分钟）
-    ScheduleRepeatRule selectedRepeatRule = ScheduleRepeatRule.none; // 重复周期规则（不重复、每天、工作日、每周、每月）
+    int advanceMinutes = 0; // 提前提醒分钟数（0: 准时, 5: 提前5分钟, 15: 提前15分钟, 30: 提前30分钟, 60: 提前1小时）
+    ScheduleRepeatRule selectedRepeatRule = ScheduleRepeatRule.none; // 重复周期规则
 
     showDialog<void>(
       context: context,
@@ -1491,218 +1491,475 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
           final theme = Theme.of(context);
           final colorScheme = theme.colorScheme;
           final actualTriggerTime = scheduleTime.subtract(Duration(minutes: advanceMinutes));
+          final weekdayStr = const ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][scheduleTime.weekday - 1];
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.alarm_add, color: Colors.amber),
-                SizedBox(width: 8),
-                Text('新建日程提醒'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: '日程待办内容',
-                      hintText: '如：项目评审、电话沟通、重要待办',
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: '备注',
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '设定提醒日期与时间:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  // 日期与时间选择器操作区
-                  Row(
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(22.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // 选择日期按钮（弹出日历大盘）
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_month, size: 16),
-                          label: Text(DateFormat('M月d日').format(scheduleTime)),
-                          onPressed: () async {
-                            final pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: scheduleTime,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2035),
-                              helpText: '选择日程日期',
-                            );
-                            if (pickedDate != null) {
-                              setDialogState(() {
-                                scheduleTime = DateTime(
-                                  pickedDate.year,
-                                  pickedDate.month,
-                                  pickedDate.day,
-                                  scheduleTime.hour,
-                                  scheduleTime.minute,
-                                );
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // 选择时间按钮（弹出时钟大盘）
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.access_time, size: 16),
-                          label: Text(DateFormat('HH:mm').format(scheduleTime)),
-                          onPressed: () async {
-                            final pickedTime = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.fromDateTime(scheduleTime),
-                              helpText: '设定提醒时间',
-                            );
-                            if (pickedTime != null) {
-                              setDialogState(() {
-                                scheduleTime = DateTime(
-                                  scheduleTime.year,
-                                  scheduleTime.month,
-                                  scheduleTime.day,
-                                  pickedTime.hour,
-                                  pickedTime.minute,
-                                );
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // 强提醒开关
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('高穿透定时提醒', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('支持系统日历不可杀保活与前台响铃通知', style: TextStyle(fontSize: 12)),
-                    value: enableReminder,
-                    onChanged: (val) {
-                      setDialogState(() {
-                        enableReminder = val;
-                      });
-                    },
-                  ),
-                  if (enableReminder) ...[
-                    const SizedBox(height: 8),
-                    const Text('提前量:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [0, 5, 15, 30, 60].map((mins) {
-                        final isSel = advanceMinutes == mins;
-                        final label = mins == 0 ? '准时' : '提前$mins分';
-                        return ChoiceChip(
-                          label: Text(label),
-                          selected: isSel,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setDialogState(() {
-                                advanceMinutes = mins;
-                              });
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('重复提醒周期:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: ScheduleRepeatRule.values.map((rule) {
-                        final isSel = selectedRepeatRule == rule;
-                        return ChoiceChip(
-                          avatar: rule != ScheduleRepeatRule.none
-                              ? const Icon(Icons.repeat, size: 14)
-                              : null,
-                          label: Text(rule.label),
-                          selected: isSel,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setDialogState(() {
-                                selectedRepeatRule = rule;
-                              });
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 12),
-                    // 提醒预告视窗
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
+                      // 1. 顶部标题栏
+                      Row(
                         children: [
-                          Icon(
-                            selectedRepeatRule != ScheduleRepeatRule.none
-                                ? Icons.repeat_on
-                                : Icons.notifications_active,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              selectedRepeatRule == ScheduleRepeatRule.none
-                                  ? '将于 ${DateFormat('M月d日 HH:mm').format(actualTriggerTime)} 发起高穿透强提醒'
-                                  : '将于每个${selectedRepeatRule.label} ${DateFormat('HH:mm').format(actualTriggerTime)} 准时重复响铃提醒并同步系统日历',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(10),
                             ),
+                            child: Icon(Icons.alarm_add_rounded, color: colorScheme.primary, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '新建日程提醒',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                                Text(
+                                  '规划待办事项与高穿透定时闹钟',
+                                  style: TextStyle(fontSize: 11, color: theme.hintColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            tooltip: '关闭',
+                            onPressed: () => Navigator.of(ctx).pop(),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ],
+                      const SizedBox(height: 16),
+
+                      // 2. 事项输入区
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                        decoration: InputDecoration(
+                          hintText: '日程待办内容（如：项目评审、沟通电话）',
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                          prefixIcon: const Icon(Icons.check_circle_outline, size: 20),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: notesController,
+                        maxLines: 2,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: '添加补充备注（可选）',
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                          prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 3. 执行时间规划卡片
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.schedule_rounded, size: 16, color: colorScheme.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '执行时间',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                // 快捷时间预设
+                                Row(
+                                  children: [
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: () {
+                                        setDialogState(() {
+                                          scheduleTime = DateTime.now().add(const Duration(hours: 1));
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        child: Text(
+                                          '1小时后',
+                                          style: TextStyle(fontSize: 11, color: colorScheme.primary),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: () {
+                                        final tomorrow = DateTime.now().add(const Duration(days: 1));
+                                        setDialogState(() {
+                                          scheduleTime = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        child: Text(
+                                          '明天09:00',
+                                          style: TextStyle(fontSize: 11, color: colorScheme.primary),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                // 日期按钮
+                                Expanded(
+                                  flex: 6,
+                                  child: Material(
+                                    color: colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(10),
+                                      onTap: () async {
+                                        final pickedDate = await showDatePicker(
+                                          context: context,
+                                          initialDate: scheduleTime,
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime(2035),
+                                          helpText: '选择日程日期',
+                                        );
+                                        if (pickedDate != null) {
+                                          setDialogState(() {
+                                            scheduleTime = DateTime(
+                                              pickedDate.year,
+                                              pickedDate.month,
+                                              pickedDate.day,
+                                              scheduleTime.hour,
+                                              scheduleTime.minute,
+                                            );
+                                          });
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.calendar_month_outlined, size: 18, color: Colors.blueAccent),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${DateFormat('M月d日').format(scheduleTime)} $weekdayStr',
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // 时间按钮
+                                Expanded(
+                                  flex: 4,
+                                  child: Material(
+                                    color: colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(10),
+                                      onTap: () async {
+                                        final pickedTime = await showTimePicker(
+                                          context: context,
+                                          initialTime: TimeOfDay.fromDateTime(scheduleTime),
+                                          helpText: '设定提醒时间',
+                                        );
+                                        if (pickedTime != null) {
+                                          setDialogState(() {
+                                            scheduleTime = DateTime(
+                                              scheduleTime.year,
+                                              scheduleTime.month,
+                                              scheduleTime.day,
+                                              pickedTime.hour,
+                                              pickedTime.minute,
+                                            );
+                                          });
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.access_time_rounded, size: 18, color: Colors.orangeAccent),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              DateFormat('HH:mm').format(scheduleTime),
+                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 4. 强提醒与重复周期卡片
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: enableReminder
+                              ? colorScheme.primaryContainer.withValues(alpha: 0.16)
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: enableReminder
+                                ? colorScheme.primary.withValues(alpha: 0.3)
+                                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 提醒开关
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      enableReminder ? Icons.notifications_active_rounded : Icons.notifications_off_outlined,
+                                      size: 18,
+                                      color: enableReminder ? colorScheme.primary : theme.disabledColor,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '高穿透定时提醒',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: enableReminder ? colorScheme.onSurface : theme.disabledColor,
+                                          ),
+                                        ),
+                                        Text(
+                                          '系统日历协同保活与桌面强响铃',
+                                          style: TextStyle(fontSize: 11, color: theme.hintColor),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                Switch(
+                                  value: enableReminder,
+                                  onChanged: (val) {
+                                    setDialogState(() {
+                                      enableReminder = val;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            if (enableReminder) ...[
+                              const Divider(height: 18),
+                              // 提前量选项
+                              Row(
+                                children: [
+                                  const Text('提前量:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: [0, 5, 15, 30, 60].map((mins) {
+                                          final isSel = advanceMinutes == mins;
+                                          final label = mins == 0 ? '准时' : '${mins}分前';
+                                          return Padding(
+                                            padding: const EdgeInsets.only(right: 6),
+                                            child: ChoiceChip(
+                                              label: Text(label),
+                                              labelStyle: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                              selected: isSel,
+                                              visualDensity: VisualDensity.compact,
+                                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                                              onSelected: (selected) {
+                                                if (selected) {
+                                                  setDialogState(() {
+                                                    advanceMinutes = mins;
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // 重复周期选项
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6),
+                                    child: Text('周期:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: ScheduleRepeatRule.values.map((rule) {
+                                        final isSel = selectedRepeatRule == rule;
+                                        return ChoiceChip(
+                                          avatar: rule != ScheduleRepeatRule.none
+                                              ? const Icon(Icons.repeat, size: 12)
+                                              : null,
+                                          label: Text(rule.label),
+                                          labelStyle: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                          selected: isSel,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          onSelected: (selected) {
+                                            if (selected) {
+                                              setDialogState(() {
+                                                selectedRepeatRule = rule;
+                                              });
+                                            }
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // 底部动态预告条
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primaryContainer.withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      selectedRepeatRule != ScheduleRepeatRule.none
+                                          ? Icons.repeat_on_rounded
+                                          : Icons.alarm_rounded,
+                                      size: 16,
+                                      color: colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        selectedRepeatRule == ScheduleRepeatRule.none
+                                            ? '将于 ${DateFormat('M月d日 HH:mm').format(actualTriggerTime)} 发起高穿透强提醒'
+                                            : '每个${selectedRepeatRule.label} ${DateFormat('HH:mm').format(actualTriggerTime)} 响铃并同步日历',
+                                        style: TextStyle(
+                                          color: colorScheme.onPrimaryContainer,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 5. 底部操作栏
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('取消'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            icon: const Icon(Icons.check, size: 16),
+                            label: const Text('保存日程'),
+                            onPressed: () {
+                              if (titleController.text.trim().isNotEmpty) {
+                                notifier.createSingleSchedule(
+                                  title: titleController.text,
+                                  time: scheduleTime,
+                                  notes: notesController.text,
+                                  hasReminder: enableReminder,
+                                  reminderMinutesBefore: advanceMinutes,
+                                  repeatRule: selectedRepeatRule,
+                                );
+                                Navigator.of(ctx).pop();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (titleController.text.trim().isNotEmpty) {
-                    notifier.createSingleSchedule(
-                      title: titleController.text,
-                      time: scheduleTime,
-                      notes: notesController.text,
-                      hasReminder: enableReminder,
-                      reminderMinutesBefore: advanceMinutes,
-                      repeatRule: selectedRepeatRule,
-                    );
-                    Navigator.of(ctx).pop();
-                  }
-                },
-                child: const Text('保存并设定提醒'),
-              ),
-            ],
           );
         },
       ),
