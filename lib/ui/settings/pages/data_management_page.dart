@@ -12,7 +12,8 @@ import '../../home/widgets/home_hint_visibility_scope.dart';
 import '../../widgets/action_loading_overlay.dart';
 import '../../widgets/delayed_loading_gate.dart';
 import '../controllers/data_management_controller.dart';
-import '../controllers/journal_import_controller.dart';
+// 【代码保存，注释不启用】：按需保留第三方导入能力，精简当前界面
+// import '../controllers/journal_import_controller.dart';
 import '../../widgets/form_width.dart';
 import 'package:node_diary/ui/app_surface/models/app_surface_enums.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_page_background.dart';
@@ -34,9 +35,8 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage>
   late final DataManagementController _controller = DataManagementController(
     this,
   );
-  late final JournalImportController _journalImport = JournalImportController(
-    this,
-  );
+  // 【代码保存，注释不启用】：第三方外部日记应用导入控制器
+  // late final JournalImportController _journalImport = JournalImportController(this);
   bool _busy = false;
   String _busyText = '';
 
@@ -172,6 +172,8 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage>
                               ),
                               onTap: _controller.importData,
                             ),
+                            // 【代码保存，注释不启用】：第三方外部日记应用导入入口（按需保留底层实现，精简当前界面体验）
+                            /*
                             ListTile(
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -191,6 +193,7 @@ class _DataManagementPageState extends ConsumerState<DataManagementPage>
                               ),
                               onTap: _journalImport.importFromApp,
                             ),
+                            */
                             ListTile(
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
