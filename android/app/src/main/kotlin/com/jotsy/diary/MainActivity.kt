@@ -37,6 +37,7 @@ class MainActivity : FlutterFragmentActivity() {
   private var longImageSlicer: DiaryLongImageSlicer? = null
   private var appUpdateInstaller: AppUpdateInstaller? = null
   private var lanSyncChannel: LanSyncChannel? = null
+  private var calendarReminderChannel: CalendarReminderChannel? = null
   // Must match launchBrandMarkEntrypointArg in lib/app/launch_brand_mark.dart.
   private val launchBrandMarkArg = "--launch-brand-mark"
 
@@ -201,6 +202,8 @@ class MainActivity : FlutterFragmentActivity() {
     appUpdateInstaller = AppUpdateInstaller(this, flutterEngine.dartExecutor.binaryMessenger)
     lanSyncChannel?.dispose()
     lanSyncChannel = LanSyncChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+    calendarReminderChannel?.dispose()
+    calendarReminderChannel = CalendarReminderChannel(this, flutterEngine.dartExecutor.binaryMessenger)
     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, configChannelName)
       .setMethodCallHandler { call, result ->
         when (call.method) {
@@ -365,10 +368,23 @@ class MainActivity : FlutterFragmentActivity() {
     appUpdateInstaller = null
     lanSyncChannel?.dispose()
     lanSyncChannel = null
+    calendarReminderChannel?.dispose()
+    calendarReminderChannel = null
     pendingBackupSaveResult?.success(null)
     clearPendingBackupSave()
     setPredictiveBackProgressEnabled(false)
     super.onDestroy()
+  }
+
+  override fun onRequestPermissionsResult(
+    requestCode: Int,
+    permissions: Array<out String>,
+    grantResults: IntArray
+  ) {
+    if (calendarReminderChannel?.onRequestPermissionsResult(requestCode, grantResults) == true) {
+      return
+    }
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
   }
 
   class PredictiveBackFlutterFragment : FlutterFragment() {

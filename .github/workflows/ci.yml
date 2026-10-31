@@ -232,6 +232,12 @@ jobs:
           sudo swapon /swapfile_extra
           free -h
 
+      # 授权 Android SDK 目录读写权限并接受所有许可证，避免 sdkmanager 下载安装 NDK 时非零退出
+      - name: Prepare Android SDK permissions & licenses
+        run: |
+          sudo chown -R $USER:$USER /usr/local/lib/android/sdk
+          yes | sdkmanager --licenses || true
+
       # 选 release 而不是 debug：AOT 编译、图标字体 tree shaking 与 R8 混淆只在
       # release 里发生，插件升级后最常见的就是这几类只在发布时才暴露的失败。
       # 单一 ABI 足以覆盖 Gradle/R8 与 AOT，三种 ABI 的分包留给发布工作流。
