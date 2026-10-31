@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_platform.dart';
 import 'diary_typography.dart';
 
 export 'diary_typography.dart';
@@ -300,7 +301,10 @@ class SettingsService {
     if (storedLocaleCode == null) {
       await prefs.setString(_keyAppLocaleCode, localeCode);
     }
-    final appLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? false;
+    // 应用锁初始化：首次安装（未显式配置过该项）且在移动端（Android/iOS）时，
+    // 默认启用指纹/生物识别锁；系统启动后若检测到设备未录入生物识别会自动安全降级。
+    final bool defaultAppLock = AppPlatform.isMobile;
+    final appLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? defaultAppLock;
     final tagFilterMemoryEnabled =
         prefs.getBool(_keyTagFilterMemoryEnabled) ?? false;
     final storedDayPhotoSuggestions = prefs.get(_keyDayPhotoSuggestionsEnabled);

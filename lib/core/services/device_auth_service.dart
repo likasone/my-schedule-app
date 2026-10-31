@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:local_auth_android/local_auth_android.dart';
 
 /// 设备身份验证（指纹、面容或锁屏密码）。
 ///
@@ -40,6 +41,16 @@ class DeviceAuthService {
         biometricOnly: false,
         sensitiveTransaction: true,
         persistAcrossBackgrounding: persistAcrossBackgrounding,
+        authMessages: const <AuthMessages>[
+          // Android 原生指纹与生物识别中文提示（避免系统默认英文导致混淆）
+          AndroidAuthMessages(
+            signInTitle: '指纹与安全解锁',
+            biometricHint: '轻触指纹传感器以验证身份',
+            cancelButton: '取消',
+            deviceCredentialsRequiredTitle: '需要屏幕锁定密码',
+            deviceCredentialsSetupDescription: '请在手机系统设置中配置锁屏密码或录入指纹',
+          ),
+        ],
       );
     } catch (_) {
       return false;
