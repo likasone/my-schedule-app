@@ -414,7 +414,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 分段导航切换组件
+  /// 分段导航切换组件（防闪烁、平滑动画过渡）
   Widget _buildSegmentedTabs(
     BuildContext context,
     ScheduleState state,
@@ -424,14 +424,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         children: [
+          // 选项卡 0：日程待办
           _buildTabItem(
             context,
             index: 0,
-            title: '日程/复习待办 (${state.selectedDateEntries.length})',
+            title: '日程待办 (${state.selectedDateEntries.length})',
             isSelected: state.selectedTab == 0,
             onTap: () => notifier.setTab(0),
           ),
           const SizedBox(width: 8),
+          // 选项卡 1：全部计划
           _buildTabItem(
             context,
             index: 1,
@@ -440,10 +442,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             onTap: () => notifier.setTab(1),
           ),
           const SizedBox(width: 8),
+          // 选项卡 2：灵感便签（便签选项）
           _buildTabItem(
             context,
             index: 2,
-            title: '随手记事 (${state.memos.length})',
+            title: '灵感便签 (${state.memos.length})',
             isSelected: state.selectedTab == 2,
             onTap: () => notifier.setTab(2),
           ),
@@ -453,6 +456,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   }
 
   /// 单个 Tab 胶囊组件
+  /// [优化关键]：引入 AnimatedContainer 平滑颜色与边框过渡（200ms），
+  /// 并显式屏蔽 Windows 平台下的焦点闪烁（focusColor/highlightColor/splashColor），
+  /// 彻底根除点击切换便签选项时先前选中按钮的突变与闪烁现象（Flicker-Free）。
   Widget _buildTabItem(
     BuildContext context, {
     required int index,
@@ -464,28 +470,50 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     final colorScheme = theme.colorScheme;
 
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
+      child: Material(
+        // 绑定确定性 Key 防止树重建混乱
+        key: ValueKey('segmented_tab_btn_$index'),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10.0),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colorScheme.primaryContainer
-                : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16.0),
+          // 彻底禁用 Windows 桌面端由于 FocusNode 焦点转移引发的高亮闪烁
+          focusColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: colorScheme.primary.withValues(alpha: 0.04),
+          child: AnimatedContainer(
+            // 200ms 平滑动画曲线，消除颜色与尺寸跳变
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(vertical: 10.0),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
               color: isSelected
-                  ? colorScheme.primary.withValues(alpha: 0.4)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  ? colorScheme.primaryContainer
+                  : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16.0),
+              border: Border.all(
+                color: isSelected
+                    ? colorScheme.primary.withValues(alpha: 0.5)
+                    : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                width: isSelected ? 1.5 : 1.0,
+              ),
             ),
-          ),
-          child: Text(
-            title,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              style: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+              ),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ),
@@ -951,20 +979,17 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 标签选择行
+                    // 标签选择行（采用防闪烁 AnimatedContainer 独立胶囊，杜绝 ChoiceChip 的动画抖动与重叠）
                     Wrap(
                       spacing: 6,
                       children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
                         final isSel = _selectedNewMemoTag == tag;
-                        return ChoiceChip(
-                          label: Text(tag, style: const TextStyle(fontSize: 11)),
-                          selected: isSel,
-                          showCheckmark: false,
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _selectedNewMemoTag = tag);
-                            }
+                        return _buildQuickMemoTagCapsule(
+                          context: context,
+                          tag: tag,
+                          isSelected: isSel,
+                          onTap: () {
+                            setState(() => _selectedNewMemoTag = tag);
                           },
                         );
                       }).toList(),
@@ -1036,7 +1061,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 ),
               ),
               const SizedBox(width: 8),
-              // 标签分类横向滚动条
+              // 标签分类横向滚动条（采用防闪烁胶囊，杜绝 Windows 焦点切换闪烁）
               Expanded(
                 flex: 3,
                 child: SizedBox(
@@ -1048,14 +1073,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     itemBuilder: (context, idx) {
                       final tag = availableTags[idx];
                       final isSelected = state.selectedMemoTag == tag;
-                      return ChoiceChip(
-                        label: Text(tag, style: const TextStyle(fontSize: 12)),
-                        selected: isSelected,
-                        showCheckmark: false,
-                        visualDensity: VisualDensity.compact,
-                        onSelected: (val) {
-                          if (val) notifier.setSelectedMemoTag(tag);
-                        },
+                      return _buildMemoFilterTagCapsule(
+                        context: context,
+                        tag: tag,
+                        isSelected: isSelected,
+                        onTap: () => notifier.setSelectedMemoTag(tag),
                       );
                     },
                   ),
@@ -1100,6 +1122,112 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 新建便签卡片中的小标签选择胶囊（无闪烁、平滑动画过渡）
+  /// [防闪烁关键]：替代 Material 3 ChoiceChip，采用 AnimatedContainer 与透明 Material，
+  /// 彻底阻断 Windows 平台下 RawChip 内部动画与鼠标 Hover 冲突造成的白光闪烁。
+  Widget _buildQuickMemoTagCapsule({
+    required BuildContext context,
+    required String tag,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      key: ValueKey('quick_memo_tag_$tag'),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        focusColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              width: 1.0,
+            ),
+          ),
+          child: Text(
+            tag,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 便签分类检索标签胶囊（无闪烁、平滑动画过渡）
+  /// [防闪烁关键]：横向列表项赋予确定性 ValueKey，平滑过渡选中状态，不产生焦点跳动。
+  Widget _buildMemoFilterTagCapsule({
+    required BuildContext context,
+    required String tag,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      key: ValueKey('memo_filter_tag_$tag'),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        focusColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Text(
+            tag,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ),
     );
   }
