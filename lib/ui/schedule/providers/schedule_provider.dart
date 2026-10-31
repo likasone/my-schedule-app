@@ -158,6 +158,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
           final decoded = jsonDecode(entriesJson) as List;
           loadedEntries = decoded.map((item) {
             final map = item as Map<String, dynamic>;
+            final reminderTimeStr = map['reminderTime'] as String?;
             return ScheduleEntry(
               id: map['id'] as String,
               planId: map['planId'] as String,
@@ -171,6 +172,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               isCompleted: map['isCompleted'] as bool? ?? false,
               originalDueDate: map['originalDueDate'] as String?,
               notes: map['notes'] as String? ?? '',
+              reminderTime: reminderTimeStr != null ? DateTime.tryParse(reminderTimeStr) : null,
+              hasReminder: map['hasReminder'] as bool? ?? (reminderTimeStr != null),
+              reminderMinutesBefore: map['reminderMinutesBefore'] as int? ?? 0,
             );
           }).toList();
         } catch (e) {
@@ -255,6 +259,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               'isCompleted': e.isCompleted,
               'originalDueDate': e.originalDueDate,
               'notes': e.notes,
+              'reminderTime': e.reminderTime?.toIso8601String(),
+              'hasReminder': e.hasReminder,
+              'reminderMinutesBefore': e.reminderMinutesBefore,
             },
           )
           .toList();
@@ -320,11 +327,13 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(updatedPlans, updatedEntries, state.memos);
   }
 
-  /// 创建单项日程待办项（支持指定具体日期和时间点）
+  /// 创建单项日程待办项（支持指定具体日期和时间点，并可配置强提醒）
   Future<void> createSingleSchedule({
     required String title,
     required DateTime time,
     String notes = '',
+    bool hasReminder = true,
+    int reminderMinutesBefore = 0,
   }) async {
     final isoDate = PlanScheduler.formatIsoDate(time);
     final entry = ScheduleEntry(
@@ -335,23 +344,29 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       stepIndex: 0,
       kind: ScheduleEntryKind.task,
       notes: notes.trim(),
+      reminderTime: time,
+      hasReminder: hasReminder,
+      reminderMinutesBefore: reminderMinutesBefore,
     );
 
     final updatedEntries = [...state.entries, entry];
 
-    // 挂载高穿透提醒（带异常保护）
-    try {
-      final reminderService = ref.read(reminderServiceProvider);
-      await reminderService.scheduleComprehensiveReminder(
-        ReminderItem(
-          id: entry.id,
-          title: entry.title,
-          notes: entry.notes,
-          reminderTime: time,
-        ),
-      );
-    } catch (e) {
-      debugPrint('调度高穿透提醒异常，已保存日程: $e');
+    // 若开启了强提醒，挂载系统日历与闹钟提醒（带异常保护）
+    if (hasReminder) {
+      try {
+        final reminderService = ref.read(reminderServiceProvider);
+        final actualAlertTime = time.subtract(Duration(minutes: reminderMinutesBefore));
+        await reminderService.scheduleComprehensiveReminder(
+          ReminderItem(
+            id: entry.id,
+            title: entry.title,
+            notes: entry.notes.isNotEmpty ? entry.notes : '日程提醒',
+            reminderTime: actualAlertTime,
+          ),
+        );
+      } catch (e) {
+        debugPrint('调度高穿透提醒异常，已保存日程: $e');
+      }
     }
 
     state = state.copyWith(
@@ -359,6 +374,35 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       isLoading: false, // 显式解除 loading，防止任何转圈卡顿
     );
     await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 切换指定条目的提醒状态（开启/关闭）
+  Future<void> toggleEntryReminder(String entryId) async {
+    final updatedEntries = state.entries.map((entry) {
+      if (entry.id == entryId) {
+        final newHasReminder = !entry.hasReminder;
+        return entry.copyWith(hasReminder: newHasReminder);
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries, isLoading: false);
+    await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 触发即时桌面/端侧提醒测试（供用户直观检验闹钟与通知弹窗）
+  Future<void> triggerTestReminder({String? customTitle}) async {
+    final reminderService = ref.read(reminderServiceProvider);
+    final now = DateTime.now();
+    final testItem = ReminderItem(
+      id: 'test_reminder_${now.millisecondsSinceEpoch}',
+      title: customTitle ?? '【测试提醒】日程与高穿透闹钟正常运作',
+      notes: '测试时间: ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
+      reminderTime: now,
+    );
+
+    // 触发桌面端/平台即时提醒测试
+    reminderService.triggerDesktopReminder(testItem);
   }
 
   /// 标记条目打卡完成，并响应记忆反馈（牢固/模糊/遗忘）

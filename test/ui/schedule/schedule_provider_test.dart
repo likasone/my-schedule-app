@@ -105,7 +105,15 @@ void main() {
         (e) => e.title == '重要技术答辩',
       );
       expect(targetEntry.scheduledDate, equals(futureDate));
+      expect(targetEntry.hasReminder, isTrue);
+      expect(targetEntry.reminderTime, equals(DateTime(2026, 11, 15, 14, 30)));
       expect(state.isLoading, isFalse);
+
+      // 验证切换提醒开关
+      await notifier.toggleEntryReminder(targetEntry.id);
+      state = container.read(scheduleProvider);
+      final updatedEntry = state.entries.firstWhere((e) => e.id == targetEntry.id);
+      expect(updatedEntry.hasReminder, isFalse);
     });
 
     test('便签记事的添加与删除', () async {

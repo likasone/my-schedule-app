@@ -97,6 +97,9 @@ class ScheduleEntry {
     this.feedback,
     this.originalDueDate,
     this.notes = '',
+    this.reminderTime,
+    this.hasReminder = false,
+    this.reminderMinutesBefore = 0,
   });
 
   /// 排程节点唯一标识
@@ -132,6 +135,15 @@ class ScheduleEntry {
   /// 阶段笔记或反思总结
   final String notes;
 
+  /// 设定提醒的具体时间戳（含时分秒）
+  final DateTime? reminderTime;
+
+  /// 是否激活定时强提醒（闹钟与日历事件）
+  final bool hasReminder;
+
+  /// 提前多少分钟发起提醒（默认 0 为准时提醒）
+  final int reminderMinutesBefore;
+
   /// 复制并更新部分属性
   ScheduleEntry copyWith({
     bool? isCompleted,
@@ -140,6 +152,9 @@ class ScheduleEntry {
     String? scheduledDate,
     String? originalDueDate,
     String? notes,
+    DateTime? reminderTime,
+    bool? hasReminder,
+    int? reminderMinutesBefore,
   }) {
     return ScheduleEntry(
       id: id,
@@ -153,6 +168,9 @@ class ScheduleEntry {
       feedback: feedback ?? this.feedback,
       originalDueDate: originalDueDate ?? this.originalDueDate,
       notes: notes ?? this.notes,
+      reminderTime: reminderTime ?? this.reminderTime,
+      hasReminder: hasReminder ?? this.hasReminder,
+      reminderMinutesBefore: reminderMinutesBefore ?? this.reminderMinutesBefore,
     );
   }
 }

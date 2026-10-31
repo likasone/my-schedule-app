@@ -19,6 +19,48 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   final TextEditingController _quickMemoController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // 注册桌面端与全局提醒监听，到期时在前台弹窗展示并发出提示
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final reminderService = ref.read(reminderServiceProvider);
+      reminderService.onDesktopReminderTriggered = (item) {
+        if (!mounted) return;
+        _showDesktopReminderAlert(item);
+      };
+    });
+  }
+
+  /// 桌面端与前台到期提醒展示弹窗
+  void _showDesktopReminderAlert(ReminderItem item) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.alarm_on, color: Colors.amber, size: 48),
+        title: Text('⏰ 日程提醒: ${item.title}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('提醒时间: ${DateFormat('yyyy年M月d日 HH:mm').format(item.reminderTime)}'),
+            if (item.notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('备注: ${item.notes}'),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('我知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   void dispose() {
     _quickMemoController.dispose();
     super.dispose();
@@ -134,9 +176,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     ),
                   ],
                 ),
-                // 新建快捷按钮组
+                // 新建快捷按钮组与提醒测试
                 Row(
                   children: [
+                    IconButton.outlined(
+                      tooltip: '立即测试提醒弹窗',
+                      icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                      onPressed: () => notifier.triggerTestReminder(),
+                    ),
+                    const SizedBox(width: 8),
                     FilledButton.tonalIcon(
                       onPressed: () => _showCreateScheduleDialog(context, state, notifier),
                       icon: const FaIcon(FontAwesomeIcons.calendarPlus, size: 14),
@@ -496,6 +544,56 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+                // 提醒时间与状态专属标签行
+                if (entry.reminderTime != null) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 48.0),
+                    child: InkWell(
+                      onTap: () => notifier.toggleEntryReminder(entry.id),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: entry.hasReminder
+                              ? (entry.isCompleted
+                                  ? colorScheme.surfaceContainer
+                                  : colorScheme.primaryContainer.withValues(alpha: 0.7))
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: entry.hasReminder
+                                ? colorScheme.primary.withValues(alpha: 0.4)
+                                : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              entry.hasReminder ? Icons.alarm_on : Icons.alarm_off,
+                              size: 13,
+                              color: entry.hasReminder
+                                  ? colorScheme.primary
+                                  : colorScheme.outline,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${DateFormat('HH:mm').format(entry.reminderTime!)} '
+                              '${entry.hasReminder ? '强提醒已就绪' : '提醒已暂停 (点击开启)'}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: entry.hasReminder
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.outline,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -890,119 +988,197 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       now.minute,
     ).add(const Duration(hours: 1)); // 默认设为 1 小时后
 
+    bool enableReminder = true; // 强提醒开关
+    int advanceMinutes = 0; // 提前提醒分钟数（0: 准时, 5: 提前5分钟, 15: 提前15分钟, 30: 提前30分钟）
+
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('新建日程提醒'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final actualTriggerTime = scheduleTime.subtract(Duration(minutes: advanceMinutes));
+
+          return AlertDialog(
+            title: const Row(
               children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: '日程待办内容',
-                    hintText: '如：项目评审、电话沟通、重要待办',
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: '备注',
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '选择提醒日期与时间:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                // 日期与时间选择器操作区
-                Row(
-                  children: [
-                    // 选择日期按钮（弹出日历大盘）
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.calendar_month, size: 16),
-                        label: Text(DateFormat('M月d日').format(scheduleTime)),
-                        onPressed: () async {
-                          final pickedDate = await showDatePicker(
-                            context: context,
-                            initialDate: scheduleTime,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2035),
-                            helpText: '选择日程日期',
-                          );
-                          if (pickedDate != null) {
-                            setDialogState(() {
-                              scheduleTime = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                scheduleTime.hour,
-                                scheduleTime.minute,
-                              );
-                            });
-                          }
-                        },
-                      ),
+                Icon(Icons.alarm_add, color: Colors.amber),
+                SizedBox(width: 8),
+                Text('新建日程提醒'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: '日程待办内容',
+                      hintText: '如：项目评审、电话沟通、重要待办',
                     ),
-                    const SizedBox(width: 8),
-                    // 选择时间按钮（弹出时钟大盘）
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.access_time, size: 16),
-                        label: Text(DateFormat('HH:mm').format(scheduleTime)),
-                        onPressed: () async {
-                          final pickedTime = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(scheduleTime),
-                            helpText: '设定提醒时间',
-                          );
-                          if (pickedTime != null) {
-                            setDialogState(() {
-                              scheduleTime = DateTime(
-                                scheduleTime.year,
-                                scheduleTime.month,
-                                scheduleTime.day,
-                                pickedTime.hour,
-                                pickedTime.minute,
-                              );
-                            });
-                          }
-                        },
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: '备注',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '设定提醒日期与时间:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  // 日期与时间选择器操作区
+                  Row(
+                    children: [
+                      // 选择日期按钮（弹出日历大盘）
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_month, size: 16),
+                          label: Text(DateFormat('M月d日').format(scheduleTime)),
+                          onPressed: () async {
+                            final pickedDate = await showDatePicker(
+                              context: context,
+                              initialDate: scheduleTime,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2035),
+                              helpText: '选择日程日期',
+                            );
+                            if (pickedDate != null) {
+                              setDialogState(() {
+                                scheduleTime = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                  scheduleTime.hour,
+                                  scheduleTime.minute,
+                                );
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 选择时间按钮（弹出时钟大盘）
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.access_time, size: 16),
+                          label: Text(DateFormat('HH:mm').format(scheduleTime)),
+                          onPressed: () async {
+                            final pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.fromDateTime(scheduleTime),
+                              helpText: '设定提醒时间',
+                            );
+                            if (pickedTime != null) {
+                              setDialogState(() {
+                                scheduleTime = DateTime(
+                                  scheduleTime.year,
+                                  scheduleTime.month,
+                                  scheduleTime.day,
+                                  pickedTime.hour,
+                                  pickedTime.minute,
+                                );
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // 强提醒开关
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('高穿透定时提醒', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('支持系统日历不可杀保活与前台响铃通知', style: TextStyle(fontSize: 12)),
+                    value: enableReminder,
+                    onChanged: (val) {
+                      setDialogState(() {
+                        enableReminder = val;
+                      });
+                    },
+                  ),
+                  if (enableReminder) ...[
+                    const SizedBox(height: 8),
+                    const Text('提前量:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [0, 5, 15, 30, 60].map((mins) {
+                        final isSel = advanceMinutes == mins;
+                        final label = mins == 0 ? '准时' : '提前$mins分';
+                        return ChoiceChip(
+                          label: Text(label),
+                          selected: isSel,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setDialogState(() {
+                                advanceMinutes = mins;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    // 提醒预告视窗
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.notifications_active, size: 20, color: colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '将于 ${DateFormat('M月d日 HH:mm').format(actualTriggerTime)} 发起高穿透强提醒',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (titleController.text.trim().isNotEmpty) {
-                  notifier.createSingleSchedule(
-                    title: titleController.text,
-                    time: scheduleTime,
-                    notes: notesController.text,
-                  );
-                  Navigator.of(ctx).pop();
-                }
-              },
-              child: const Text('保存并设定提醒'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (titleController.text.trim().isNotEmpty) {
+                    notifier.createSingleSchedule(
+                      title: titleController.text,
+                      time: scheduleTime,
+                      notes: notesController.text,
+                      hasReminder: enableReminder,
+                      reminderMinutesBefore: advanceMinutes,
+                    );
+                    Navigator.of(ctx).pop();
+                  }
+                },
+                child: const Text('保存并设定提醒'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
