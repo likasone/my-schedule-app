@@ -116,21 +116,60 @@ void main() {
       expect(updatedEntry.hasReminder, isFalse);
     });
 
-    test('便签记事的添加与删除', () async {
+    test('便签记事的添加、编辑、置顶与一键转日程', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       final notifier = container.read(scheduleProvider.notifier);
-      await notifier.addQuickMemo('临时代办：给服务器更新证书');
+      await notifier.addQuickMemo(
+        '临时代办：给服务器更新证书',
+        tag: '待办',
+        isPinned: false,
+      );
 
       var state = container.read(scheduleProvider);
-      expect(state.memos.first, equals('临时代办：给服务器更新证书'));
+      final memo = state.memos.firstWhere((m) => m.content == '临时代办：给服务器更新证书');
+      expect(memo.tag, equals('待办'));
+      expect(memo.isPinned, isFalse);
 
-      await notifier.deleteQuickMemo(0);
+      // 验证置顶功能
+      await notifier.togglePinMemo(memo.id);
       state = container.read(scheduleProvider);
-      expect(state.memos.contains('临时代办：给服务器更新证书'), isFalse);
+      final pinnedMemo = state.memos.firstWhere((m) => m.id == memo.id);
+      expect(pinnedMemo.isPinned, isTrue);
+      // 验证在 filteredMemos 中置顶排在最前
+      expect(state.filteredMemos.first.id, equals(memo.id));
+
+      // 验证编辑功能
+      await notifier.updateMemo(
+        id: memo.id,
+        content: '临时代办：给核心集群更新 SSL 证书',
+        tag: '备忘',
+      );
+      state = container.read(scheduleProvider);
+      final updatedMemo = state.memos.firstWhere((m) => m.id == memo.id);
+      expect(updatedMemo.content, equals('临时代办：给核心集群更新 SSL 证书'));
+      expect(updatedMemo.tag, equals('备忘'));
+
+      // 验证一键转日程待办
+      final scheduleTargetTime = DateTime(2026, 11, 20, 16, 0);
+      await notifier.convertMemoToSchedule(
+        memoId: memo.id,
+        scheduleTime: scheduleTargetTime,
+      );
+      state = container.read(scheduleProvider);
+      final createdTask = state.entries.firstWhere(
+        (e) => e.notes == updatedMemo.content,
+      );
+      expect(createdTask.scheduledDate, equals('2026-11-20'));
+      expect(createdTask.hasReminder, isTrue);
+
+      // 验证删除便签
+      await notifier.deleteMemo(memo.id);
+      state = container.read(scheduleProvider);
+      expect(state.memos.any((m) => m.id == memo.id), isFalse);
     });
 
     test('周期性重复任务创建与打卡后自动生成下一周期待办', () async {

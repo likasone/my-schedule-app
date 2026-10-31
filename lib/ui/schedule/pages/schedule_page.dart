@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +18,8 @@ class SchedulePage extends ConsumerStatefulWidget {
 
 class _SchedulePageState extends ConsumerState<SchedulePage> {
   final TextEditingController _quickMemoController = TextEditingController();
+  String _selectedNewMemoTag = '闪念';
+  bool _isNewMemoPinned = false;
 
   @override
   void initState() {
@@ -834,7 +837,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 视图 3：随手记事便签板
+  /// 视图 3：随手记事便签板（支持多行输入、标签分类、快速搜索、置顶、一键转日程）
   Widget _buildMemosView(
     BuildContext context,
     ScheduleState state,
@@ -842,68 +845,524 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final memos = state.memos;
+    final memos = state.filteredMemos;
+    const availableTags = ['全部', '闪念', '灵感', '待办', '备忘', '随想'];
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         children: [
+          // 1. 记事新建卡片（多行输入 + 标签快速选择 + 置顶开关）
+          Container(
+            padding: const EdgeInsets.all(14.0),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _quickMemoController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    hintText: '随时记下闪念、临时要点、工作灵感...',
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 标签选择行
+                    Wrap(
+                      spacing: 6,
+                      children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
+                        final isSel = _selectedNewMemoTag == tag;
+                        return ChoiceChip(
+                          label: Text(tag, style: const TextStyle(fontSize: 11)),
+                          selected: isSel,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedNewMemoTag = tag);
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    // 置顶与添加按钮
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: _isNewMemoPinned ? '取消置顶' : '置顶本条',
+                          icon: Icon(
+                            _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                            size: 18,
+                            color: _isNewMemoPinned ? Colors.amber : colorScheme.outline,
+                          ),
+                          onPressed: () {
+                            setState(() => _isNewMemoPinned = !_isNewMemoPinned);
+                          },
+                        ),
+                        FilledButton.icon(
+                          onPressed: () {
+                            final text = _quickMemoController.text.trim();
+                            if (text.isNotEmpty) {
+                              notifier.addQuickMemo(
+                                text,
+                                tag: _selectedNewMemoTag,
+                                isPinned: _isNewMemoPinned,
+                              );
+                              _quickMemoController.clear();
+                              setState(() => _isNewMemoPinned = false);
+                            }
+                          },
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('记一笔'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // 2. 检索与分类筛选条
           Row(
             children: [
+              // 快速搜索栏
               Expanded(
-                child: TextField(
-                  controller: _quickMemoController,
-                  decoration: InputDecoration(
-                    hintText: '随手记录闪念灵感、临时待办...',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                flex: 2,
+                child: SizedBox(
+                  height: 38,
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: '搜索便签...',
+                      hintStyle: const TextStyle(fontSize: 12),
+                      prefixIcon: const Icon(Icons.search, size: 16),
+                      suffixIcon: state.memoSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 14),
+                              onPressed: () => notifier.setMemoSearchQuery(''),
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (val) => notifier.setMemoSearchQuery(val),
                   ),
-                  onSubmitted: (text) {
-                    notifier.addQuickMemo(text);
-                    _quickMemoController.clear();
-                  },
                 ),
               ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: () {
-                  notifier.addQuickMemo(_quickMemoController.text);
-                  _quickMemoController.clear();
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加'),
+              const SizedBox(width: 8),
+              // 标签分类横向滚动条
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 38,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: availableTags.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (context, idx) {
+                      final tag = availableTags[idx];
+                      final isSelected = state.selectedMemoTag == tag;
+                      return ChoiceChip(
+                        label: Text(tag, style: const TextStyle(fontSize: 12)),
+                        selected: isSelected,
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (val) {
+                          if (val) notifier.setSelectedMemoTag(tag);
+                        },
+                      );
+                    },
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 12),
+
+          // 3. 便签列表展示
           Expanded(
             child: memos.isEmpty
                 ? Center(
-                    child: Text(
-                      '便签板暂无内容，随时记下一笔吧',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.note_alt_outlined,
+                          size: 48,
+                          color: colorScheme.outline.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          state.memoSearchQuery.isNotEmpty
+                              ? '未找到匹配“${state.memoSearchQuery}”的便签'
+                              : '便签板暂无内容，随时记下灵感并支持一键转日程',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 24),
                     itemCount: memos.length,
                     itemBuilder: (context, index) {
                       final memo = memos[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          title: Text(memo, style: theme.textTheme.bodyMedium),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            onPressed: () => notifier.deleteQuickMemo(index),
-                          ),
-                        ),
-                      );
+                      return _buildMemoCard(context, memo, notifier);
                     },
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 单项便签卡片渲染（含置顶标记、标签、时间戳、一键复制、一键转日程与编辑）
+  Widget _buildMemoCard(
+    BuildContext context,
+    MemoItem memo,
+    ScheduleNotifier notifier,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final timeStr = DateFormat('M月d日 HH:mm').format(memo.createdAt);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: memo.isPinned
+              ? Colors.amber.withValues(alpha: 0.6)
+              : colorScheme.outlineVariant.withValues(alpha: 0.3),
+          width: memo.isPinned ? 1.5 : 1.0,
+        ),
+      ),
+      color: memo.isPinned
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
+          : colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 卡片顶栏：分类标签 + 时间戳 + 置顶标记
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    memo.tag,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  timeStr,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.outline,
+                  ),
+                ),
+                const Spacer(),
+                if (memo.isPinned) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.push_pin, size: 12, color: Colors.amber),
+                        SizedBox(width: 2),
+                        Text('置顶', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            // 便签正文（点击可触发编辑）
+            InkWell(
+              onTap: () => _showEditMemoDialog(context, memo, notifier),
+              child: Text(
+                memo.content,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            const Divider(height: 20),
+            // 卡片底部快捷操作条（置顶 / 转日程 / 复制 / 编辑 / 删除）
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // 置顶按钮
+                IconButton(
+                  tooltip: memo.isPinned ? '取消置顶' : '置顶便签',
+                  icon: Icon(
+                    memo.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    size: 16,
+                    color: memo.isPinned ? Colors.amber : colorScheme.outline,
+                  ),
+                  onPressed: () => notifier.togglePinMemo(memo.id),
+                ),
+                // 一键转日程待办
+                TextButton.icon(
+                  icon: const Icon(Icons.event_available, size: 14),
+                  label: const Text('转日程', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _showConvertMemoToScheduleDialog(context, memo, notifier),
+                ),
+                // 复制全文
+                IconButton(
+                  tooltip: '复制全文',
+                  icon: const Icon(Icons.copy, size: 16),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: memo.content));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('已复制便签内容到剪贴板'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                ),
+                // 编辑修改
+                IconButton(
+                  tooltip: '编辑便签',
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  onPressed: () => _showEditMemoDialog(context, memo, notifier),
+                ),
+                // 删除
+                IconButton(
+                  tooltip: '删除便签',
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  onPressed: () => notifier.deleteMemo(memo.id),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 弹窗：编辑记事便签内容与属性
+  void _showEditMemoDialog(
+    BuildContext context,
+    MemoItem memo,
+    ScheduleNotifier notifier,
+  ) {
+    final controller = TextEditingController(text: memo.content);
+    String currentTag = memo.tag;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('编辑便签'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: '便签正文',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('分类标签:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: ['闪念', '灵感', '待办', '备忘', '随想'].map((tag) {
+                    final isSel = currentTag == tag;
+                    return ChoiceChip(
+                      label: Text(tag),
+                      selected: isSel,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setDialogState(() => currentTag = tag);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  notifier.updateMemo(
+                    id: memo.id,
+                    content: text,
+                    tag: currentTag,
+                  );
+                  Navigator.of(ctx).pop();
+                }
+              },
+              child: const Text('保存修改'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 弹窗：一键将随手记事转换为正式日程待办
+  void _showConvertMemoToScheduleDialog(
+    BuildContext context,
+    MemoItem memo,
+    ScheduleNotifier notifier,
+  ) {
+    final titleController = TextEditingController(
+      text: memo.content.length > 20 ? '${memo.content.substring(0, 20)}...' : memo.content,
+    );
+    DateTime targetTime = DateTime.now().add(const Duration(hours: 1));
+    bool enableReminder = true;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.event_available, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('将便签转为日程'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: '日程待办标题'),
+                ),
+                const SizedBox(height: 14),
+                const Text('设定执行与提醒时间:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today, size: 14),
+                        label: Text(DateFormat('M月d日').format(targetTime)),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: targetTime,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2035),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              targetTime = DateTime(
+                                picked.year,
+                                picked.month,
+                                picked.day,
+                                targetTime.hour,
+                                targetTime.minute,
+                              );
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.access_time, size: 14),
+                        label: Text(DateFormat('HH:mm').format(targetTime)),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(targetTime),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              targetTime = DateTime(
+                                targetTime.year,
+                                targetTime.month,
+                                targetTime.day,
+                                picked.hour,
+                                picked.minute,
+                              );
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('开启强提醒', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  value: enableReminder,
+                  onChanged: (val) => setDialogState(() => enableReminder = val),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                notifier.convertMemoToSchedule(
+                  memoId: memo.id,
+                  scheduleTime: targetTime,
+                  title: titleController.text,
+                  hasReminder: enableReminder,
+                );
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已成功将便签转为日程待办，并在日程中心生成！'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: const Text('立即转换'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -437,3 +437,91 @@ class PlanScheduler {
     return allEntries.where((e) => e.scheduledDate == targetDateIso).toList();
   }
 }
+
+/// 闪念与随手记事便签实体模型（Memo Item）
+@immutable
+class MemoItem {
+  const MemoItem({
+    required this.id,
+    required this.content,
+    required this.createdAt,
+    this.updatedAt,
+    this.isPinned = false,
+    this.tag = '闪念',
+  });
+
+  /// 便签唯一标识符
+  final String id;
+
+  /// 便签内容文本（支持多行随想、待办灵感）
+  final String content;
+
+  /// 创建时间戳
+  final DateTime createdAt;
+
+  /// 最后修改更新时间戳
+  final DateTime? updatedAt;
+
+  /// 是否置顶显示
+  final bool isPinned;
+
+  /// 分类标签（如：闪念、灵感、待办、备忘、随想）
+  final String tag;
+
+  /// 转换为 JSON 存储 Map
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'content': content,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt?.toIso8601String(),
+    'isPinned': isPinned,
+    'tag': tag,
+  };
+
+  /// 从 JSON 容错反序列化，无缝兼容旧版本的纯文本 String 格式
+  factory MemoItem.fromJson(dynamic json) {
+    if (json is String) {
+      return MemoItem(
+        id: 'memo_${json.hashCode.abs()}',
+        content: json,
+        createdAt: DateTime.now(),
+      );
+    }
+    if (json is Map<String, dynamic>) {
+      return MemoItem(
+        id: json['id'] as String? ?? 'memo_${DateTime.now().millisecondsSinceEpoch}',
+        content: json['content'] as String? ?? '',
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+            : DateTime.now(),
+        updatedAt: json['updatedAt'] != null
+            ? DateTime.tryParse(json['updatedAt'] as String)
+            : null,
+        isPinned: json['isPinned'] as bool? ?? false,
+        tag: json['tag'] as String? ?? '闪念',
+      );
+    }
+    return MemoItem(
+      id: 'memo_${DateTime.now().millisecondsSinceEpoch}',
+      content: json.toString(),
+      createdAt: DateTime.now(),
+    );
+  }
+
+  /// 拷贝并更新属性
+  MemoItem copyWith({
+    String? content,
+    DateTime? updatedAt,
+    bool? isPinned,
+    String? tag,
+  }) {
+    return MemoItem(
+      id: id,
+      content: content ?? this.content,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isPinned: isPinned ?? this.isPinned,
+      tag: tag ?? this.tag,
+    );
+  }
+}

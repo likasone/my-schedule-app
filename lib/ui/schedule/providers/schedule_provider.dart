@@ -16,6 +16,8 @@ class ScheduleState {
     this.selectedTab = 0, // 0: 日程/复习待办, 1: 全部计划, 2: 灵感便签
     this.isLoading = false,
     this.selectedDateIso,
+    this.memoSearchQuery = '',
+    this.selectedMemoTag = '全部',
   });
 
   /// 所有的计划集合
@@ -24,8 +26,14 @@ class ScheduleState {
   /// 所有的排程执行条目（含初学、艾宾浩斯复习、自适应补救）
   final List<ScheduleEntry> entries;
 
-  /// 快速记事便签列表
-  final List<String> memos;
+  /// 快速记事便签列表（实体列表）
+  final List<MemoItem> memos;
+
+  /// 记事检索关键词
+  final String memoSearchQuery;
+
+  /// 当前选中的记事分类标签（'全部' / '闪念' / '灵感' / '待办' / '备忘' / '随想'）
+  final String selectedMemoTag;
 
   /// 当前选中的视图 Tab
   final int selectedTab;
@@ -35,6 +43,26 @@ class ScheduleState {
 
   /// 当前选中的日历查看日期（格式：YYYY-MM-DD，为空则默认为今日）
   final String? selectedDateIso;
+
+  /// 经过排序与搜索过滤后的便签列表（置顶优先，其次按更新/创建时间倒序）
+  List<MemoItem> get filteredMemos {
+    var list = memos;
+    if (selectedMemoTag != '全部') {
+      list = list.where((m) => m.tag == selectedMemoTag).toList();
+    }
+    if (memoSearchQuery.trim().isNotEmpty) {
+      final q = memoSearchQuery.trim().toLowerCase();
+      list = list.where((m) => m.content.toLowerCase().contains(q)).toList();
+    }
+    return List<MemoItem>.from(list)..sort((a, b) {
+      if (a.isPinned != b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+      final timeA = a.updatedAt ?? a.createdAt;
+      final timeB = b.updatedAt ?? b.createdAt;
+      return timeB.compareTo(timeA);
+    });
+  }
 
   /// 获取当前有效的查看日期 ISO 字符串
   String get effectiveDateIso =>
@@ -66,10 +94,12 @@ class ScheduleState {
   ScheduleState copyWith({
     List<PlanItem>? plans,
     List<ScheduleEntry>? entries,
-    List<String>? memos,
+    List<MemoItem>? memos,
     int? selectedTab,
     bool? isLoading,
     String? selectedDateIso,
+    String? memoSearchQuery,
+    String? selectedMemoTag,
   }) {
     return ScheduleState(
       plans: plans ?? this.plans,
@@ -78,6 +108,8 @@ class ScheduleState {
       selectedTab: selectedTab ?? this.selectedTab,
       isLoading: isLoading ?? this.isLoading,
       selectedDateIso: selectedDateIso ?? this.selectedDateIso,
+      memoSearchQuery: memoSearchQuery ?? this.memoSearchQuery,
+      selectedMemoTag: selectedMemoTag ?? this.selectedMemoTag,
     );
   }
 }
@@ -129,7 +161,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
 
       List<PlanItem> loadedPlans = [];
       List<ScheduleEntry> loadedEntries = [];
-      List<String> loadedMemos = [];
+      List<MemoItem> loadedMemos = [];
 
       if (plansJson != null && plansJson.isNotEmpty) {
         try {
@@ -189,7 +221,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       if (memosJson != null && memosJson.isNotEmpty) {
         try {
           final decoded = jsonDecode(memosJson) as List;
-          loadedMemos = decoded.cast<String>();
+          loadedMemos = decoded.map(MemoItem.fromJson).toList();
         } catch (_) {}
       }
 
@@ -209,8 +241,19 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
         loadedPlans = [demoPlan];
         loadedEntries = demoEntries;
         loadedMemos = [
-          '欢迎使用日程与计划中心！这里支持任务、智能复习和轻便签。',
-          'Windows 桌面端与安卓端已实现全链路安全存储与提醒穿透。',
+          MemoItem(
+            id: 'memo_demo_01',
+            content: '欢迎使用日程与计划中心！这里支持任务规划、智能艾宾浩斯复习和随手记事。',
+            createdAt: now,
+            isPinned: true,
+            tag: '备忘',
+          ),
+          MemoItem(
+            id: 'memo_demo_02',
+            content: 'Windows 桌面端与安卓端已实现全链路安全存储、加密同步与高穿透系统级提醒。',
+            createdAt: now,
+            tag: '灵感',
+          ),
         ];
 
         await _persist(loadedPlans, loadedEntries, loadedMemos);
@@ -232,7 +275,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
   Future<void> _persist(
     List<PlanItem> plans,
     List<ScheduleEntry> entries,
-    List<String> memos,
+    List<MemoItem> memos,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -271,9 +314,11 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
           )
           .toList();
 
+      final memosData = memos.map((m) => m.toJson()).toList();
+
       await prefs.setString(_plansStorageKey, jsonEncode(plansData));
       await prefs.setString(_entriesStorageKey, jsonEncode(entriesData));
-      await prefs.setString(_memosStorageKey, jsonEncode(memos));
+      await prefs.setString(_memosStorageKey, jsonEncode(memosData));
     } catch (e) {
       debugPrint('持久化存储写入失败: $e');
     }
@@ -495,21 +540,110 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(state.plans, updatedEntries, state.memos);
   }
 
-  /// 添加快速便签记事
-  Future<void> addQuickMemo(String memo) async {
+  /// 添加快速便签记事（支持设置分类标签与置顶）
+  Future<void> addQuickMemo(
+    String memo, {
+    String tag = '闪念',
+    bool isPinned = false,
+  }) async {
     final text = memo.trim();
     if (text.isEmpty) return;
 
-    final updatedMemos = [text, ...state.memos];
+    final now = DateTime.now();
+    final newMemo = MemoItem(
+      id: 'memo_${now.millisecondsSinceEpoch}',
+      content: text,
+      createdAt: now,
+      tag: tag,
+      isPinned: isPinned,
+    );
+
+    final updatedMemos = [newMemo, ...state.memos];
     state = state.copyWith(memos: updatedMemos, isLoading: false);
     await _persist(state.plans, state.entries, updatedMemos);
   }
 
-  /// 删除便签记事
-  Future<void> deleteQuickMemo(int index) async {
-    if (index < 0 || index >= state.memos.length) return;
-    final updatedMemos = List<String>.from(state.memos)..removeAt(index);
+  /// 编辑更新已有的记事便签内容与属性
+  Future<void> updateMemo({
+    required String id,
+    required String content,
+    String? tag,
+    bool? isPinned,
+  }) async {
+    final text = content.trim();
+    if (text.isEmpty) return;
+
+    final updatedMemos = state.memos.map((m) {
+      if (m.id == id) {
+        return m.copyWith(
+          content: text,
+          tag: tag,
+          isPinned: isPinned,
+          updatedAt: DateTime.now(),
+        );
+      }
+      return m;
+    }).toList();
+
     state = state.copyWith(memos: updatedMemos, isLoading: false);
     await _persist(state.plans, state.entries, updatedMemos);
+  }
+
+  /// 切换指定便签的置顶状态（📌 置顶）
+  Future<void> togglePinMemo(String id) async {
+    final updatedMemos = state.memos.map((m) {
+      if (m.id == id) {
+        return m.copyWith(isPinned: !m.isPinned, updatedAt: DateTime.now());
+      }
+      return m;
+    }).toList();
+
+    state = state.copyWith(memos: updatedMemos, isLoading: false);
+    await _persist(state.plans, state.entries, updatedMemos);
+  }
+
+  /// 根据 ID 删除便签记事
+  Future<void> deleteMemo(String id) async {
+    final updatedMemos = state.memos.where((m) => m.id != id).toList();
+    state = state.copyWith(memos: updatedMemos, isLoading: false);
+    await _persist(state.plans, state.entries, updatedMemos);
+  }
+
+  /// 根据索引删除便签记事（兼容旧单元测试接口）
+  Future<void> deleteQuickMemo(int index) async {
+    if (index < 0 || index >= state.memos.length) return;
+    final updatedMemos = List<MemoItem>.from(state.memos)..removeAt(index);
+    state = state.copyWith(memos: updatedMemos, isLoading: false);
+    await _persist(state.plans, state.entries, updatedMemos);
+  }
+
+  /// 设置记事搜索关键词
+  void setMemoSearchQuery(String query) {
+    state = state.copyWith(memoSearchQuery: query);
+  }
+
+  /// 切换记事分类标签
+  void setSelectedMemoTag(String tag) {
+    state = state.copyWith(selectedMemoTag: tag);
+  }
+
+  /// 将随手记事一键转化为正式日程待办（并设置定时强提醒）
+  Future<void> convertMemoToSchedule({
+    required String memoId,
+    required DateTime scheduleTime,
+    String? title,
+    bool hasReminder = true,
+  }) async {
+    final memo = state.memos.firstWhere((m) => m.id == memoId);
+    final taskTitle = title?.trim().isNotEmpty == true
+        ? title!.trim()
+        : (memo.content.length > 20 ? '${memo.content.substring(0, 20)}...' : memo.content);
+
+    await createSingleSchedule(
+      title: taskTitle,
+      time: scheduleTime,
+      notes: memo.content,
+      hasReminder: hasReminder,
+    );
   }
 }
