@@ -224,10 +224,19 @@ jobs:
             printf 'storeFile=ci-throwaway.jks\n'
           } > android/key.properties
 
-      # 挂载 6GB 额外 Swap 虚拟内存（避免覆盖已被系统占用的 /swapfile），防止 Gradle、Kotlin 和 R8 峰值内存超限
+      # 清理不需要的预装大工具链，释放 20GB+ 磁盘空间，防止 Android SDK / NDK 下载解压报 No space left on device
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      # 挂载 2GB 额外 Swap 虚拟内存，防止 Gradle、Kotlin 和 R8 峰值内存超限，同时保留充足磁盘空间
       - name: Increase swap space
         run: |
-          sudo fallocate -l 6G /swapfile_extra || sudo dd if=/dev/zero of=/swapfile_extra bs=1M count=6144
+          sudo fallocate -l 2G /swapfile_extra || sudo dd if=/dev/zero of=/swapfile_extra bs=1M count=2048
           sudo chmod 600 /swapfile_extra
           sudo mkswap /swapfile_extra
           sudo swapon /swapfile_extra
@@ -237,6 +246,7 @@ jobs:
       - name: Prepare Android SDK permissions & licenses
         run: |
           sudo chown -R "$USER:$USER" /usr/local/lib/android/sdk
+          export PATH="/usr/local/lib/android/sdk/cmdline-tools/latest/bin:$PATH"
           yes | sdkmanager --licenses || true
 
       # 选 release 而不是 debug：AOT 编译、图标字体 tree shaking 与 R8 混淆只在
