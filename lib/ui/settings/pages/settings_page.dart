@@ -330,6 +330,14 @@ class _FingerprintLockCard extends ConsumerWidget {
     final isSupported = await deviceAuth.isSupported();
     if (!isSupported) {
       if (!context.mounted) return;
+      // 若当前操作是解除应用锁，而设备根本不支持硬件生物识别，直接放行关闭
+      if (!target) {
+        await settingsService.setAppLockEnabled(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ 检测到当前设备不支持生物识别，已直接解除应用锁保护')),
+        );
+        return;
+      }
       // 若设备未配备指纹模块或系统未录入指纹，给出直观提醒
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('当前设备未检测到指纹硬件或尚未在系统设置中录入指纹/密码')),

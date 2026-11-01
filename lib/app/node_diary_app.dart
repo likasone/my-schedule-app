@@ -494,8 +494,9 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
       });
     }
 
-    // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行）
+    // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行并重置开关）
     if (!AppPlatform.supportsDeviceAuth) {
+      await settingsService.setAppLockEnabled(false);
       if (mounted) {
         setState(() {
           _appLocked = false;
@@ -507,6 +508,22 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
 
     // 获取系统底层设备身份验证服务实例
     final deviceAuth = ref.read(deviceAuthServiceProvider);
+
+    // 动态设备硬件及系统凭据能力检查：
+    // 若当前硬件无生物识别设备（无指纹仪/摄像头）或未设置 Windows Hello/PIN，
+    // 安全放行并自动将设置中的应用锁开关关闭，彻底解除死锁！
+    final isSupported = await deviceAuth.isSupported();
+    if (!isSupported) {
+      await settingsService.setAppLockEnabled(false);
+      if (mounted) {
+        setState(() {
+          _appLocked = false;
+          _unlockingApp = false;
+        });
+      }
+      return;
+    }
+
     // 唤起系统级原生指纹/生物识别对话框
     final authenticated = await deviceAuth.authenticate(
       reason: _bootstrapL10n(settingsService).appLockAuthReason,

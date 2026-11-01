@@ -51,21 +51,24 @@ class DataPrivacyPage extends ConsumerWidget {
       }
     }
     if (!enabled) {
-      final verified = await deviceAuth.authenticate(
-        reason: context.l10n.appLockDisableAuthReason,
-        persistAcrossBackgrounding: false,
-      );
-      if (!context.mounted) {
-        return;
-      }
-      if (!verified) {
-        await HomeHintVisibilityScope.showTrackedSnackBar(
-          context: context,
-          snackBar: SnackBar(
-            content: Text(context.l10n.appLockDisableVerifyFailed),
-          ),
+      final supported = await deviceAuth.isSupported();
+      if (supported) {
+        final verified = await deviceAuth.authenticate(
+          reason: context.l10n.appLockDisableAuthReason,
+          persistAcrossBackgrounding: false,
         );
-        return;
+        if (!context.mounted) {
+          return;
+        }
+        if (!verified) {
+          await HomeHintVisibilityScope.showTrackedSnackBar(
+            context: context,
+            snackBar: SnackBar(
+              content: Text(context.l10n.appLockDisableVerifyFailed),
+            ),
+          );
+          return;
+        }
       }
     }
     await settingsService.setAppLockEnabled(enabled);
