@@ -154,9 +154,6 @@ class SettingsPage extends StatelessWidget {
                         );
                       },
                 ),
-                // 指纹安全锁卡片：直接在设置首页提供一键开启与解除保护入口
-                const _FingerprintLockCard(),
-                const SizedBox(height: 12),
                 _SettingsDestination(
                   icon: FontAwesomeIcons.shieldHalved,
                   title: l10n.settingsDataPrivacy,
@@ -171,6 +168,9 @@ class SettingsPage extends StatelessWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 12),
+                // 指纹安全锁卡片：位于数据与隐私之后，在设置首页直接呈现保护状态与切换开关
+                const _FingerprintLockCard(),
                 const SizedBox(height: 12),
                 // 有新版本时在“关于”入口上提示（自动检查或手动检查发现的）。
                 Consumer(
