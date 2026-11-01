@@ -1,9 +1,9 @@
 name: node_diary
-description: "A new Flutter project."
+description: "个人私密日程、计划与日记管理系统"
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 0.10.0+23
+version: 1.0.0+1
 
 environment:
   sdk: ^3.12.0
