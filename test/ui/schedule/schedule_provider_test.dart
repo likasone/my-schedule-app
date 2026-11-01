@@ -251,7 +251,7 @@ void main() {
       // 2. 测试艾宾浩斯复习计划的创建与级联删除
       await notifier.createPlan(
         title: 'Flutter 架构设计计划',
-        dayCount: 1,
+        customStartDateIso: '2026-11-01',
       );
       state = container.read(scheduleProvider);
       final plan = state.plans.firstWhere((p) => p.title == 'Flutter 架构设计计划');

@@ -46,6 +46,7 @@ dependencies:
   package_info_plus: ^9.0.0
   archive: ^3.6.1
   local_auth: ^3.0.1
+  local_auth_android: ^2.0.0
   pdf: ^3.11.3
   xml: ^6.6.1
   meta: ^1.15.0
