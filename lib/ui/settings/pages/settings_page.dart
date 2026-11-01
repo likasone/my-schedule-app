@@ -9,6 +9,10 @@ import 'package:node_diary/ui/settings/pages/data_privacy_page.dart';
 import 'package:node_diary/ui/settings/pages/editor_settings_page.dart';
 import 'package:node_diary/ui/settings/pages/tag_management_page.dart';
 import '../../../app/theme/expressive_surfaces.dart';
+import '../../../core/services/app_platform.dart';
+import '../../../core/services/app_service.dart';
+import '../../../core/services/device_auth_service.dart';
+import '../../../core/services/settings_service.dart';
 import '../../app_surface/widgets/app_glass_scope.dart';
 import '../../app_surface/widgets/app_glass_surface.dart';
 import '../../app_surface/widgets/app_page_backdrop.dart';
@@ -150,6 +154,9 @@ class SettingsPage extends StatelessWidget {
                         );
                       },
                 ),
+                // 指纹安全锁卡片：直接在设置首页提供一键开启与解除保护入口
+                const _FingerprintLockCard(),
+                const SizedBox(height: 12),
                 _SettingsDestination(
                   icon: FontAwesomeIcons.shieldHalved,
                   title: l10n.settingsDataPrivacy,
@@ -293,6 +300,169 @@ class _SettingsDestination extends StatelessWidget {
           child: tile,
         ),
       ),
+    );
+  }
+}
+
+/// 设置页指纹锁安全卡片组件（Fingerprint Lock Card）
+/// 职责：在设置首页直接呈现指纹/生物识别锁状态并支持一键开启或关闭。
+/// [技术原理]：
+/// 1. 响应式监听 [settingsServiceProvider] 与 [appLockEnabledNotifier]；
+/// 2. 状态切换时调用 [DeviceAuthService] 触发操作系统底层生物识别硬件（指纹/面容/凭据）核验；
+/// 3. 自适应材质渲染：支持液态玻璃质感（AppGlassSurface）与 Material Expressive 卡片规范。
+class _FingerprintLockCard extends ConsumerWidget {
+  const _FingerprintLockCard();
+
+  /// 切换指纹保护状态
+  /// [安全关键]：无论开启还是解除，均调用硬件级生物识别核验，确保本人操作
+  Future<void> _toggleFingerprint(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsService settingsService,
+    bool currentEnabled,
+  ) async {
+    // 获取设备生物识别认证服务实例
+    final deviceAuth = ref.read(deviceAuthServiceProvider);
+    // 目标状态：当前开启则目标为关闭，当前未开则目标为开启
+    final target = !currentEnabled;
+
+    // 开启前先验证底层硬件支持状态
+    final isSupported = await deviceAuth.isSupported();
+    if (!isSupported) {
+      if (!context.mounted) return;
+      // 若设备未配备指纹模块或系统未录入指纹，给出直观提醒
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前设备未检测到指纹硬件或尚未在系统设置中录入指纹/密码')),
+      );
+      return;
+    }
+
+    // 调用系统级指纹/生物识别核验弹窗
+    final verified = await deviceAuth.authenticate(
+      reason: target ? '请验证指纹以开启应用锁保护' : '请验证指纹以解除应用锁保护',
+    );
+
+    // 仅在生物识别核验成功通过后才持久化更新配置
+    if (verified) {
+      await settingsService.setAppLockEnabled(target);
+      if (!context.mounted) return;
+      // 成功状态提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(target ? '✅ 已成功开启指纹锁保护，下次打开应用生效' : '⚠️ 已关闭指纹锁保护'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 获取持久化设置服务实例
+    final settingsService = ref.watch(settingsServiceProvider).asData?.value;
+    // 获取当前应用主题色彩体系
+    final colors = Theme.of(context).colorScheme;
+    // 检测当前运行操作系统平台是否支持生物识别
+    final supported = AppPlatform.supportsDeviceAuth;
+
+    // 若配置服务初始化中，渲染占位符保持平滑过渡
+    if (settingsService == null) {
+      return const SizedBox.shrink();
+    }
+
+    // 监听应用锁开关状态 Notifier 变更并局部精准重构 UI
+    return ValueListenableBuilder<bool>(
+      valueListenable: settingsService.appLockEnabledNotifier,
+      builder: (BuildContext context, bool enabled, Widget? child) {
+        // 当前指纹保护是否有效生效（平台支持且用户开启）
+        final isLocked = supported && enabled;
+
+        // 构建 ListTile 卡片核心内容
+        final tile = ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          // 左侧指纹高亮图标微容器
+          leading: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              // 开启时展现安全绿色半透底色，未开启时展现柔和的主题色
+              color: isLocked
+                  ? Colors.green.withValues(alpha: 0.15)
+                  : colors.primaryContainer.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: FaIcon(
+              FontAwesomeIcons.fingerprint,
+              size: 20,
+              color: isLocked ? Colors.green : colors.onPrimaryContainer,
+            ),
+          ),
+          // 标题：指纹锁
+          title: Text(
+            '指纹锁',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: 16.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // 动态副标题：直观反映当前保护状态
+          subtitle: Text(
+            !supported
+                ? '当前平台不支持本地身份验证'
+                : (isLocked ? '已开启保护，进入应用需验证指纹' : '未开启，点击开启以保护隐私与记事'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          // 右侧开关组件
+          trailing: Switch(
+            value: isLocked,
+            onChanged: supported
+                ? (_) => _toggleFingerprint(context, ref, settingsService, isLocked)
+                : null,
+          ),
+          // 点击卡片任意非开关区域同样触发指纹安全切换
+          onTap: supported
+              ? () => _toggleFingerprint(context, ref, settingsService, isLocked)
+              : null,
+        );
+
+        // 卡片圆角规格：与全局设置卡片一致统一采用 20
+        const radius = BorderRadius.all(Radius.circular(20));
+
+        // 玻璃材质时整张卡渲染为内容玻璃（共用全局背景模糊体系）
+        if (AppGlass.of(context).isGlass(AppGlassComponent.cards)) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: AppGlassSurface(
+              component: AppGlassComponent.cards,
+              borderRadius: radius,
+              shadow: true,
+              child: tile,
+            ),
+          );
+        }
+
+        // 经典材质：Material Expressive 柔和投影与边框体系
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppEffects.restingCardShadow(colors),
+            ),
+            child: Card.filled(
+              margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: ExpressiveSurfaces.cardBorderSide(colors),
+              ),
+              color: ExpressiveSurfaces.cardColor(colors),
+              child: tile,
+            ),
+          ),
+        );
+      },
     );
   }
 }

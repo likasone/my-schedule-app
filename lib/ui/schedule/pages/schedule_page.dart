@@ -4,11 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/services/app_service.dart';
-import '../../../core/services/device_auth_service.dart';
 import '../../../core/services/plan_scheduler.dart';
 import '../../../core/services/reminder_service.dart';
-import '../../../core/services/settings_service.dart';
 import '../providers/schedule_provider.dart';
 
 /// 日程、计划、复习与便签核心页面（Schedule & Plan Page）
@@ -114,63 +111,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 快捷切换指纹锁保护状态
-  /// [安全关键]：无论开启还是关闭，均调用硬件级生物识别（指纹/面容）进行安全核验
-  Future<void> _toggleFingerprintLock(BuildContext context) async {
-    final settingsService = await ref.read(settingsServiceProvider.future);
-    final deviceAuth = ref.read(deviceAuthServiceProvider);
-    final isSupported = await deviceAuth.isSupported();
-
-    if (!isSupported) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前设备未检测到指纹硬件或尚未在系统设置中录入指纹/密码')),
-      );
-      return;
-    }
-
-    final currentEnabled = settingsService.isAppLockEnabled;
-    final target = !currentEnabled;
-
-    final verified = await deviceAuth.authenticate(
-      reason: target ? '请验证指纹以开启应用锁保护' : '请验证指纹以解除应用锁保护',
-    );
-
-    if (verified) {
-      await settingsService.setAppLockEnabled(target);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(target ? '✅ 已成功开启指纹锁保护，下次打开应用生效' : '⚠️ 已关闭指纹锁保护'),
-        ),
-      );
-    }
-  }
-
-  /// 顶部指纹锁快捷状态微按钮组件
-  Widget _buildFingerprintStatusButton(BuildContext context) {
-    final settingsService = ref.watch(settingsServiceProvider).asData?.value;
-    final isLocked = settingsService?.isAppLockEnabled ?? false;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return IconButton.outlined(
-      tooltip: isLocked ? '指纹锁保护中（点击管理）' : '指纹锁未开启（点击开启）',
-      visualDensity: VisualDensity.compact,
-      icon: Icon(
-        Icons.fingerprint,
-        size: 19,
-        color: isLocked ? Colors.green : colorScheme.outline,
-      ),
-      style: IconButton.styleFrom(
-        side: BorderSide(
-          color: isLocked ? Colors.green.withValues(alpha: 0.6) : colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      onPressed: () => _toggleFingerprintLock(context),
-    );
-  }
-
   /// 顶部核心信息与操作看板组件
   Widget _buildHeaderCard(
     BuildContext context,
@@ -253,9 +193,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(child: titleBlock),
-                          // 指纹锁快捷状态与管理微按钮
-                          _buildFingerprintStatusButton(context),
-                          const SizedBox(width: 6),
                           IconButton.outlined(
                             tooltip: '立即测试提醒弹窗',
                             visualDensity: VisualDensity.compact,
@@ -303,9 +240,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     titleBlock,
                     Row(
                       children: [
-                        // 指纹锁快捷状态与管理微按钮
-                        _buildFingerprintStatusButton(context),
-                        const SizedBox(width: 8),
                         IconButton.outlined(
                           tooltip: '立即测试提醒弹窗',
                           icon: const Icon(Icons.notifications_active_outlined, size: 18),

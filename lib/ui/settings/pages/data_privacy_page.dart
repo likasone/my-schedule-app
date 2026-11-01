@@ -69,6 +69,13 @@ class DataPrivacyPage extends ConsumerWidget {
       }
     }
     await settingsService.setAppLockEnabled(enabled);
+    if (!context.mounted) return;
+    await HomeHintVisibilityScope.showTrackedSnackBar(
+      context: context,
+      snackBar: SnackBar(
+        content: Text(enabled ? '✅ 已成功开启指纹锁保护，下次打开应用生效' : '⚠️ 已关闭指纹锁保护'),
+      ),
+    );
   }
 
   @override
@@ -149,6 +156,10 @@ class DataPrivacyPage extends ConsumerWidget {
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 16,
                                       vertical: 4,
+                                    ),
+                                    secondary: const FaIcon(
+                                      FontAwesomeIcons.fingerprint,
+                                      size: 18,
                                     ),
                                     value: supported && enabled,
                                     title: Text(l10n.settingsAppLock),
