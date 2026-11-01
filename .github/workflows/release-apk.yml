@@ -479,9 +479,10 @@ jobs:
       # 安装包全部传完后才出现。同一步里的多个文件会并发上传，顺序没有保证，
       # 因此分成两步：先传各平台安装包，再传校验文件与清单。
       - name: Upload packages to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             release-artifacts/*.apk
             release-artifacts/*.tar.gz
@@ -491,9 +492,10 @@ jobs:
           overwrite_files: true
 
       - name: Upload checksums and update manifest to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             release-artifacts/SHA256SUMS.txt
             release-artifacts/jotsy-update.json
