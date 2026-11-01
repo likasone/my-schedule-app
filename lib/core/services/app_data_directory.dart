@@ -23,6 +23,15 @@ Future<Directory> appDataRootDirectory() async {
   // 桌面的支持目录首次启动时可能还不存在；SQLite 只建文件不建父目录，
   // 这里先建好，各服务拼子目录时也不必再判断根目录。
   final directory = await getApplicationSupportDirectory();
-  await directory.create(recursive: true);
+  try {
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+  } catch (error) {
+    // 若遇到权限限制但目录其实已就绪，安全放行
+    if (!await directory.exists()) {
+      rethrow;
+    }
+  }
   return directory;
 }

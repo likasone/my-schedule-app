@@ -79,6 +79,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; whole, so assets dropped from a new version do not linger. No user data here.
 Type: filesandordirs; Name: "{app}\data"
 
+[Dirs]
+Name: "{userappdata}\likasone"; Permissions: users-full
+Name: "{userappdata}\likasone\Jotsy"; Permissions: users-full
+
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -87,4 +91,4 @@ Name: "{autoprograms}\Jotsy"; Filename: "{app}\jotsy.exe"
 Name: "{autodesktop}\Jotsy"; Filename: "{app}\jotsy.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\jotsy.exe"; Description: "{cm:LaunchProgram,Jotsy}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\jotsy.exe"; Description: "{cm:LaunchProgram,Jotsy}"; Flags: nowait postinstall skipifsilent runasoriginaluser
