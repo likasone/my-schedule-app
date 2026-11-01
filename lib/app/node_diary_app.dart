@@ -161,8 +161,10 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
         });
       }
     } else if (state == AppLifecycleState.inactive) {
-      // 若非指纹锁内部唤起的系统级生物识别弹窗，失焦即提前预盖安全遮罩
-      if (!_unlockingApp && mounted) {
+      // 桌面平台（Windows/macOS）唤起 Windows Hello 弹窗或窗口短暂失焦时会派发 inactive，
+      // 桌面端绝不能失焦即强行上锁，否则系统凭据弹窗会与应用锁产生竞态死锁；
+      // 仅在移动端（Android/iOS）为了防止系统多任务卡片预览泄露时覆盖安全遮罩。
+      if (AppPlatform.isMobile && !_unlockingApp && mounted) {
         setState(() {
           _appLocked = true;
         });
