@@ -420,7 +420,7 @@ void main() {
         );
         expect(
           controller().desktopDownloadUri().toString(),
-          '${mirror.prefix}https://github.com/CikeSeven/jotsy/releases/'
+          '${mirror.prefix}https://github.com/${AppUpdateEndpoints.owner}/${AppUpdateEndpoints.repo}/releases/'
           'download/v0.6.1/jotsy-v0.6.1-linux-x64.tar.gz',
         );
       },

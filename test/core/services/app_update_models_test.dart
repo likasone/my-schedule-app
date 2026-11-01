@@ -135,7 +135,7 @@ void main() {
       expect(asset.sha256, sha);
       expect(
         asset.url.toString(),
-        'https://github.com/CikeSeven/jotsy/releases/download/v0.6.1/'
+        'https://github.com/${AppUpdateEndpoints.owner}/${AppUpdateEndpoints.repo}/releases/download/v0.6.1/'
         'jotsy-v0.6.1-arm64-v8a.apk',
       );
     });

@@ -218,7 +218,7 @@ void main() {
           : 'jotsy-v0.6.1-windows-x64-setup.exe';
       expect(launched, <String>[
         '${AppUpdateSource.builtInSources.first.prefix}'
-            'https://github.com/CikeSeven/jotsy/releases/download/v0.6.1/$name',
+            'https://github.com/${AppUpdateEndpoints.owner}/${AppUpdateEndpoints.repo}/releases/download/v0.6.1/$name',
       ]);
       expect(service.installCount, 0);
     }, variant: TargetPlatformVariant.only(TargetPlatform.linux));

@@ -172,7 +172,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(launched, <String>[
-        'https://github.com/CikeSeven/jotsy/releases/download/v0.6.1/'
+        'https://github.com/${AppUpdateEndpoints.owner}/${AppUpdateEndpoints.repo}/releases/download/v0.6.1/'
             'jotsy-v0.6.1-linux-x64.tar.gz',
       ]);
       // 不进入更新页。
