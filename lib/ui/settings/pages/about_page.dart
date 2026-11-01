@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
@@ -10,31 +9,28 @@ import '../../../app/theme/app_spacing.dart';
 import '../../../app/theme/expressive_surfaces.dart';
 import '../../app_surface/widgets/app_glass_scope.dart';
 import '../../app_surface/widgets/app_glass_surface.dart';
-import '../../home/widgets/home_hint_visibility_scope.dart';
 import '../../../app/theme/app_effects.dart';
-import '../../widgets/app_modal/app_dialog.dart';
 import '../../widgets/expressive_image_frame.dart';
 import '../controllers/app_update_controller.dart';
 import '../models/app_update_state.dart';
 import '../widgets/app_update_badge.dart';
-import '../widgets/external_link.dart';
-import '../widgets/support_developer_sheet.dart';
 import 'app_update_page.dart';
 import 'changelog_page.dart';
 import '../../widgets/form_width.dart';
 import 'package:node_diary/ui/app_surface/models/app_surface_enums.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_page_background.dart';
 
-/// 关于页面：以阅读化卡片布局展示应用信息、核心入口与协议信息。
+/// 关于页面：以阅读化卡片布局展示应用版本、核心更新入口与开源许可协议。
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
 
+  /// 应用显示名称
   static const String _appName = 'Jotsy';
-  static const String _appIconAssetPath = 'assets/app_icon/mingcute_icon.png';
-  static const String _repoUrl = 'https://github.com/CikeSeven/jotsy';
-  static const String _issueUrl = 'https://github.com/CikeSeven/jotsy/issues';
-  static const String _qqFeedbackGroupNumber = '678136434';
 
+  /// 应用图标静态资产路径
+  static const String _appIconAssetPath = 'assets/app_icon/mingcute_icon.png';
+
+  /// 异步获取当前平台编译的应用版本号与构建号
   static Future<String> _loadAppVersion() async {
     final info = await PackageInfo.fromPlatform();
     if (info.buildNumber.trim().isEmpty) {
@@ -48,55 +44,14 @@ class AboutPage extends ConsumerStatefulWidget {
 }
 
 class _AboutPageState extends ConsumerState<AboutPage> {
+  /// 缓存版本号 Future，防止页面重绘时重复触发异步平台通道读取
   late final Future<String> _appVersionFuture;
 
   @override
   void initState() {
     super.initState();
+    // 初始化时一次性加载应用版本号
     _appVersionFuture = AboutPage._loadAppVersion();
-  }
-
-  Future<void> _copyQqFeedbackGroup(BuildContext context) async {
-    await Clipboard.setData(
-      const ClipboardData(text: AboutPage._qqFeedbackGroupNumber),
-    );
-    if (!context.mounted) {
-      return;
-    }
-    await HomeHintVisibilityScope.showTrackedSnackBar(
-      context: context,
-      snackBar: SnackBar(
-        content: Text(context.l10n.aboutQqFeedbackGroupCopied),
-      ),
-    );
-  }
-
-  Future<void> _showPrivacyDialog(BuildContext context) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    await showAppDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        final l10n = dialogContext.l10n;
-        return AlertDialog(
-          title: Text(l10n.aboutPrivacyDialogTitle),
-          content: Text(l10n.aboutPrivacyDialogMessage),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: colorScheme.onSurfaceVariant,
-              ),
-              child: Text(l10n.commonClose),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
-              child: Text(l10n.commonConfirm),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -110,6 +65,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
     );
   }
 
+  /// 构建页面主体结构
   Widget _buildContent(BuildContext context, {required String appVersion}) {
     final l10n = context.l10n;
     final textTheme = Theme.of(context).textTheme;
@@ -139,6 +95,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                         ),
                         sliver: SliverList.list(
                           children: <Widget>[
+                            // 1. 顶部应用品牌卡片：展示图标、应用名称、版本号与标语
                             _SectionCard(
                               child: Builder(
                                 builder: (BuildContext context) {
@@ -147,6 +104,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                                   ).colorScheme;
                                   return Column(
                                     children: <Widget>[
+                                      // 应用图标容器
                                       Container(
                                         width: 92,
                                         height: 92,
@@ -173,6 +131,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 16),
+                                      // 应用名称
                                       Text(
                                         AboutPage._appName,
                                         style: textTheme.headlineSmall
@@ -181,6 +140,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                                             ),
                                       ),
                                       const SizedBox(height: 6),
+                                      // 应用版本号
                                       Text(
                                         '${l10n.aboutVersion} $appVersion',
                                         style: textTheme.bodySmall?.copyWith(
@@ -188,6 +148,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 16),
+                                      // 品牌标语 Slogan
                                       Text(
                                         l10n.aboutPageSlogan,
                                         textAlign: TextAlign.center,
@@ -202,21 +163,15 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                               ),
                             ),
                             const SizedBox(height: 14),
+                            // 2. 核心操作列表卡片：聚焦软件更新、更新日志与开源协议
                             _SectionCard(
                               padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
                               child: Column(
                                 children: <Widget>[
-                                  _AboutActionTile(
-                                    icon: FontAwesomeIcons.github,
-                                    title: l10n.aboutOpenSourceRepo,
-                                    onTap: () => openExternalLink(
-                                      context,
-                                      AboutPage._repoUrl,
-                                    ),
-                                  ),
-                                  const Divider(height: 1),
+                                  // 检查最新版本
                                   const _CheckUpdateTile(),
                                   const Divider(height: 1),
+                                  // 更新日志入口
                                   _AboutActionTile(
                                     icon: FontAwesomeIcons.clockRotateLeft,
                                     title: l10n.aboutChangelog,
@@ -228,56 +183,25 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                                     ),
                                   ),
                                   const Divider(height: 1),
+                                  // 第三方开源组件与协议入口
                                   _AboutActionTile(
-                                    icon: FontAwesomeIcons.bug,
-                                    title: l10n.aboutSubmitIssue,
-                                    onTap: () => openExternalLink(
-                                      context,
-                                      AboutPage._issueUrl,
-                                    ),
-                                  ),
-                                  const Divider(height: 1),
-                                  _AboutActionTile(
-                                    icon: FontAwesomeIcons.qq,
-                                    title: l10n.aboutQqFeedbackGroup,
-                                    subtitle: l10n.aboutQqFeedbackGroupSubtitle,
-                                    onTap: () => _copyQqFeedbackGroup(context),
-                                  ),
-                                  const Divider(height: 1),
-                                  _AboutActionTile(
-                                    icon: FontAwesomeIcons.mugHot,
-                                    title: l10n.supportDeveloperTitle,
-                                    subtitle:
-                                        l10n.supportDeveloperEntrySubtitle,
-                                    onTap: () =>
-                                        showSupportDeveloperSheet(context),
-                                  ),
-                                  const Divider(height: 1),
-                                  _AboutActionTile(
-                                    icon: FontAwesomeIcons.shieldHalved,
-                                    title: l10n.aboutPrivacyAndData,
-                                    onTap: () => _showPrivacyDialog(context),
+                                    icon: FontAwesomeIcons.fileContract,
+                                    title: l10n.aboutOpenSourceLicenses,
+                                    onTap: () {
+                                      showLicensePage(
+                                        context: context,
+                                        applicationName: AboutPage._appName,
+                                        applicationVersion: appVersion,
+                                      );
+                                    },
                                   ),
                                 ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            _SectionCard(
-                              child: _AboutActionTile(
-                                icon: FontAwesomeIcons.fileContract,
-                                title: l10n.aboutOpenSourceLicenses,
-                                onTap: () {
-                                  showLicensePage(
-                                    context: context,
-                                    applicationName: AboutPage._appName,
-                                    applicationVersion: appVersion,
-                                  );
-                                },
                               ),
                             ),
                           ],
                         ),
                       ),
+                      // 3. 底部版权信息
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: Padding(
@@ -310,6 +234,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                   );
                 },
               ),
+              // 固定顶部导航返回栏
               _AboutHeader(
                 title: l10n.aboutTitle,
                 onBack: () => Navigator.of(context).maybePop(),
@@ -323,6 +248,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
   }
 }
 
+/// 关于页面顶部导航栏组件
 class _AboutHeader extends StatelessWidget {
   const _AboutHeader({
     required this.title,
@@ -346,13 +272,12 @@ class _AboutHeader extends StatelessWidget {
       left: 0,
       right: 0,
       child: ColoredBox(
-        // 实色顶栏：设了纯色背景时与页面同色，图片背景时保持不透明。
+        // 实色顶栏：设了纯色背景时与页面同色，图片背景时保持不透明
         color: AppPageBackdrop.solidBarColorOf(context),
         child: Padding(
           padding: EdgeInsets.only(top: topSafeInset),
           child: SizedBox(
             height: contentHeight,
-            // 宽窗口：返回键随内容列内收（与 AppTopBar 的 contentMaxWidth 同一口径）。
             child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) =>
                   Padding(
@@ -362,6 +287,7 @@ class _AboutHeader extends StatelessWidget {
                     ),
                     child: Row(
                       children: <Widget>[
+                        // 返回按钮
                         IconButton(
                           tooltip: backTooltip,
                           onPressed: onBack,
@@ -370,6 +296,7 @@ class _AboutHeader extends StatelessWidget {
                             size: 18,
                           ),
                         ),
+                        // 居中标题
                         Expanded(
                           child: Center(
                             child: Text(
@@ -392,6 +319,7 @@ class _AboutHeader extends StatelessWidget {
   }
 }
 
+/// 通用分组卡片组件，支持毛玻璃与经典表面
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.child,
@@ -404,8 +332,7 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // 玻璃材质时改为内容玻璃（共用页面背景读取、无背景图不模糊）；经典
-    // 分支保持原来的 Card 写法不变。
+    // 毛玻璃材质分支
     if (AppGlass.of(context).isGlass(AppGlassComponent.cards)) {
       return AppGlassSurface(
         component: AppGlassComponent.cards,
@@ -414,6 +341,7 @@ class _SectionCard extends StatelessWidget {
         child: Padding(padding: padding, child: child),
       );
     }
+    // 经典 Material 实体卡片分支
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadii.card),
@@ -433,8 +361,7 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-/// “检查更新”行：打开软件更新页；副标题随全局更新状态显示新版本、下载
-/// 进度或待安装，有新版本时右侧显示“新版本”胶囊。
+/// “检查更新”行：打开软件更新页；副标题随全局更新状态动态提示
 class _CheckUpdateTile extends ConsumerWidget {
   const _CheckUpdateTile();
 
@@ -480,6 +407,7 @@ class _CheckUpdateTile extends ConsumerWidget {
   }
 }
 
+/// 通用操作行组件
 class _AboutActionTile extends StatelessWidget {
   const _AboutActionTile({
     required this.icon,
@@ -507,11 +435,13 @@ class _AboutActionTile extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 18, 6, 18),
         child: Row(
           children: <Widget>[
+            // 左侧图标
             SizedBox(
               width: 34,
               child: FaIcon(icon, size: 18, color: iconColor),
             ),
             const SizedBox(width: 10),
+            // 中间标题与副标题
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,6 +465,7 @@ class _AboutActionTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // 右侧尾随部件（默认向右箭头）
             trailing ??
                 FaIcon(FontAwesomeIcons.angleRight, size: 15, color: iconColor),
           ],
