@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
-import 'package:local_auth_windows/local_auth_windows.dart';
 
 /// 设备身份验证（指纹、面容或锁屏密码）。
 ///
@@ -15,7 +14,7 @@ class DeviceAuthService {
 
   final LocalAuthentication _localAuthentication;
 
-  /// 这台设备能否验证身份：系统级凭证（Windows Hello / PIN / 锁屏密码）或生物识别任一可用即可。
+  /// 这台设备能否验证身份：系统级凭据（Windows Hello / PIN / 锁屏密码）或生物识别任一可用即可。
   Future<bool> isSupported() async {
     try {
       if (await _localAuthentication.isDeviceSupported()) {
@@ -48,8 +47,6 @@ class DeviceAuthService {
             signInTitle: '指纹与安全解锁',
             cancelButton: '取消',
           ),
-          // Windows 原生 Windows Hello / 设备凭据认证提示适配
-          WindowsAuthMessages(),
         ],
       );
     } catch (_) {
