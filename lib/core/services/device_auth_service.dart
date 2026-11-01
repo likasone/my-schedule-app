@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
+import 'package:node_diary/core/services/app_platform.dart';
 
 /// 设备身份验证（指纹、面容或锁屏密码）。
 ///
@@ -14,13 +15,28 @@ class DeviceAuthService {
 
   final LocalAuthentication _localAuthentication;
 
-  /// 这台设备能否验证身份：设置了锁屏密码，或至少能检查生物识别。
+  /// 这台设备能否验证身份：
+  /// - 在桌面平台（Windows / Linux）：由于 local_auth_windows 在缺乏物理生物识别传感器时，
+  ///   即使有系统密码/PIN，底层调用 authenticate 仍会抛出 NoHardware 异常导致应用死锁；
+  ///   因此桌面平台必须严格要求检测到实际生物识别硬件（如指纹仪或红外人脸模组）才判定为支持；
+  /// - 在移动平台（Android / iOS）：支持锁屏密码或生物硬件任一可用即可。
   Future<bool> isSupported() async {
     try {
-      if (await _localAuthentication.isDeviceSupported()) {
+      // 检查物理生物识别传感器硬件支持
+      final canBiometrics = await _localAuthentication.canCheckBiometrics;
+      if (canBiometrics) {
         return true;
       }
-      return await _localAuthentication.canCheckBiometrics;
+      final available = await _localAuthentication.getAvailableBiometrics();
+      if (available.isNotEmpty) {
+        return true;
+      }
+      // 桌面平台（如 Windows / Linux）：若无实体生物硬件，严禁开启生物锁，防止无解死锁
+      if (AppPlatform.isDesktop) {
+        return false;
+      }
+      // 移动端若支持设备锁屏密码（PIN/图案）亦可放行
+      return await _localAuthentication.isDeviceSupported();
     } catch (_) {
       return false;
     }
@@ -36,6 +52,13 @@ class DeviceAuthService {
     bool persistAcrossBackgrounding = true,
   }) async {
     try {
+      // 桌面平台若无生物硬件支持直接阻断，避免触发 local_auth_windows 的 NoHardware 异常
+      if (AppPlatform.isDesktop) {
+        final supported = await isSupported();
+        if (!supported) {
+          return false;
+        }
+      }
       return await _localAuthentication.authenticate(
         localizedReason: reason,
         biometricOnly: false,
