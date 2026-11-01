@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
@@ -385,6 +386,18 @@ class MainActivity : FlutterFragmentActivity() {
       return
     }
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+  }
+
+  override fun onPause() {
+    super.onPause()
+    // 退入后台或失焦时开启 FLAG_SECURE，系统多任务切换器（Recents/Overview）将物理屏蔽缩略图快照，彻底杜绝切换栏隐私泄露
+    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+  }
+
+  override fun onResume() {
+    super.onResume()
+    // 回到前台后清除 FLAG_SECURE，在 Flutter 应用锁安全遮罩保护下继续由系统指纹解锁，同时保障应用内正常长图导出与截图
+    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
   }
 
   class PredictiveBackFlutterFragment : FlutterFragment() {

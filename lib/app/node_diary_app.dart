@@ -77,8 +77,6 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
   bool _appLocked = false;
   bool _unlockingApp = false;
   bool _initialAppLockChecked = false;
-  DateTime? _lastPausedAt;
-  static const Duration _appLockTimeoutGracePeriod = Duration(seconds: 15);
 
   @override
   void initState() {
@@ -142,25 +140,38 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    // 获取当前绑定的持久化设置服务实例
     final settings = _boundSettingsService;
+    // 若尚未加载就绪或用户未启用指纹锁保护，无需进行生命周期拦截
     if (settings == null || !settings.isAppLockEnabled) {
       return;
     }
 
+    // [核心安全机制]：
+    // 1. 当应用完全退入后台、被其它应用遮挡或设备锁屏（paused 或 hidden）：
+    //    立即在 UI 树中将 _appLocked 置为 true，挂上 _AppLockOverlay 锁屏遮罩。
+    //    无论用户是缩小去开其它应用、锁屏还是呼出切换栏，系统截取的缩略图只有安全遮罩，彻底根除切换栏内容泄露！
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      // 记录切入后台或失焦的时刻
-      _lastPausedAt = DateTime.now();
+        state == AppLifecycleState.hidden) {
+      if (mounted) {
+        setState(() {
+          _appLocked = true;
+          // 退出前台后重置正在解锁中的中间状态，以便下次切回时重新触发完整核验流程
+          _unlockingApp = false;
+        });
+      }
+    } else if (state == AppLifecycleState.inactive) {
+      // 若非指纹锁内部唤起的系统级生物识别弹窗，失焦即提前预盖安全遮罩
+      if (!_unlockingApp && mounted) {
+        setState(() {
+          _appLocked = true;
+        });
+      }
     } else if (state == AppLifecycleState.resumed) {
-      // 从后台或睡眠状态恢复至前台
-      final pausedAt = _lastPausedAt;
-      _lastPausedAt = null;
-      if (pausedAt != null) {
-        final elapsed = DateTime.now().difference(pausedAt);
-        // 超过缓冲期立即触发指纹 / PIN 校验
-        if (elapsed >= _appLockTimeoutGracePeriod) {
-          _lockAndAuthenticate(settingsService: settings);
-        }
+      // 2. 从后台、锁屏解锁或多任务切换栏切回前台（resumed）：
+      //    只要当前处于锁定状态且未处于正在解锁中，立即自动唤起系统级指纹/生物识别解锁
+      if (_appLocked && !_unlockingApp) {
+        _lockAndAuthenticate(settingsService: settings);
       }
     }
   }
@@ -471,34 +482,32 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
   Future<void> _lockAndAuthenticate({
     required SettingsService settingsService,
   }) async {
+    // 若当前已在进行生物核验中，或用户未启用指纹锁，直接返回杜绝并发重入
     if (_unlockingApp || !settingsService.isAppLockEnabled) {
       return;
     }
     if (mounted) {
       setState(() {
+        // 锁定界面并进入解锁中状态
         _appLocked = true;
         _unlockingApp = true;
       });
     }
 
-    final deviceAuth = ref.read(deviceAuthServiceProvider);
-    final supportsAuth = await deviceAuth.isSupported();
-    if (!mounted) {
-      return;
-    }
-    if (!supportsAuth) {
-      // [修复关键]：当次检测未就绪或临时异常时，绝不能永久篡改或关闭用户的应用锁配置（移除 setAppLockEnabled(false)）
-      // 仅在当前会话安全放行，确保用户的指纹锁持久化配置始终有效
-      if (!mounted) {
-        return;
+    // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行）
+    if (!AppPlatform.supportsDeviceAuth) {
+      if (mounted) {
+        setState(() {
+          _appLocked = false;
+          _unlockingApp = false;
+        });
       }
-      setState(() {
-        _appLocked = false;
-        _unlockingApp = false;
-      });
       return;
     }
 
+    // 获取系统底层设备身份验证服务实例
+    final deviceAuth = ref.read(deviceAuthServiceProvider);
+    // 唤起系统级原生指纹/生物识别对话框
     final authenticated = await deviceAuth.authenticate(
       reason: _bootstrapL10n(settingsService).appLockAuthReason,
     );
@@ -507,7 +516,10 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
       return;
     }
     setState(() {
+      // 结束解锁中中间态
       _unlockingApp = false;
+      // [关键安全铁律]：只有在系统明确返回 authenticated == true 时才解除应用遮罩；
+      // 用户点击取消、识别失败、锁屏或异常时，必须始终保持 _appLocked = true 牢牢锁死！
       _appLocked = !authenticated;
     });
   }
