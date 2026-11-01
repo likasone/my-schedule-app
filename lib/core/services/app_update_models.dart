@@ -15,8 +15,8 @@ export 'app_update_version.dart';
 /// 仓库与各类地址。Release 附件、源码文件都走 github.com / raw 域名，
 /// 便于整体套上镜像前缀（国内网络下 api.github.com 与附件直连常不可用）。
 abstract final class AppUpdateEndpoints {
-  static const String owner = 'CikeSeven';
-  static const String repo = 'jotsy';
+  static const String owner = 'likasone';
+  static const String repo = 'my-schedule-app';
 
   /// 随 Release 发布的更新清单文件名（见 `release-apk.yml`）。
   static const String manifestFileName = 'jotsy-update.json';

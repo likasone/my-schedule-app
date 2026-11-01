@@ -1,4 +1,4 @@
-﻿// Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #pragma code_page(65001)
 #include "resource.h"
@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "CikeSeven" "\0"
+            VALUE "CompanyName", "likasone" "\0"
             VALUE "FileDescription", "Jotsy" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "Jotsy" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 CikeSeven" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 likasone" "\0"
             VALUE "OriginalFilename", "jotsy.exe" "\0"
             VALUE "ProductName", "Jotsy" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

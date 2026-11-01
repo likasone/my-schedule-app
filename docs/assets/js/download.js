@@ -35,7 +35,7 @@
 import { currentLang, formatNumber, onLangChange, t } from './i18n.js';
 import { copyText, toast } from './ui.js';
 
-const REPO = 'CikeSeven/jotsy';
+const REPO = 'likasone/my-schedule-app';
 const GH = `https://github.com/${REPO}`;
 const API = `https://api.github.com/repos/${REPO}`;
 const ROUTES = [
