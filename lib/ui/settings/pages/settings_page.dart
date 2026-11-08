@@ -346,22 +346,12 @@ class _FingerprintLockCard extends ConsumerWidget {
     }
 
     // 调用系统级指纹/生物识别核验弹窗
-    final authResult = await deviceAuth.authenticateWithResult(
+    final verified = await deviceAuth.authenticate(
       reason: target ? '请验证指纹以开启应用锁保护' : '请验证指纹以解除应用锁保护',
     );
 
-    // 关键降级：在桌面端（Windows/macOS/Linux），若用户本意是解除保护，而设备无硬件或核验异常，允许直接解除
-    if (!target && AppPlatform.isDesktop && authResult.isHardwareUnavailable) {
-      await settingsService.setAppLockEnabled(false);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ 检测到当前桌面设备未配置生物硬件，已直接解除应用锁保护')),
-      );
-      return;
-    }
-
     // 仅在生物识别核验成功通过后才持久化更新配置
-    if (authResult.isSuccess) {
+    if (verified) {
       await settingsService.setAppLockEnabled(target);
       if (!context.mounted) return;
       // 成功状态提示

@@ -543,7 +543,7 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     }
 
     // 唤起系统级原生指纹/生物识别对话框
-    final authResult = await deviceAuth.authenticateWithResult(
+    final authenticated = await deviceAuth.authenticate(
       reason: _bootstrapL10n(settingsService).appLockAuthReason,
     );
 
@@ -551,25 +551,13 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
       return;
     }
 
-    // 桌面平台关键安全降级：
-    // 若在桌面平台（Windows / Linux / macOS）因硬件缺失、无指纹模组、系统未录入 Windows Hello
-    // 或环境异常导致验证根本无法发起，自动安全放行并解除应用锁开关，彻底杜绝死锁！
-    if (AppPlatform.isDesktop && authResult.isHardwareUnavailable) {
-      await settingsService.setAppLockEnabled(false);
-      setState(() {
-        _appLocked = false;
-        _unlockingApp = false;
-      });
-      return;
-    }
-
     setState(() {
       // 结束解锁中中间态
       _unlockingApp = false;
       // [关键安全铁律]：
-      // 在移动端或硬件就绪状态下，只有当系统明确返回 isSuccess == true 时才解除应用遮罩；
-      // 用户点击取消、识别失败、锁屏或异常时，移动端始终保持 _appLocked = true 牢牢锁死！
-      _appLocked = !authResult.isSuccess;
+      // 在移动端或硬件就绪状态下，只有当系统明确返回 authenticated == true 时才解除应用遮罩；
+      // 用户点击取消、识别失败、锁屏或异常时，始终保持 _appLocked = true 牢牢锁死！
+      _appLocked = !authenticated;
     });
   }
 }

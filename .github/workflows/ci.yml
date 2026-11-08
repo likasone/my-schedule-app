@@ -59,15 +59,7 @@ jobs:
 
       - name: Analyze
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: |
-          set -o pipefail
-          flutter analyze --no-pub 2>&1 | tee analyze_output.log || {
-            echo "### ❌ Flutter Analyze Failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat analyze_output.log >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          }
+        run: flutter analyze --no-pub
 
       - name: Check ARB metadata
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
@@ -127,14 +119,7 @@ jobs:
             exit 1
           fi
           echo "Shard $((SHARD_INDEX + 1))/$SHARD_TOTAL: ${#shard_files[@]} of ${#test_files[@]} test files"
-          set -o pipefail
-          flutter test --no-pub --coverage "${shard_files[@]}" 2>&1 | tee test_output.log || {
-            echo "### ❌ Test Shard $SHARD_INDEX Failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            grep -E "(FAILED|Expected:|Actual:|══╡ EXCEPTION CAUGHT|ERROR)" test_output.log -B 2 -A 5 | head -n 120 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          }
+          flutter test --no-pub --coverage "${shard_files[@]}"
 
       - name: Upload shard coverage
         if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
@@ -271,15 +256,7 @@ jobs:
       # integration_test 这类 dev_dependencies 插件；跳过时沿用 pub get 生成的
       # 版本，javac 会找不到 dev.flutter.plugins.integration_test。
       - name: Build release APK (arm64)
-        run: |
-          set -o pipefail
-          flutter build apk --release --target-platform android-arm64 2>&1 | tee apk_build.log || {
-            echo "### ❌ Build release APK Failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 100 apk_build.log >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          }
+        run: flutter build apk --release --target-platform android-arm64
 
       # Flutter 构建会先生成仓库未跟踪的 gradlew；原生测试复用这份 wrapper。
       - name: Test Android picker permissions and result handling
@@ -349,16 +326,7 @@ jobs:
         uses: ./.github/actions/setup-flutter
 
       - name: Build Windows release
-        shell: bash
-        run: |
-          set -o pipefail
-          flutter build windows --release 2>&1 | tee windows_build.log || {
-            echo "### ❌ Build Windows Release Failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 100 windows_build.log >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          }
+        run: flutter build windows --release
 
       - name: Report build size
         shell: bash

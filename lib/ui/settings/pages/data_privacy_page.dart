@@ -53,17 +53,14 @@ class DataPrivacyPage extends ConsumerWidget {
     if (!enabled) {
       final supported = await deviceAuth.isSupported();
       if (supported) {
-        final authResult = await deviceAuth.authenticateWithResult(
+        final verified = await deviceAuth.authenticate(
           reason: context.l10n.appLockDisableAuthReason,
           persistAcrossBackgrounding: false,
         );
         if (!context.mounted) {
           return;
         }
-        // 桌面平台容错：若因缺少硬件模组导致核验失败，允许直接放行解除
-        final allowFallback =
-            AppPlatform.isDesktop && authResult.isHardwareUnavailable;
-        if (!authResult.isSuccess && !allowFallback) {
+        if (!verified) {
           await HomeHintVisibilityScope.showTrackedSnackBar(
             context: context,
             snackBar: SnackBar(

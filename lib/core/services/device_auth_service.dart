@@ -1,28 +1,7 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:node_diary/core/services/app_platform.dart';
-
-/// 设备身份验证结果封装模型。
-///
-/// 区分“用户核验未通过/取消”与“设备硬件缺失/系统未配置/插件调用异常”。
-class DeviceAuthResult {
-  const DeviceAuthResult({
-    required this.isSuccess,
-    this.isHardwareUnavailable = false,
-    this.errorCode,
-  });
-
-  /// 身份核验是否成功通过（指纹/面容/凭据匹配成功）
-  final bool isSuccess;
-
-  /// 是否因硬件缺失、系统未录入凭证或平台不支持导致验证根本无法唤起
-  final bool isHardwareUnavailable;
-
-  /// 底层平台抛出的错误代码（若有）
-  final String? errorCode;
-}
 
 /// 设备身份验证（指纹、面容或锁屏密码）。
 ///
@@ -36,65 +15,26 @@ class DeviceAuthService {
 
   final LocalAuthentication _localAuthentication;
 
-  /// 这台设备能否验证身份：系统级凭据（Windows Hello / PIN / 锁屏密码）或生物识别任一可用即可。
+  /// 这台设备能否验证身份：
+  /// - 在桌面平台（Windows / Linux）：由于无生物传感器时调用原生验证极易抛错死锁，
+  ///   桌面端必须要求检测到物理生物传感器（指纹仪/摄像头）才判定为支持；
+  /// - 在移动平台（Android / iOS）：支持锁屏密码或生物识别任一可用即可。
   Future<bool> isSupported() async {
     try {
+      if (AppPlatform.isDesktop) {
+        final canBiometrics = await _localAuthentication.canCheckBiometrics;
+        if (canBiometrics) {
+          return true;
+        }
+        final available = await _localAuthentication.getAvailableBiometrics();
+        return available.isNotEmpty;
+      }
       if (await _localAuthentication.isDeviceSupported()) {
         return true;
       }
       return await _localAuthentication.canCheckBiometrics;
     } catch (_) {
       return false;
-    }
-  }
-
-  /// 弹出系统验证，返回包含详细硬件可用性状态的结果对象 [DeviceAuthResult]。
-  ///
-  /// 在桌面平台（Windows / Linux / macOS）：若设备缺少指纹模组或未设置 Windows Hello，
-  /// 会将 [DeviceAuthResult.isHardwareUnavailable] 标为 true，避免将环境不可用误判为密码错误。
-  Future<DeviceAuthResult> authenticateWithResult({
-    required String reason,
-    bool persistAcrossBackgrounding = true,
-  }) async {
-    try {
-      final success = await _localAuthentication.authenticate(
-        localizedReason: reason,
-        biometricOnly: false,
-        sensitiveTransaction: true,
-        persistAcrossBackgrounding: persistAcrossBackgrounding,
-        authMessages: const <AuthMessages>[
-          // Android 原生指纹与生物识别中文提示（全版本通用核心参数）
-          AndroidAuthMessages(
-            signInTitle: '指纹与安全解锁',
-            cancelButton: '取消',
-          ),
-        ],
-      );
-      return DeviceAuthResult(isSuccess: success);
-    } on PlatformException catch (e) {
-      // 常见硬件缺失与未配置的系统异常代码
-      const unavailableCodes = {
-        'NotAvailable',
-        'PasscodeNotSet',
-        'NotEnrolled',
-        'DeviceNotPresent',
-        'NotConfiguredForUser',
-        'no_biometrics_available',
-        'DisabledByPolicy',
-      };
-      final isUnavailable =
-          unavailableCodes.contains(e.code) || AppPlatform.isDesktop;
-      return DeviceAuthResult(
-        isSuccess: false,
-        isHardwareUnavailable: isUnavailable,
-        errorCode: e.code,
-      );
-    } catch (e) {
-      return DeviceAuthResult(
-        isSuccess: false,
-        isHardwareUnavailable: AppPlatform.isDesktop,
-        errorCode: e.toString(),
-      );
     }
   }
 
@@ -107,11 +47,23 @@ class DeviceAuthService {
     required String reason,
     bool persistAcrossBackgrounding = true,
   }) async {
-    final result = await authenticateWithResult(
-      reason: reason,
-      persistAcrossBackgrounding: persistAcrossBackgrounding,
-    );
-    return result.isSuccess;
+    try {
+      return await _localAuthentication.authenticate(
+        localizedReason: reason,
+        biometricOnly: false,
+        sensitiveTransaction: true,
+        persistAcrossBackgrounding: persistAcrossBackgrounding,
+        authMessages: const <AuthMessages>[
+          // Android 原生指纹与生物识别中文提示（全版本通用核心参数）
+          AndroidAuthMessages(
+            signInTitle: '指纹与安全解锁',
+            cancelButton: '取消',
+          ),
+        ],
+      );
+    } catch (_) {
+      return false;
+    }
   }
 }
 
