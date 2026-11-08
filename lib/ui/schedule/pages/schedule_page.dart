@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -3264,14 +3265,22 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     _showEditScheduleDialog(context, tempEntry, notifier, isCreating: true);
   }
 
+  /// 在主页面安全展示 SnackBar 反馈提示条，防范异步生命周期失效
+  void _showScheduleSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   /// 弹窗：导出日程、计划与便签数据（支持复制 JSON 或系统分享/保存）
   Future<void> _showExportScheduleDialog(
-    BuildContext context,
+    BuildContext ctx,
     ScheduleNotifier notifier,
   ) async {
     // 获取导出的 JSON 字符串
     final jsonStr = await notifier.exportScheduleDataJson();
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     // 显示导出操作面板
     showDialog<void>(
@@ -3317,14 +3326,10 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             ),
             OutlinedButton.icon(
               onPressed: () async {
+                Navigator.of(dialogCtx).pop();
                 // 写入系统剪贴板
                 await Clipboard.setData(ClipboardData(text: jsonStr));
-                if (dialogCtx.mounted) {
-                  Navigator.of(dialogCtx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('日程计划 JSON 数据已复制到剪贴板！')),
-                  );
-                }
+                _showScheduleSnackBar('日程计划 JSON 数据已复制到剪贴板！');
               },
               icon: const Icon(Icons.copy, size: 14),
               label: const Text('复制 JSON'),
@@ -3346,7 +3351,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
   /// 弹窗：导入日程、计划与便签数据（支持文件选取与文本粘贴，支持去重合并或全量覆盖）
   Future<void> _showImportScheduleDialog(
-    BuildContext context,
+    BuildContext ctx,
     ScheduleNotifier notifier,
   ) async {
     final pasteController = TextEditingController();
@@ -3356,7 +3361,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       context: context,
       builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogContentCtx, setDialogState) {
             return AlertDialog(
               title: const Row(
                 children: [
@@ -3392,18 +3397,14 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                               if (filePath != null) {
                                 content = await File(filePath).readAsString();
                               } else if (result.files.first.bytes != null) {
-                                content = String.fromCharCodes(result.files.first.bytes!);
+                                content = utf8.decode(result.files.first.bytes!);
                               }
                               if (content.isNotEmpty) {
                                 pasteController.text = content;
                               }
                             }
                           } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('选择文件失败: $e')),
-                              );
-                            }
+                            _showScheduleSnackBar('选择文件失败: $e');
                           }
                         },
                         icon: const Icon(Icons.folder_open, size: 16),
@@ -3446,11 +3447,11 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                   onPressed: () async {
                     final text = pasteController.text.trim();
                     if (text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('请先选择文件或粘贴 JSON 内容')),
-                      );
+                      _showScheduleSnackBar('请先选择文件或粘贴 JSON 内容');
                       return;
                     }
+
+                    Navigator.of(dialogCtx).pop();
 
                     try {
                       // 调用底层统一导入接口
@@ -3458,20 +3459,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         text,
                         overwrite: isOverwrite,
                       );
-                      if (dialogCtx.mounted) {
-                        Navigator.of(dialogCtx).pop();
-                      }
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('🎉 导入成功！共计合并 $importedCount 条记录')),
-                        );
-                      }
+                      _showScheduleSnackBar('🎉 导入成功！共计合并 $importedCount 条记录');
                     } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('导入解析失败: $e')),
-                        );
-                      }
+                      _showScheduleSnackBar('导入解析失败: $e');
                     }
                   },
                   icon: const Icon(Icons.check, size: 16),
