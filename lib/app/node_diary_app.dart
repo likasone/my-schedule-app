@@ -370,6 +370,7 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
               overlayBuilder: (_) => _AppLockOverlay(
                 unlocking: _unlockingApp,
                 onTapUnlock: _handleManualUnlockTap,
+                onEmergencyDesktopUnlock: _handleEmergencyDesktopUnlock,
               ),
               // 上锁日记本的重新上锁层在应用锁之下：两者同时盖着时先解应用锁。
               child: NotebookLockLayer(child: scaledChild),
@@ -481,6 +482,21 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     await _lockAndAuthenticate(settingsService: settingsService);
   }
 
+  /// 桌面端应急解除应用锁：
+  /// 当桌面设备无指纹仪或 Windows Hello 无法响应时，重置应用锁配置并安全解除遮罩
+  Future<void> _handleEmergencyDesktopUnlock() async {
+    final settingsService = _boundSettingsService;
+    if (settingsService != null) {
+      await settingsService.setAppLockEnabled(false);
+    }
+    if (mounted) {
+      setState(() {
+        _appLocked = false;
+        _unlockingApp = false;
+      });
+    }
+  }
+
   Future<void> _lockAndAuthenticate({
     required SettingsService settingsService,
   }) async {
@@ -527,19 +543,33 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     }
 
     // 唤起系统级原生指纹/生物识别对话框
-    final authenticated = await deviceAuth.authenticate(
+    final authResult = await deviceAuth.authenticateWithResult(
       reason: _bootstrapL10n(settingsService).appLockAuthReason,
     );
 
     if (!mounted) {
       return;
     }
+
+    // 桌面平台关键安全降级：
+    // 若在桌面平台（Windows / Linux / macOS）因硬件缺失、无指纹模组、系统未录入 Windows Hello
+    // 或环境异常导致验证根本无法发起，自动安全放行并解除应用锁开关，彻底杜绝死锁！
+    if (AppPlatform.isDesktop && authResult.isHardwareUnavailable) {
+      await settingsService.setAppLockEnabled(false);
+      setState(() {
+        _appLocked = false;
+        _unlockingApp = false;
+      });
+      return;
+    }
+
     setState(() {
       // 结束解锁中中间态
       _unlockingApp = false;
-      // [关键安全铁律]：只有在系统明确返回 authenticated == true 时才解除应用遮罩；
-      // 用户点击取消、识别失败、锁屏或异常时，必须始终保持 _appLocked = true 牢牢锁死！
-      _appLocked = !authenticated;
+      // [关键安全铁律]：
+      // 在移动端或硬件就绪状态下，只有当系统明确返回 isSuccess == true 时才解除应用遮罩；
+      // 用户点击取消、识别失败、锁屏或异常时，移动端始终保持 _appLocked = true 牢牢锁死！
+      _appLocked = !authResult.isSuccess;
     });
   }
 }
@@ -590,12 +620,18 @@ class _AppMultiplierTextScaler implements TextScaler {
 /// 设计目标：
 /// - 在应用锁开启时阻断所有交互；
 /// - 自动解锁中给出统一 loading 反馈；
-/// - 解锁失败后提供明确的手动重试入口。
+/// - 解锁失败后提供明确的手动重试入口；
+/// - 在桌面端（Windows / Linux / macOS）提供设备无生物硬件时的应急解除通道，彻底避免死锁。
 class _AppLockOverlay extends StatelessWidget {
-  const _AppLockOverlay({required this.unlocking, required this.onTapUnlock});
+  const _AppLockOverlay({
+    required this.unlocking,
+    required this.onTapUnlock,
+    this.onEmergencyDesktopUnlock,
+  });
 
   final bool unlocking;
   final VoidCallback onTapUnlock;
+  final VoidCallback? onEmergencyDesktopUnlock;
 
   @override
   Widget build(BuildContext context) {
@@ -661,6 +697,44 @@ class _AppLockOverlay extends StatelessWidget {
                           ),
                   ),
                 ),
+                // 桌面端专属：当电脑未配备指纹仪或 Windows Hello 无法弹出时，提供明确的安全解除选项
+                if (AppPlatform.isDesktop &&
+                    onEmergencyDesktopUnlock != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (dialogCtx) => AlertDialog(
+                          title: const Text('解除桌面端应用锁'),
+                          content: const Text(
+                            '检测到当前在电脑端运行。如果您的设备未配备物理指纹仪或 Windows Hello 无法唤起，'
+                            '可以点击下方按钮安全解除应用锁并直接进入主界面。',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(dialogCtx).pop(),
+                              child: const Text('取消'),
+                            ),
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.of(dialogCtx).pop();
+                                onEmergencyDesktopUnlock?.call();
+                              },
+                              child: const Text('确认解除锁定'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.shield_outlined, size: 16),
+                    label: const Text('电脑无指纹/无法唤起验证？解除锁定'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.outline,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
