@@ -261,7 +261,7 @@ jobs:
       # Flutter 构建会先生成仓库未跟踪的 gradlew；原生测试复用这份 wrapper。
       - name: Test Android picker permissions and result handling
         working-directory: android
-        run: ./gradlew :app:testDebugUnitTest --console=plain
+        run: ./gradlew :app:testDebugUnitTest --console=plain -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g"
 
       - name: Report APK size
         run: |
