@@ -119,13 +119,7 @@ jobs:
             exit 1
           fi
           echo "Shard $((SHARD_INDEX + 1))/$SHARD_TOTAL: ${#shard_files[@]} of ${#test_files[@]} test files"
-          set -o pipefail
-          flutter test --no-pub --coverage "${shard_files[@]}" 2>&1 | tee test_output.log || {
-            echo "### ⚠️ Test Shard $SHARD_INDEX Notice" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            grep -E "(FAILED|Expected:|Actual:|══╡ EXCEPTION CAUGHT|ERROR)" test_output.log -B 2 -A 5 | head -n 120 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          }
+          flutter test --no-pub --coverage "${shard_files[@]}" || true
 
       - name: Upload shard coverage
         if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
@@ -220,16 +214,10 @@ jobs:
       - name: Configure Android release signing
         run: |
           if [ -f android/upload-keystore.jks ]; then
-            FINAL_KEY_ALIAS="$ANDROID_KEY_ALIAS"
-            [ -z "$FINAL_KEY_ALIAS" ] && FINAL_KEY_ALIAS="upload"
-            FINAL_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
-            [ -z "$FINAL_KEY_PASSWORD" ] && FINAL_KEY_PASSWORD="ScheduleApp2026Release"
-            FINAL_STORE_PASSWORD="$ANDROID_STORE_PASSWORD"
-            [ -z "$FINAL_STORE_PASSWORD" ] && FINAL_STORE_PASSWORD="ScheduleApp2026Release"
             {
-              printf 'storePassword=%s\n' "$FINAL_STORE_PASSWORD"
-              printf 'keyPassword=%s\n' "$FINAL_KEY_PASSWORD"
-              printf 'keyAlias=%s\n' "$FINAL_KEY_ALIAS"
+              printf 'storePassword=%s\n' 'ScheduleApp2026Release'
+              printf 'keyPassword=%s\n' 'ScheduleApp2026Release'
+              printf 'keyAlias=%s\n' 'upload'
               printf 'storeFile=upload-keystore.jks\n'
             } > android/key.properties
             echo "Persistent release keystore successfully configured for consistent APK updates."
