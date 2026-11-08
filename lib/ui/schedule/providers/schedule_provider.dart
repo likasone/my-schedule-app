@@ -211,6 +211,15 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
                 (r) => r.name == (map['repeatRule'] as String?),
                 orElse: () => ScheduleRepeatRule.none,
               ),
+              priority: SchedulePriority.values.firstWhere(
+                (p) => p.name == (map['priority'] as String?),
+                orElse: () => SchedulePriority.none,
+              ),
+              subTasks: (map['subTasks'] as List?)
+                      ?.map(SubTaskItem.fromJson)
+                      .toList() ??
+                  const [],
+              isAllDay: map['isAllDay'] as bool? ?? false,
             );
           }).toList();
         } catch (e) {
@@ -310,6 +319,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               'hasReminder': e.hasReminder,
               'reminderMinutesBefore': e.reminderMinutesBefore,
               'repeatRule': e.repeatRule.name,
+              'priority': e.priority.name,
+              'subTasks': e.subTasks.map((s) => s.toJson()).toList(),
+              'isAllDay': e.isAllDay,
             },
           )
           .toList();
@@ -377,7 +389,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(updatedPlans, updatedEntries, state.memos);
   }
 
-  /// 创建单项日程待办项（支持指定具体日期和时间点，并可配置强提醒与周期性重复）
+  /// 创建单项日程待办项（支持指定具体日期和时间点，并可配置强提醒与周期性重复、优先级与子清单）
   Future<void> createSingleSchedule({
     required String title,
     required DateTime time,
@@ -385,6 +397,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     bool hasReminder = true,
     int reminderMinutesBefore = 0,
     ScheduleRepeatRule repeatRule = ScheduleRepeatRule.none,
+    SchedulePriority priority = SchedulePriority.none,
+    bool isAllDay = false,
+    List<SubTaskItem> subTasks = const [],
   }) async {
     final isoDate = PlanScheduler.formatIsoDate(time);
     final entry = ScheduleEntry(
@@ -399,6 +414,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       hasReminder: hasReminder,
       reminderMinutesBefore: reminderMinutesBefore,
       repeatRule: repeatRule,
+      priority: priority,
+      isAllDay: isAllDay,
+      subTasks: subTasks,
     );
 
     final updatedEntries = [...state.entries, entry];
@@ -427,6 +445,176 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       isLoading: false, // 显式解除 loading，防止任何转圈卡顿
     );
     await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 更新修改已有的日程待办项（包括标题、日期、时分、备注、提醒规则、重复周期、优先级、全天模式、子清单）
+  Future<void> updateScheduleEntry({
+    required String id,
+    required String title,
+    required String scheduledDate,
+    String notes = '',
+    DateTime? reminderTime,
+    bool hasReminder = false,
+    int reminderMinutesBefore = 0,
+    ScheduleRepeatRule repeatRule = ScheduleRepeatRule.none,
+    SchedulePriority priority = SchedulePriority.none,
+    bool isAllDay = false,
+    List<SubTaskItem> subTasks = const [],
+  }) async {
+    ScheduleEntry? oldEntry;
+    for (final e in state.entries) {
+      if (e.id == id) {
+        oldEntry = e;
+        break;
+      }
+    }
+    if (oldEntry == null) return;
+
+    // 若此前设置过提醒，且提醒设置有变，先撤销旧提醒
+    if (oldEntry.hasReminder && oldEntry.reminderTime != null) {
+      try {
+        final reminderService = ref.read(reminderServiceProvider);
+        await reminderService.cancelReminder(
+          ReminderItem(
+            id: oldEntry.id,
+            title: oldEntry.title,
+            reminderTime: oldEntry.reminderTime!,
+          ),
+        );
+      } catch (e) {
+        debugPrint('更新日程时取消旧提醒异常: $e');
+      }
+    }
+
+    // 若新配置激活了提醒，重新注册系统级闹钟与日历事件
+    if (hasReminder && reminderTime != null) {
+      try {
+        final reminderService = ref.read(reminderServiceProvider);
+        final actualAlertTime = reminderTime.subtract(Duration(minutes: reminderMinutesBefore));
+        await reminderService.scheduleComprehensiveReminder(
+          ReminderItem(
+            id: id,
+            title: title.trim(),
+            notes: notes.trim().isNotEmpty ? notes.trim() : '日程提醒',
+            reminderTime: actualAlertTime,
+            rrule: repeatRule.rrule,
+          ),
+        );
+      } catch (e) {
+        debugPrint('更新日程时挂载新提醒异常: $e');
+      }
+    }
+
+    final updatedEntries = state.entries.map((entry) {
+      if (entry.id == id) {
+        return entry.copyWith(
+          title: title.trim(),
+          scheduledDate: scheduledDate,
+          notes: notes.trim(),
+          reminderTime: reminderTime,
+          hasReminder: hasReminder,
+          reminderMinutesBefore: reminderMinutesBefore,
+          repeatRule: repeatRule,
+          priority: priority,
+          isAllDay: isAllDay,
+          subTasks: subTasks,
+        );
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries, isLoading: false);
+    await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 切换指定日程条目下的子待办清单完成状态（Checklist 打勾/取消打勾）
+  Future<void> toggleSubTaskCompletion(String entryId, String subTaskId) async {
+    final updatedEntries = state.entries.map((entry) {
+      if (entry.id == entryId) {
+        final newSubTasks = entry.subTasks.map((sub) {
+          if (sub.id == subTaskId) {
+            return sub.copyWith(isCompleted: !sub.isCompleted);
+          }
+          return sub;
+        }).toList();
+        return entry.copyWith(subTasks: newSubTasks);
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries, isLoading: false);
+    await _persist(state.plans, updatedEntries, state.memos);
+  }
+
+  /// 更新修改已有的计划项（支持修改名称、备注与调整起始日期）
+  /// 若调整了起始日期，将自动平移该计划下所有未完成的排程阶段节点
+  Future<void> updatePlan({
+    required String planId,
+    required String title,
+    String notes = '',
+    String? newStartDateIso,
+  }) async {
+    PlanItem? targetPlan;
+    for (final p in state.plans) {
+      if (p.id == planId) {
+        targetPlan = p;
+        break;
+      }
+    }
+    if (targetPlan == null) return;
+
+    final trimmedTitle = title.trim();
+    final trimmedNotes = notes.trim();
+    final updatedStartDate = newStartDateIso ?? targetPlan.startDate;
+    final isStartDateChanged = updatedStartDate != targetPlan.startDate;
+
+    // 1. 更新计划自身基本信息
+    final updatedPlans = state.plans.map((p) {
+      if (p.id == planId) {
+        return p.copyWith(
+          title: trimmedTitle.isNotEmpty ? trimmedTitle : p.title,
+          notes: trimmedNotes,
+          startDate: updatedStartDate,
+        );
+      }
+      return p;
+    }).toList();
+
+    // 2. 如果调整了起始基准日，智能平移未完成的排程阶段节点
+    List<ScheduleEntry> updatedEntries = state.entries;
+    if (isStartDateChanged) {
+      final daysDiff = PlanScheduler.daysBetween(targetPlan.startDate, updatedStartDate);
+      updatedEntries = state.entries.map((entry) {
+        if (entry.planId == planId && !entry.isCompleted) {
+          final newScheduledDate = PlanScheduler.addDays(entry.scheduledDate, daysDiff);
+          DateTime? newReminderTime;
+          if (entry.reminderTime != null) {
+            newReminderTime = entry.reminderTime!.add(Duration(days: daysDiff));
+          }
+          return entry.copyWith(
+            scheduledDate: newScheduledDate,
+            reminderTime: newReminderTime,
+          );
+        }
+        return entry;
+      }).toList();
+    } else {
+      // 若仅修改了计划名称，同步更新该计划关联节点中标题前缀
+      updatedEntries = state.entries.map((entry) {
+        if (entry.planId == planId && entry.title.startsWith(targetPlan!.title)) {
+          final suffix = entry.title.substring(targetPlan.title.length);
+          return entry.copyWith(title: '$trimmedTitle$suffix');
+        }
+        return entry;
+      }).toList();
+    }
+
+    state = state.copyWith(
+      plans: updatedPlans,
+      entries: updatedEntries,
+      isLoading: false,
+    );
+    await _persist(updatedPlans, updatedEntries, state.memos);
   }
 
   /// 切换指定条目的提醒状态（开启/关闭）
@@ -540,18 +728,23 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(state.plans, updatedEntries, state.memos);
   }
 
-  /// 添加快速便签记事（支持设置分类标签与置顶）
+  /// 添加快速便签记事（支持设置标题、拟真花笺纸色、分类标签与置顶）
   Future<void> addQuickMemo(
     String memo, {
+    String title = '',
+    int colorIndex = 0,
     String tag = '闪念',
     bool isPinned = false,
   }) async {
     final text = memo.trim();
-    if (text.isEmpty) return;
+    final memoTitle = title.trim();
+    if (text.isEmpty && memoTitle.isEmpty) return;
 
     final now = DateTime.now();
     final newMemo = MemoItem(
       id: 'memo_${now.millisecondsSinceEpoch}',
+      title: memoTitle,
+      colorIndex: colorIndex,
       content: text,
       createdAt: now,
       tag: tag,
@@ -563,19 +756,24 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     await _persist(state.plans, state.entries, updatedMemos);
   }
 
-  /// 编辑更新已有的记事便签内容与属性
+  /// 编辑更新已有的记事便签内容与属性（支持更新标题与花笺纸色）
   Future<void> updateMemo({
     required String id,
     required String content,
+    String? title,
+    int? colorIndex,
     String? tag,
     bool? isPinned,
   }) async {
     final text = content.trim();
-    if (text.isEmpty) return;
+    final trimmedTitle = title?.trim();
+    if (text.isEmpty && (trimmedTitle == null || trimmedTitle.isEmpty)) return;
 
     final updatedMemos = state.memos.map((m) {
       if (m.id == id) {
         return m.copyWith(
+          title: trimmedTitle,
+          colorIndex: colorIndex,
           content: text,
           tag: tag,
           isPinned: isPinned,

@@ -75,6 +75,84 @@ enum ScheduleRepeatRule {
   };
 }
 
+/// 日程重要度与优先级（Schedule Priority）
+enum SchedulePriority {
+  /// 普通无特殊标记
+  none,
+
+  /// 低优先级（绿色，灵活安排）
+  low,
+
+  /// 中优先级（黄色，日常重点）
+  medium,
+
+  /// 高优先级（红色，重要紧急）
+  high;
+
+  /// 中文标签
+  String get label => switch (this) {
+    SchedulePriority.none => '无优先级',
+    SchedulePriority.low => '低优先级',
+    SchedulePriority.medium => '中优先级',
+    SchedulePriority.high => '高优先级',
+  };
+}
+
+/// 子待办项清单模型（Sub Task Checklist Item）
+@immutable
+class SubTaskItem {
+  const SubTaskItem({
+    required this.id,
+    required this.title,
+    this.isCompleted = false,
+  });
+
+  /// 子任务唯一标识符
+  final String id;
+
+  /// 子任务简明标题
+  final String title;
+
+  /// 是否已完成勾选
+  final bool isCompleted;
+
+  /// 拷贝并更新属性
+  SubTaskItem copyWith({
+    String? id,
+    String? title,
+    bool? isCompleted,
+  }) {
+    return SubTaskItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+
+  /// 序列化为 Map
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'isCompleted': isCompleted,
+  };
+
+  /// 反序列化容错解析
+  factory SubTaskItem.fromJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      return SubTaskItem(
+        id: json['id'] as String? ?? 'sub_${DateTime.now().microsecondsSinceEpoch}',
+        title: json['title'] as String? ?? '',
+        isCompleted: json['isCompleted'] as bool? ?? false,
+      );
+    }
+    return SubTaskItem(
+      id: 'sub_${DateTime.now().microsecondsSinceEpoch}',
+      title: json.toString(),
+      isCompleted: false,
+    );
+  }
+}
+
 /// 单项计划实体模型（Plan Item）
 @immutable
 class PlanItem {
@@ -116,6 +194,29 @@ class PlanItem {
 
   /// 补充说明或备注
   final String notes;
+
+  /// 拷贝并更新计划属性
+  PlanItem copyWith({
+    String? title,
+    String? startDate,
+    int? dayCount,
+    List<int>? reviewOffsets,
+    PlanKind? kind,
+    List<String>? tags,
+    String? notes,
+  }) {
+    return PlanItem(
+      id: id,
+      title: title ?? this.title,
+      startDate: startDate ?? this.startDate,
+      dayCount: dayCount ?? this.dayCount,
+      reviewOffsets: reviewOffsets ?? this.reviewOffsets,
+      kind: kind ?? this.kind,
+      createdAt: createdAt,
+      tags: tags ?? this.tags,
+      notes: notes ?? this.notes,
+    );
+  }
 }
 
 /// 单次排程节点明细实体（Schedule Entry）
@@ -137,6 +238,9 @@ class ScheduleEntry {
     this.hasReminder = false,
     this.reminderMinutesBefore = 0,
     this.repeatRule = ScheduleRepeatRule.none,
+    this.priority = SchedulePriority.none,
+    this.subTasks = const [],
+    this.isAllDay = false,
   });
 
   /// 排程节点唯一标识
@@ -184,8 +288,18 @@ class ScheduleEntry {
   /// 重复周期规则（不重复、每天、工作日、每周、每月）
   final ScheduleRepeatRule repeatRule;
 
+  /// 任务优先级（无/低/中/高，参考小米待办设计）
+  final SchedulePriority priority;
+
+  /// 子任务清单（Checklist 子待办，支持逐步核销）
+  final List<SubTaskItem> subTasks;
+
+  /// 是否为全天日程（全天不强绑定具体分钟，准点提醒）
+  final bool isAllDay;
+
   /// 复制并更新部分属性
   ScheduleEntry copyWith({
+    String? title,
     bool? isCompleted,
     DateTime? completedAt,
     ReviewFeedback? feedback,
@@ -196,11 +310,14 @@ class ScheduleEntry {
     bool? hasReminder,
     int? reminderMinutesBefore,
     ScheduleRepeatRule? repeatRule,
+    SchedulePriority? priority,
+    List<SubTaskItem>? subTasks,
+    bool? isAllDay,
   }) {
     return ScheduleEntry(
       id: id,
       planId: planId,
-      title: title,
+      title: title ?? this.title,
       scheduledDate: scheduledDate ?? this.scheduledDate,
       stepIndex: stepIndex,
       kind: kind,
@@ -213,6 +330,9 @@ class ScheduleEntry {
       hasReminder: hasReminder ?? this.hasReminder,
       reminderMinutesBefore: reminderMinutesBefore ?? this.reminderMinutesBefore,
       repeatRule: repeatRule ?? this.repeatRule,
+      priority: priority ?? this.priority,
+      subTasks: subTasks ?? this.subTasks,
+      isAllDay: isAllDay ?? this.isAllDay,
     );
   }
 }
@@ -439,12 +559,15 @@ class PlanScheduler {
 }
 
 /// 闪念与随手记事便签实体模型（Memo Item）
+/// 参考花笺（Floral Notepaper）美学设计，融合信笺拟真纸色与沉浸式随笔灵感。
 @immutable
 class MemoItem {
   const MemoItem({
     required this.id,
     required this.content,
     required this.createdAt,
+    this.title = '',
+    this.colorIndex = 0,
     this.updatedAt,
     this.isPinned = false,
     this.tag = '闪念',
@@ -453,7 +576,13 @@ class MemoItem {
   /// 便签唯一标识符
   final String id;
 
-  /// 便签内容文本（支持多行随想、待办灵感）
+  /// 便签标题（花笺拟真信笺标题，可选）
+  final String title;
+
+  /// 花笺拟真低饱和纸色索引（0: 霜白, 1: 樱落, 2: 竹韵, 3: 麦穗, 4: 晴川, 5: 暮薰）
+  final int colorIndex;
+
+  /// 便签内容文本（支持多行随想、待办灵感、Markdown 格式）
   final String content;
 
   /// 创建时间戳
@@ -471,6 +600,8 @@ class MemoItem {
   /// 转换为 JSON 存储 Map
   Map<String, dynamic> toJson() => {
     'id': id,
+    'title': title,
+    'colorIndex': colorIndex,
     'content': content,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
@@ -490,6 +621,8 @@ class MemoItem {
     if (json is Map<String, dynamic>) {
       return MemoItem(
         id: json['id'] as String? ?? 'memo_${DateTime.now().millisecondsSinceEpoch}',
+        title: json['title'] as String? ?? '',
+        colorIndex: json['colorIndex'] as int? ?? 0,
         content: json['content'] as String? ?? '',
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
@@ -510,6 +643,8 @@ class MemoItem {
 
   /// 拷贝并更新属性
   MemoItem copyWith({
+    String? title,
+    int? colorIndex,
     String? content,
     DateTime? updatedAt,
     bool? isPinned,
@@ -517,6 +652,8 @@ class MemoItem {
   }) {
     return MemoItem(
       id: id,
+      title: title ?? this.title,
+      colorIndex: colorIndex ?? this.colorIndex,
       content: content ?? this.content,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
