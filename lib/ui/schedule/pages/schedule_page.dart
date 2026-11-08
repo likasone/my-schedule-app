@@ -1,8 +1,12 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/services/plan_scheduler.dart';
 import '../../../core/services/reminder_service.dart';
@@ -204,11 +208,51 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(child: titleBlock),
-                          IconButton.outlined(
-                            tooltip: '立即测试提醒弹窗',
-                            visualDensity: VisualDensity.compact,
-                            icon: const Icon(Icons.notifications_active_outlined, size: 18),
-                            onPressed: () => notifier.triggerTestReminder(),
+                          PopupMenuButton<String>(
+                            tooltip: '更多数据管理与选项',
+                            icon: const Icon(Icons.more_vert, size: 20),
+                            onSelected: (val) {
+                              if (val == 'import') {
+                                _showImportScheduleDialog(context, notifier);
+                              } else if (val == 'export') {
+                                _showExportScheduleDialog(context, notifier);
+                              } else if (val == 'test_reminder') {
+                                notifier.triggerTestReminder();
+                              }
+                            },
+                            itemBuilder: (ctx) => [
+                              const PopupMenuItem(
+                                value: 'import',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.file_download_outlined, size: 18, color: Colors.green),
+                                    SizedBox(width: 8),
+                                    Text('导入日程与计划'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'export',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.file_upload_outlined, size: 18, color: Colors.blue),
+                                    SizedBox(width: 8),
+                                    Text('导出日程与计划'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              const PopupMenuItem(
+                                value: 'test_reminder',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.notifications_active_outlined, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('测试系统强提醒'),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -251,12 +295,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     titleBlock,
                     Row(
                       children: [
-                        IconButton.outlined(
-                          tooltip: '立即测试提醒弹窗',
-                          icon: const Icon(Icons.notifications_active_outlined, size: 18),
-                          onPressed: () => notifier.triggerTestReminder(),
-                        ),
-                        const SizedBox(width: 8),
                         FilledButton.tonalIcon(
                           onPressed: () => _showCreateScheduleDialog(context, state, notifier),
                           icon: const FaIcon(FontAwesomeIcons.calendarPlus, size: 14),
@@ -267,6 +305,53 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           onPressed: () => _showCreatePlanDialog(context, state, notifier),
                           icon: const FaIcon(FontAwesomeIcons.brain, size: 14),
                           label: const Text('建计划'),
+                        ),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          tooltip: '更多数据管理与选项',
+                          icon: const Icon(Icons.more_vert, size: 20),
+                          onSelected: (val) {
+                            if (val == 'import') {
+                              _showImportScheduleDialog(context, notifier);
+                            } else if (val == 'export') {
+                              _showExportScheduleDialog(context, notifier);
+                            } else if (val == 'test_reminder') {
+                              notifier.triggerTestReminder();
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'import',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.file_download_outlined, size: 18, color: Colors.green),
+                                  SizedBox(width: 8),
+                                  Text('导入日程与计划'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'export',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.file_upload_outlined, size: 18, color: Colors.blue),
+                                  SizedBox(width: 8),
+                                  Text('导出日程与计划'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuDivider(),
+                            const PopupMenuItem(
+                              value: 'test_reminder',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.notifications_active_outlined, size: 18),
+                                  SizedBox(width: 8),
+                                  Text('测试系统强提醒'),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -3177,5 +3262,226 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
 
     _showEditScheduleDialog(context, tempEntry, notifier, isCreating: true);
+  }
+
+  /// 弹窗：导出日程、计划与便签数据（支持复制 JSON 或系统分享/保存）
+  Future<void> _showExportScheduleDialog(
+    BuildContext context,
+    ScheduleNotifier notifier,
+  ) async {
+    // 获取导出的 JSON 字符串
+    final jsonStr = await notifier.exportScheduleDataJson();
+    if (!context.mounted) return;
+
+    // 显示导出操作面板
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.file_upload_outlined, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('导出日程与计划数据'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '已为您打包当前的复习计划、日程待办与花笺便签数据。您可以直接复制 JSON 文本，或通过系统分享保存为文件。',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                constraints: const BoxConstraints(maxHeight: 140),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    jsonStr,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('关闭'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                // 写入系统剪贴板
+                await Clipboard.setData(ClipboardData(text: jsonStr));
+                if (dialogCtx.mounted) {
+                  Navigator.of(dialogCtx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('日程计划 JSON 数据已复制到剪贴板！')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy, size: 14),
+              label: const Text('复制 JSON'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                // 唤起系统级分享或保存
+                await Share.share(jsonStr, subject: '日程计划与便签数据备份.json');
+              },
+              icon: const Icon(Icons.share, size: 14),
+              label: const Text('分享 / 保存'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 弹窗：导入日程、计划与便签数据（支持文件选取与文本粘贴，支持去重合并或全量覆盖）
+  Future<void> _showImportScheduleDialog(
+    BuildContext context,
+    ScheduleNotifier notifier,
+  ) async {
+    final pasteController = TextEditingController();
+    bool isOverwrite = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.file_download_outlined, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text('导入日程与计划数据'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '支持从本地 JSON 备份文件中读取，或直接在此处粘贴日程计划的 JSON 格式文本：',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 12),
+                    // 快捷选取文件按钮
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            // 调用文件选择器
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.any,
+                              dialogTitle: '选择日程计划备份 JSON 文件',
+                            );
+                            if (result != null && result.files.isNotEmpty) {
+                              final filePath = result.files.first.path;
+                              String content = '';
+                              if (filePath != null) {
+                                content = await File(filePath).readAsString();
+                              } else if (result.files.first.bytes != null) {
+                                content = String.fromCharCodes(result.files.first.bytes!);
+                              }
+                              if (content.isNotEmpty) {
+                                pasteController.text = content;
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('选择文件失败: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.folder_open, size: 16),
+                        label: const Text('选取本地文件 (.json / .txt)'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: pasteController,
+                      maxLines: 5,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                      decoration: InputDecoration(
+                        hintText: '或者在此粘贴包含 plans / entries / memos 的 JSON 字符串...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.all(10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // 覆盖或合并选项勾选框
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('清空覆盖现有数据（谨慎使用）', style: TextStyle(fontSize: 13)),
+                      subtitle: const Text('默认关闭为安全去重合并模式，保留现有数据', style: TextStyle(fontSize: 11)),
+                      value: isOverwrite,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          isOverwrite = val ?? false;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('取消'),
+                ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    final text = pasteController.text.trim();
+                    if (text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先选择文件或粘贴 JSON 内容')),
+                      );
+                      return;
+                    }
+
+                    try {
+                      // 调用底层统一导入接口
+                      final importedCount = await notifier.importScheduleDataJson(
+                        text,
+                        overwrite: isOverwrite,
+                      );
+                      if (dialogCtx.mounted) {
+                        Navigator.of(dialogCtx).pop();
+                      }
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('🎉 导入成功！共计合并 $importedCount 条记录')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('导入解析失败: $e')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text('立即开始导入'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

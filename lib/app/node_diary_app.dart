@@ -512,53 +512,71 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
       });
     }
 
-    // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行并重置开关）
-    if (!AppPlatform.supportsDeviceAuth) {
-      await settingsService.setAppLockEnabled(false);
+    try {
+      // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行并重置开关）
+      if (!AppPlatform.supportsDeviceAuth) {
+        // 自动禁用不可用平台上的应用锁开关
+        await settingsService.setAppLockEnabled(false);
+        if (mounted) {
+          setState(() {
+            // 解除锁定遮罩
+            _appLocked = false;
+          });
+        }
+        return;
+      }
+
+      // 获取系统底层设备身份验证服务实例
+      final deviceAuth = ref.read(deviceAuthServiceProvider);
+
+      // 动态设备硬件及系统凭据能力检查：
+      // 若当前硬件无生物识别设备（无指纹仪/摄像头）或未设置 Windows Hello/PIN，
+      // 安全放行并自动将设置中的应用锁开关关闭，彻底解除死锁！
+      final isSupported = await deviceAuth.isSupported();
+      if (!isSupported) {
+        // 自动关闭应用锁开关
+        await settingsService.setAppLockEnabled(false);
+        if (mounted) {
+          setState(() {
+            // 解除锁定遮罩
+            _appLocked = false;
+          });
+        }
+        return;
+      }
+
+      // 唤起系统级原生指纹/生物识别对话框
+      final authenticated = await deviceAuth.authenticate(
+        reason: _bootstrapL10n(settingsService).appLockAuthReason,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        // [关键安全铁律]：
+        // 在移动端或硬件就绪状态下，只有当系统明确返回 authenticated == true 时才解除应用遮罩；
+        // 用户点击取消、识别失败、锁屏或异常时，保持锁定状态
+        _appLocked = !authenticated;
+      });
+    } catch (e) {
+      // 记录底层核验过程中抛出的任何异常
+      debugPrint('设备身份验证发生异常: $e');
       if (mounted) {
         setState(() {
-          _appLocked = false;
+          // 发生异常时保持锁定，等待用户点击手动解锁或桌面应急通道
+          _appLocked = true;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          // 严格在 finally 保证重置正在解锁中状态，彻底根除转圈卡死死锁
           _unlockingApp = false;
         });
       }
-      return;
     }
-
-    // 获取系统底层设备身份验证服务实例
-    final deviceAuth = ref.read(deviceAuthServiceProvider);
-
-    // 动态设备硬件及系统凭据能力检查：
-    // 若当前硬件无生物识别设备（无指纹仪/摄像头）或未设置 Windows Hello/PIN，
-    // 安全放行并自动将设置中的应用锁开关关闭，彻底解除死锁！
-    final isSupported = await deviceAuth.isSupported();
-    if (!isSupported) {
-      await settingsService.setAppLockEnabled(false);
-      if (mounted) {
-        setState(() {
-          _appLocked = false;
-          _unlockingApp = false;
-        });
-      }
-      return;
-    }
-
-    // 唤起系统级原生指纹/生物识别对话框
-    final authenticated = await deviceAuth.authenticate(
-      reason: _bootstrapL10n(settingsService).appLockAuthReason,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      // 结束解锁中中间态
-      _unlockingApp = false;
-      // [关键安全铁律]：
-      // 在移动端或硬件就绪状态下，只有当系统明确返回 authenticated == true 时才解除应用遮罩；
-      // 用户点击取消、识别失败、锁屏或异常时，始终保持 _appLocked = true 牢牢锁死！
-      _appLocked = !authenticated;
-    });
   }
 }
 
@@ -689,37 +707,13 @@ class _AppLockOverlay extends StatelessWidget {
                 if (AppPlatform.isDesktop &&
                     onEmergencyDesktopUnlock != null) ...[
                   const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: () {
-                      showDialog<void>(
-                        context: context,
-                        builder: (dialogCtx) => AlertDialog(
-                          title: const Text('解除桌面端应用锁'),
-                          content: const Text(
-                            '检测到当前在电脑端运行。如果您的设备未配备物理指纹仪或 Windows Hello 无法唤起，'
-                            '可以点击下方按钮安全解除应用锁并直接进入主界面。',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(dialogCtx).pop(),
-                              child: const Text('取消'),
-                            ),
-                            FilledButton(
-                              onPressed: () {
-                                Navigator.of(dialogCtx).pop();
-                                onEmergencyDesktopUnlock?.call();
-                              },
-                              child: const Text('确认解除锁定'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.shield_outlined, size: 16),
-                    label: const Text('电脑无指纹/无法唤起验证？解除锁定'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: colorScheme.outline,
-                      visualDensity: VisualDensity.compact,
+                  OutlinedButton.icon(
+                    onPressed: onEmergencyDesktopUnlock,
+                    icon: const Icon(Icons.lock_open_rounded, size: 16),
+                    label: const Text('电脑无生物识别硬件？直接进入应用'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                      side: BorderSide(color: colorScheme.outlineVariant),
                     ),
                   ),
                 ],

@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/open.dart';
 
 import '../../utils/text_stats.dart';
 import 'content_codec.dart';
@@ -99,6 +101,27 @@ class AppDatabase extends _$AppDatabase
   /// 供数据库之外需要先定好 id 的场合使用（如旧备份里的单份草稿转为草稿行）。
   static String newBusinessId() => _newBusinessUuid();
 
+  /// 初始化并为各平台配置 SQLite 动态链接库查找机制。
+  /// 尤其在 Windows 桌面端优先从当前可执行文件同级目录加载 sqlite3.dll，彻底解决符号缺失与加载崩溃。
+  static void setupSqliteLibraryOverrides() {
+    // 仅针对 Windows 操作系统执行专门的动态库加载重载
+    if (Platform.isWindows) {
+      // 注册 Windows 下的 sqlite3 打开解析器
+      open.overrideFor(OperatingSystem.windows, () {
+        // 获取当前正在运行的应用程序可执行文件所在目录
+        final exeDir = File(Platform.resolvedExecutable).parent.path;
+        // 拼接同级目录下的 sqlite3.dll 完整物理绝对路径
+        final dllPath = p.join(exeDir, 'sqlite3.dll');
+        // 若同级目录真实存在该动态链接库，直接打开该物理文件
+        if (File(dllPath).existsSync()) {
+          return DynamicLibrary.open(dllPath);
+        }
+        // 若不存在，则回退调用系统级默认搜索路径加载 sqlite3.dll
+        return DynamicLibrary.open('sqlite3.dll');
+      });
+    }
+  }
+
   @override
   int get schemaVersion => 16;
 
@@ -178,6 +201,8 @@ class AppDatabase extends _$AppDatabase
 /// 使用后台 isolate 建库，避免阻塞主线程。
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
+    // 确保在建库或后台 isolate 初始化前完成动态库路径重载
+    AppDatabase.setupSqliteLibraryOverrides();
     final root = await appDataRootDirectory();
     final file = File(p.join(root.path, 'node_diary.sqlite'));
     return NativeDatabase.createInBackground(file);

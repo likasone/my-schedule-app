@@ -887,4 +887,225 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     state = state.copyWith(plans: updatedPlans, entries: updatedEntries, isLoading: false);
     await _persist(updatedPlans, updatedEntries, state.memos);
   }
+
+  /// 导出日程、计划与便签数据为标准 JSON 字符串
+  Future<String> exportScheduleDataJson() async {
+    // 将计划列表转为可序列化的 Map 集合
+    final plansData = state.plans.map((p) => {
+      'id': p.id,
+      'title': p.title,
+      'startDate': p.startDate,
+      'dayCount': p.dayCount,
+      'reviewOffsets': p.reviewOffsets,
+      'createdAt': p.createdAt.toIso8601String(),
+      'notes': p.notes,
+    }).toList();
+
+    // 将日程条目转为 Map 集合
+    final entriesData = state.entries.map((e) => {
+      'id': e.id,
+      'planId': e.planId,
+      'title': e.title,
+      'scheduledDate': e.scheduledDate,
+      'stepIndex': e.stepIndex,
+      'kind': e.kind.name,
+      'isCompleted': e.isCompleted,
+      'originalDueDate': e.originalDueDate,
+      'notes': e.notes,
+      'reminderTime': e.reminderTime?.toIso8601String(),
+      'hasReminder': e.hasReminder,
+      'reminderMinutesBefore': e.reminderMinutesBefore,
+      'repeatRule': e.repeatRule.name,
+      'priority': e.priority.name,
+      'subTasks': e.subTasks.map((s) => s.toJson()).toList(),
+      'isAllDay': e.isAllDay,
+    }).toList();
+
+    // 将便签列表转为 Map 集合
+    final memosData = state.memos.map((m) => m.toJson()).toList();
+
+    // 组合成标准全量备份对象结构
+    final payload = {
+      'version': 1,
+      'exportTime': DateTime.now().toIso8601String(),
+      'plans': plansData,
+      'entries': entriesData,
+      'memos': memosData,
+    };
+
+    // 格式化输出为美观缩进的 JSON
+    return const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
+  /// 导入日程计划与便签数据接口（支持合并或覆盖）
+  /// 返回成功导入/合并的有效记录总数量
+  Future<int> importScheduleDataJson(
+    String jsonString, {
+    bool overwrite = false,
+  }) async {
+    // 校验输入非空
+    if (jsonString.trim().isEmpty) {
+      throw const FormatException('导入的数据内容为空');
+    }
+
+    // 解码 JSON 结构
+    final decoded = jsonDecode(jsonString.trim());
+    final List<PlanItem> parsedPlans = [];
+    final List<ScheduleEntry> parsedEntries = [];
+    final List<MemoItem> parsedMemos = [];
+
+    // 解析计划集合
+    if (decoded is Map<String, dynamic> && decoded['plans'] is List) {
+      final list = decoded['plans'] as List;
+      for (final item in list) {
+        if (item is Map<String, dynamic>) {
+          parsedPlans.add(
+            PlanItem(
+              id: item['id'] as String? ?? 'plan_${DateTime.now().microsecondsSinceEpoch}',
+              title: item['title'] as String? ?? '未命名计划',
+              startDate: item['startDate'] as String? ?? PlanScheduler.formatIsoDate(DateTime.now()),
+              dayCount: item['dayCount'] as int? ?? 365,
+              reviewOffsets: (item['reviewOffsets'] as List?)?.cast<int>() ?? [1, 2, 4, 7, 15, 30],
+              createdAt: item['createdAt'] != null
+                  ? DateTime.tryParse(item['createdAt'] as String) ?? DateTime.now()
+                  : DateTime.now(),
+              notes: item['notes'] as String? ?? '',
+            ),
+          );
+        }
+      }
+    }
+
+    // 解析日程待办条目集合
+    if (decoded is Map<String, dynamic> && decoded['entries'] is List) {
+      final list = decoded['entries'] as List;
+      for (final item in list) {
+        if (item is Map<String, dynamic>) {
+          final reminderTimeStr = item['reminderTime'] as String?;
+          parsedEntries.add(
+            ScheduleEntry(
+              id: item['id'] as String? ?? 'entry_${DateTime.now().microsecondsSinceEpoch}',
+              planId: item['planId'] as String? ?? 'standalone_single_task',
+              title: item['title'] as String? ?? '待办任务',
+              scheduledDate: item['scheduledDate'] as String? ?? PlanScheduler.formatIsoDate(DateTime.now()),
+              stepIndex: item['stepIndex'] as int? ?? 0,
+              kind: ScheduleEntryKind.values.firstWhere(
+                (k) => k.name == (item['kind'] as String?),
+                orElse: () => ScheduleEntryKind.task,
+              ),
+              isCompleted: item['isCompleted'] as bool? ?? false,
+              originalDueDate: item['originalDueDate'] as String?,
+              notes: item['notes'] as String? ?? '',
+              reminderTime: reminderTimeStr != null ? DateTime.tryParse(reminderTimeStr) : null,
+              hasReminder: item['hasReminder'] as bool? ?? (reminderTimeStr != null),
+              reminderMinutesBefore: item['reminderMinutesBefore'] as int? ?? 0,
+              repeatRule: ScheduleRepeatRule.values.firstWhere(
+                (r) => r.name == (item['repeatRule'] as String?),
+                orElse: () => ScheduleRepeatRule.none,
+              ),
+              priority: SchedulePriority.values.firstWhere(
+                (p) => p.name == (item['priority'] as String?),
+                orElse: () => SchedulePriority.none,
+              ),
+              subTasks: (item['subTasks'] as List?)
+                      ?.map(SubTaskItem.fromJson)
+                      .toList() ??
+                  const [],
+              isAllDay: item['isAllDay'] as bool? ?? false,
+            ),
+          );
+        }
+      }
+    }
+
+    // 解析灵感与备忘便签集合
+    if (decoded is Map<String, dynamic> && decoded['memos'] is List) {
+      final list = decoded['memos'] as List;
+      for (final item in list) {
+        if (item is Map<String, dynamic>) {
+          parsedMemos.add(MemoItem.fromJson(item));
+        }
+      }
+    }
+
+    // 若传入的是单一便签数组形式，进行智能兼容解析
+    if (decoded is List) {
+      for (final item in decoded) {
+        if (item is Map<String, dynamic>) {
+          if (item.containsKey('reviewOffsets')) {
+            parsedPlans.add(PlanItem(
+              id: item['id'] as String? ?? 'plan_${DateTime.now().microsecondsSinceEpoch}',
+              title: item['title'] as String? ?? '导入计划',
+              startDate: item['startDate'] as String? ?? PlanScheduler.formatIsoDate(DateTime.now()),
+              dayCount: item['dayCount'] as int? ?? 365,
+              reviewOffsets: (item['reviewOffsets'] as List?)?.cast<int>() ?? [1, 2, 4, 7, 15, 30],
+              createdAt: DateTime.now(),
+              notes: item['notes'] as String? ?? '',
+            ));
+          } else if (item.containsKey('scheduledDate')) {
+            parsedEntries.add(ScheduleEntry(
+              id: item['id'] as String? ?? 'entry_${DateTime.now().microsecondsSinceEpoch}',
+              planId: item['planId'] as String? ?? 'standalone_single_task',
+              title: item['title'] as String? ?? '待办任务',
+              scheduledDate: item['scheduledDate'] as String? ?? PlanScheduler.formatIsoDate(DateTime.now()),
+              stepIndex: item['stepIndex'] as int? ?? 0,
+              kind: ScheduleEntryKind.task,
+              notes: item['notes'] as String? ?? '',
+            ));
+          } else if (item.containsKey('content')) {
+            parsedMemos.add(MemoItem.fromJson(item));
+          }
+        }
+      }
+    }
+
+    // 计算导入的有效数据总量
+    final totalCount = parsedPlans.length + parsedEntries.length + parsedMemos.length;
+    if (totalCount == 0) {
+      throw const FormatException('未识别到有效的日程、计划或便签数据');
+    }
+
+    List<PlanItem> finalPlans;
+    List<ScheduleEntry> finalEntries;
+    List<MemoItem> finalMemos;
+
+    if (overwrite) {
+      // 覆盖模式：直接替换现有数据
+      finalPlans = parsedPlans;
+      finalEntries = parsedEntries;
+      finalMemos = parsedMemos;
+    } else {
+      // 合并模式：按 ID 去重合并
+      final planMap = {for (final p in state.plans) p.id: p};
+      for (final p in parsedPlans) {
+        planMap[p.id] = p;
+      }
+      finalPlans = planMap.values.toList();
+
+      final entryMap = {for (final e in state.entries) e.id: e};
+      for (final e in parsedEntries) {
+        entryMap[e.id] = e;
+      }
+      finalEntries = entryMap.values.toList();
+
+      final memoMap = {for (final m in state.memos) m.id: m};
+      for (final m in parsedMemos) {
+        memoMap[m.id] = m;
+      }
+      finalMemos = memoMap.values.toList();
+    }
+
+    // 持久化存储到本地
+    await _persist(finalPlans, finalEntries, finalMemos);
+
+    // 更新内存状态，刷新页面响应
+    state = state.copyWith(
+      plans: finalPlans,
+      entries: finalEntries,
+      memos: finalMemos,
+      isLoading: false,
+    );
+
+    return totalCount;
+  }
 }
