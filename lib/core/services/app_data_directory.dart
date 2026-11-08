@@ -18,7 +18,13 @@ import 'app_platform.dart';
 /// （`BackupMediaPaths`），与根目录在哪无关，跨平台恢复同样成立。
 Future<Directory> appDataRootDirectory() async {
   if (!AppPlatform.isDesktop) {
-    return getApplicationDocumentsDirectory();
+    // 获取移动端应用沙盒文档根目录
+    final directory = await getApplicationDocumentsDirectory();
+    // 确保该目录在文件系统上真实存在，彻底杜绝 SQLite 首次建库因父路径缺失导致无法打开数据库
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return directory;
   }
   // 桌面的支持目录首次启动时可能还不存在；SQLite 只建文件不建父目录，
   // 这里先建好，各服务拼子目录时也不必再判断根目录。

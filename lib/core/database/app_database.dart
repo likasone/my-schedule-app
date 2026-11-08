@@ -102,9 +102,9 @@ class AppDatabase extends _$AppDatabase
   static String newBusinessId() => _newBusinessUuid();
 
   /// 初始化并为各平台配置 SQLite 动态链接库查找机制。
-  /// 尤其在 Windows 桌面端优先从当前可执行文件同级目录加载 sqlite3.dll，彻底解决符号缺失与加载崩溃。
+  /// 彻底解决 Windows 桌面端与 Android 移动端符号缺失与动态库加载崩溃问题。
   static void setupSqliteLibraryOverrides() {
-    // 仅针对 Windows 操作系统执行专门的动态库加载重载
+    // 针对 Windows 操作系统执行专门的动态库加载重载
     if (Platform.isWindows) {
       // 注册 Windows 下的 sqlite3 打开解析器
       open.overrideFor(OperatingSystem.windows, () {
@@ -118,6 +118,12 @@ class AppDatabase extends _$AppDatabase
         }
         // 若不存在，则回退调用系统级默认搜索路径加载 sqlite3.dll
         return DynamicLibrary.open('sqlite3.dll');
+      });
+    } else if (Platform.isAndroid) {
+      // 针对 Android 平台显式指定加载由 sqlite3_flutter_libs 打包的动态链接库
+      open.overrideFor(OperatingSystem.android, () {
+        // 优先直接打开标准打包的 libsqlite3.so
+        return DynamicLibrary.open('libsqlite3.so');
       });
     }
   }
