@@ -1677,7 +1677,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 IconButton(
                   tooltip: '编辑便签',
                   icon: const Icon(Icons.edit_outlined, size: 16),
-                  onPressed: () => _showFloralMemoEditor(context, notifier, initialMemo: memo),
+                  onPressed: () => _showEditMemoDialog(context, memo, notifier),
                 ),
                 // 删除
                 IconButton(
@@ -2177,7 +2177,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
         builder: (context, setDialogState) {
           final theme = Theme.of(context);
           final colorScheme = theme.colorScheme;
-          final actualTriggerTime = scheduleTime.subtract(Duration(minutes: advanceMinutes));
           final weekdayStr = const ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][scheduleTime.weekday - 1];
 
           return Dialog(
@@ -3178,36 +3177,5 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
 
     _showEditScheduleDialog(context, tempEntry, notifier, isCreating: true);
-  }
-
-  /// 快捷时间微按钮
-  Widget _buildTimeShortcutPill({
-    required String label,
-    required ColorScheme colorScheme,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: colorScheme.surface,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.primary,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -51,10 +51,14 @@ class DataPrivacyPage extends ConsumerWidget {
       }
     }
     if (!enabled) {
+      final reason = context.l10n.appLockDisableAuthReason;
       final supported = await deviceAuth.isSupported();
+      if (!context.mounted) {
+        return;
+      }
       if (supported) {
         final verified = await deviceAuth.authenticate(
-          reason: context.l10n.appLockDisableAuthReason,
+          reason: reason,
           persistAcrossBackgrounding: false,
         );
         if (!context.mounted) {

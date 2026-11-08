@@ -126,3 +126,9 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/app_icon/mingcute_icon.png
+
+# 禁用构建与测试时在线拉取 precompiled native assets，避免 GitHub 限流 403 导致校验失败与构建中断
+hooks:
+  user_defines:
+    sqlite3:
+      source: process
