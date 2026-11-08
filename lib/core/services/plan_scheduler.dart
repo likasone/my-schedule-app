@@ -445,7 +445,7 @@ class PlanScheduler {
 
       // 超过计划最大生命周期上限的节点自动截断
       if (!isDateInsidePlan(
-        startDate: plan.startDate,
+        startDate: start,
         dayCount: plan.dayCount,
         targetDate: scheduledDate,
       )) {

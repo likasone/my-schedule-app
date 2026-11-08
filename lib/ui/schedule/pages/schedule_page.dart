@@ -1661,7 +1661,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 // 复制全文
                 IconButton(
                   tooltip: '复制全文',
-                  icon: const Icon(Icons.copy, size: 16),
+                  icon: const Icon(Icons.content_copy, size: 16),
                   onPressed: () {
                     final fullText = memo.title.isNotEmpty ? '【${memo.title}】\n${memo.content}' : memo.content;
                     Clipboard.setData(ClipboardData(text: fullText));

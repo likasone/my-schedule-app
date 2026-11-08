@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,13 +80,11 @@ class ReminderService {
   /// 桌面端提醒触发回调函数（供 UI 层弹窗监听）
   void Function(ReminderItem reminder)? onDesktopReminderTriggered;
 
-  /// 判断当前平台是否为 Android
-  bool get isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  /// 判断当前平台是否为真实 Android 物理设备或模拟器（单元测试与非 Android 平台返回 false）
+  bool get isAndroid => !kIsWeb && Platform.isAndroid;
 
   /// 判断当前平台是否为 Windows 桌面端
-  bool get isWindows =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  bool get isWindows => !kIsWeb && Platform.isWindows;
 
   /// 检查当前是否已获得系统日历读写权限（仅 Android 生效，桌面端默认返回 true）
   Future<bool> hasCalendarPermission() async {
@@ -93,8 +92,8 @@ class ReminderService {
     try {
       final result = await _channel.invokeMethod<bool>('hasCalendarPermission');
       return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('检查日历权限异常: ${e.message}');
+    } catch (e) {
+      debugPrint('检查日历权限异常: $e');
       return false;
     }
   }
@@ -107,8 +106,8 @@ class ReminderService {
         'requestCalendarPermission',
       );
       return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('申请日历权限异常: ${e.message}');
+    } catch (e) {
+      debugPrint('申请日历权限异常: $e');
       return false;
     }
   }
@@ -148,8 +147,8 @@ class ReminderService {
       );
 
       return eventId;
-    } on PlatformException catch (e) {
-      debugPrint('创建系统日历事件失败: ${e.message}');
+    } catch (e) {
+      debugPrint('创建系统日历事件失败: $e');
       return null;
     }
   }
@@ -163,8 +162,8 @@ class ReminderService {
         dynamic
       >{'eventId': calendarEventId});
       return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('删除系统日历事件失败: ${e.message}');
+    } catch (e) {
+      debugPrint('删除系统日历事件失败: $e');
       return false;
     }
   }
@@ -189,8 +188,8 @@ class ReminderService {
         'notes': notes,
       });
       return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('设置高精度闹钟失败: ${e.message}');
+    } catch (e) {
+      debugPrint('设置高精度闹钟失败: $e');
       return false;
     }
   }

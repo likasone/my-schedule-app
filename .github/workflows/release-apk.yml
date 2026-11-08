@@ -101,22 +101,23 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          DEFAULT_KEYSTORE_BASE64: "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"
         run: |
-          # 优先使用 GitHub Secrets；若未配置 Secrets，自动回退到项目专用的持久化签名（避免缺失 Secrets 报错，并确保每次更新签名绝对一致）
-          FINAL_KEYSTORE_B64="${ANDROID_KEYSTORE_BASE64:-$DEFAULT_KEYSTORE_BASE64}"
+          # 若配置了 GitHub Secrets 则解码覆盖；否则直接使用仓库固化纳管的签名证书
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > android/upload-keystore.jks
+          fi
+
           FINAL_KEY_ALIAS="${ANDROID_KEY_ALIAS:-upload}"
           FINAL_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-ScheduleApp2026Release}"
           FINAL_STORE_PASSWORD="${ANDROID_STORE_PASSWORD:-ScheduleApp2026Release}"
 
-          printf '%s' "$FINAL_KEYSTORE_B64" | tr -d '\r\n ' | base64 -d > android/upload-keystore.jks
           {
             printf 'storePassword=%s\n' "$FINAL_STORE_PASSWORD"
             printf 'keyPassword=%s\n' "$FINAL_KEY_PASSWORD"
             printf 'keyAlias=%s\n' "$FINAL_KEY_ALIAS"
             printf 'storeFile=upload-keystore.jks\n'
           } > android/key.properties
-          echo "Android release keystore and key.properties successfully restored (Consistent Signature Ensured)."
+          echo "Android release keystore and key.properties successfully configured (Consistent Signature Ensured)."
 
       # 清理不需要的预装大工具链，释放 20GB+ 磁盘空间，防止 Android SDK / NDK 下载解压报 No space left on device
       - name: Free disk space
