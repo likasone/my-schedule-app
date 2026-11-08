@@ -301,10 +301,8 @@ class SettingsService {
     if (storedLocaleCode == null) {
       await prefs.setString(_keyAppLocaleCode, localeCode);
     }
-    // 应用锁初始化：首次安装（未显式配置过该项）且在移动端（Android/iOS）时，
-    // 默认启用指纹/生物识别锁；系统启动后若检测到设备未录入生物识别会自动安全降级。
-    final bool defaultAppLock = AppPlatform.isMobile;
-    final appLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? defaultAppLock;
+    // 应用锁默认关闭，由用户在设置中心显式开启保护，避免在测试或未录入生物识别时阻塞启动
+    final appLockEnabled = prefs.getBool(_keyAppLockEnabled) ?? false;
     final tagFilterMemoryEnabled =
         prefs.getBool(_keyTagFilterMemoryEnabled) ?? false;
     final storedDayPhotoSuggestions = prefs.get(_keyDayPhotoSuggestionsEnabled);
