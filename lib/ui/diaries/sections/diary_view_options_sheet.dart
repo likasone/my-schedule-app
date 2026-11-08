@@ -8,6 +8,7 @@ import '../../../core/database/app_database.dart';
 import '../../widgets/app_modal/app_modal_bottom_sheet.dart';
 import '../../widgets/expressive_button_group.dart';
 import '../../notebooks/viewmodels/notebook_labels.dart';
+import '../../settings/pages/data_management_page.dart';
 import '../../widgets/expressive_choice_tile.dart';
 import 'diary_head_section.dart';
 
@@ -265,6 +266,30 @@ class _DiaryViewOptionsSheetState extends State<DiaryViewOptionsSheet> {
                 },
               ),
             ],
+            const SizedBox(height: AppSpacing.l),
+            const _SectionHeader(
+              icon: FontAwesomeIcons.database,
+              label: '日记数据管理',
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            ListTile(
+              dense: true,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              leading: const FaIcon(FontAwesomeIcons.fileImport, size: 16),
+              title: const Text('导入日记与数据'),
+              subtitle: const Text('从第三方日记应用或本地完整备份导入'),
+              trailing: const FaIcon(FontAwesomeIcons.angleRight, size: 14),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) => const DataManagementPage(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

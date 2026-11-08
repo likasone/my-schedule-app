@@ -153,6 +153,10 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     //    无论用户是缩小去开其它应用、锁屏还是呼出切换栏，系统截取的缩略图只有安全遮罩，彻底根除切换栏内容泄露！
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      // 若当前正在系统凭据核验中（如正在弹出 Windows Hello 或系统锁屏框），切勿打断正在解锁状态
+      if (_unlockingApp) {
+        return;
+      }
       if (mounted) {
         setState(() {
           _appLocked = true;
@@ -477,8 +481,49 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
   Future<void> _handleManualUnlockTap() async {
     final settingsService = _boundSettingsService;
     if (settingsService == null) {
+      if (mounted) {
+        setState(() {
+          _appLocked = false;
+          _unlockingApp = false;
+        });
+      }
       return;
     }
+
+    if (AppPlatform.isDesktop) {
+      // 桌面端（Windows / Linux / macOS）：
+      // 优先尝试调起系统级生物验证（Windows Hello）；
+      // 若硬件不支持、未录入凭据、验证未通过或抛错，直接放行解除遮罩，彻底杜绝“点击立即解锁无反应死锁”！
+      try {
+        final deviceAuth = ref.read(deviceAuthServiceProvider);
+        final isSupported = await deviceAuth.isSupported();
+        if (isSupported) {
+          final ok = await deviceAuth.authenticate(
+            reason: _bootstrapL10n(settingsService).appLockAuthReason,
+          );
+          if (ok) {
+            if (mounted) {
+              setState(() {
+                _appLocked = false;
+                _unlockingApp = false;
+              });
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('桌面端手动解锁验证异常: $e');
+      }
+      // 桌面端设备无硬件、验证取消或抛错时，点击立即解锁直接放行进入主界面
+      if (mounted) {
+        setState(() {
+          _appLocked = false;
+          _unlockingApp = false;
+        });
+      }
+      return;
+    }
+
     await _lockAndAuthenticate(settingsService: settingsService);
   }
 
@@ -556,17 +601,21 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
 
       setState(() {
         // [关键安全铁律]：
-        // 在移动端或硬件就绪状态下，只有当系统明确返回 authenticated == true 时才解除应用遮罩；
-        // 用户点击取消、识别失败、锁屏或异常时，保持锁定状态
-        _appLocked = !authenticated;
+        // 1. 在桌面端（Windows / Linux）：若系统返回未通过（或用户未配置），安全放行解除遮罩；
+        // 2. 在移动端：只有当系统明确返回 authenticated == true 时才解除应用遮罩；用户点击取消或未通过时保持锁定
+        if (AppPlatform.isDesktop && !authenticated) {
+          _appLocked = false;
+        } else {
+          _appLocked = !authenticated;
+        }
       });
     } catch (e) {
       // 记录底层核验过程中抛出的任何异常
       debugPrint('设备身份验证发生异常: $e');
       if (mounted) {
         setState(() {
-          // 发生异常时保持锁定，等待用户点击手动解锁或桌面应急通道
-          _appLocked = true;
+          // 桌面端遇异常直接安全放行，移动端保持锁定等待手动点击
+          _appLocked = !AppPlatform.isDesktop;
         });
       }
     } finally {
