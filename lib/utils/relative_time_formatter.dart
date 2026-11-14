@@ -1,4 +1,4 @@
-import '../../l10n/app_localizations.dart';
+import 'package:node_diary/l10n/app_localizations.dart';
 
 /// 统一的“更新时间”展示格式化工具。
 ///

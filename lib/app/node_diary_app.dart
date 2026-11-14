@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:node_diary/ui/widgets/expressive_loading_indicator.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:node_diary/app/app_bootstrap_home.dart';
 import 'package:node_diary/app/app_lock_layer.dart';
 import 'package:node_diary/app/synced_data_refresh.dart';
@@ -14,9 +12,15 @@ import 'package:node_diary/app/theme/theme.dart';
 import 'package:node_diary/app/theme/app_scroll_behavior.dart';
 import 'package:node_diary/app/theme/expressive_controls.dart';
 import 'package:node_diary/app/theme/expressive_motion.dart';
+import 'package:node_diary/core/services/app_lock_platform.dart';
 import 'package:node_diary/core/services/app_platform.dart';
 import 'package:node_diary/core/services/app_service.dart';
-import 'package:node_diary/core/services/device_auth_service.dart';
+import 'package:node_diary/core/services/app_passcode/app_passcode_store.dart';
+import 'package:node_diary/ui/app_lock/controllers/app_lock_controller.dart';
+import 'package:node_diary/ui/app_lock/controllers/identity_verifier.dart';
+import 'package:node_diary/ui/app_lock/models/app_lock_options.dart';
+import 'package:node_diary/ui/app_lock/providers/app_lock_options_provider.dart';
+import 'package:node_diary/ui/app_lock/widgets/app_lock_overlay.dart';
 import 'package:node_diary/ui/app_surface/providers/app_surface_settings_provider.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_glass_controls_theme.dart';
 import 'package:node_diary/ui/app_surface/widgets/app_glass_scope.dart';
@@ -26,6 +30,7 @@ import 'package:node_diary/ui/diaries/providers/diary_typography_provider.dart';
 import 'package:node_diary/ui/home/pages/home_page.dart';
 import 'package:node_diary/ui/home/widgets/home_hint_visibility_scope.dart';
 import 'package:node_diary/ui/lan_sync/providers/lan_sync_providers.dart';
+import 'package:node_diary/ui/notebooks/providers/home_notebook_scope_provider.dart';
 import 'package:node_diary/ui/notebooks/widgets/notebook_lock_layer.dart';
 
 import '../core/services/settings_service.dart';
@@ -38,7 +43,7 @@ import '../l10n/app_localizations.dart';
 /// 2. 监听主题模式变化；
 /// 3. 处理启动加载页和最短展示时长，就绪后交给 [AppBootstrapHome] 揭幕；
 /// 4. 提供 MaterialApp 壳与首页入口；
-/// 5. 在启用应用锁时，统一处理前台解锁门禁；
+/// 5. 在启用应用锁时，统一处理解锁门禁（上锁时机与验证见 [AppLockController]）；
 /// 6. 安排启动后的媒体文件回收；
 /// 7. 常驻监听局域网同步的写入事件，失效一次性读取（[syncedDataRefreshProvider]）；
 /// 8. 启动时建好局域网同步控制器（[lanSyncControllerProvider]），引擎随应用
@@ -54,8 +59,7 @@ class NodeDiaryApp extends ConsumerStatefulWidget {
   ConsumerState<NodeDiaryApp> createState() => _NodeDiaryAppState();
 }
 
-class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
-    with WidgetsBindingObserver {
+class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
   // 启动等待反馈采用“延迟出现 + 最短展示”：
   // - 设置与首屏日记在 [_loaderShowDelay] 内就绪：直接淡入首页，不出现加载页，
   //   避免此前固定 1.2s 最短展示把快速冷启动人为拉长；
@@ -72,16 +76,13 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
   bool _loaderShown = false;
   bool _loaderHolding = false;
 
-  SettingsService? _boundSettingsService;
-  VoidCallback? _appLockToggleListener;
-  bool _appLocked = false;
-  bool _unlockingApp = false;
-  bool _initialAppLockChecked = false;
+  /// 应用锁控制器（随第一次就绪的设置服务创建，见 [_bindAppLock]）
+  AppLockController? _appLock;
+  SettingsService? _appLockSettings;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _homeHintVisibilityController = HomeHintVisibilityController();
     _loaderShowTimer = Timer(_loaderShowDelay, _handleLoaderShowDelayElapsed);
     // 编辑期不删除媒体文件，冷启动后延迟回收无人引用的文件与选择器缓存。
@@ -101,6 +102,13 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     // 已配对设备时只在同步页打开期间，docs/lan_sync.md §9），不支持的平台
     // 是不联网的空实现。
     ref.listenManual(lanSyncControllerProvider, (_, _) {});
+    // 应用密码存储与设置同时开始加载：应用锁判断验证方式时通常已就绪，
+    // 遮罩不会先闪一下系统验证的加载指示再换成密码输入。
+    ref.listenManual(appPasscodeConfigProvider, (_, _) {});
+    // 设置页改了上锁时机 / 隐私选项后立即生效。
+    ref.listenManual(appLockOptionsProvider, (_, AppLockOptions next) {
+      _appLock?.options = next;
+    });
   }
 
   /// 延迟到点仍未就绪时才显示加载页，并开始计算最短展示时长。
@@ -129,57 +137,11 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _loaderShowTimer?.cancel();
     _loaderMinVisibleTimer?.cancel();
-    _unbindAppLockListener();
+    _disposeAppLock();
     _homeHintVisibilityController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    // 获取当前绑定的持久化设置服务实例
-    final settings = _boundSettingsService;
-    // 若尚未加载就绪或用户未启用指纹锁保护，无需进行生命周期拦截
-    if (settings == null || !settings.isAppLockEnabled) {
-      return;
-    }
-
-    // [核心安全机制]：
-    // 1. 当应用完全退入后台、被其它应用遮挡或设备锁屏（paused 或 hidden）：
-    //    立即在 UI 树中将 _appLocked 置为 true，挂上 _AppLockOverlay 锁屏遮罩。
-    //    无论用户是缩小去开其它应用、锁屏还是呼出切换栏，系统截取的缩略图只有安全遮罩，彻底根除切换栏内容泄露！
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
-      // 若当前正在系统凭据核验中（如正在弹出 Windows Hello 或系统锁屏框），切勿打断正在解锁状态
-      if (_unlockingApp) {
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _appLocked = true;
-          // 退出前台后重置正在解锁中的中间状态，以便下次切回时重新触发完整核验流程
-          _unlockingApp = false;
-        });
-      }
-    } else if (state == AppLifecycleState.inactive) {
-      // 桌面平台（Windows/macOS）唤起 Windows Hello 弹窗或窗口短暂失焦时会派发 inactive，
-      // 桌面端绝不能失焦即强行上锁，否则系统凭据弹窗会与应用锁产生竞态死锁；
-      // 仅在移动端（Android/iOS）为了防止系统多任务卡片预览泄露时覆盖安全遮罩。
-      if (AppPlatform.isMobile && !_unlockingApp && mounted) {
-        setState(() {
-          _appLocked = true;
-        });
-      }
-    } else if (state == AppLifecycleState.resumed) {
-      // 2. 从后台、锁屏解锁或多任务切换栏切回前台（resumed）：
-      //    只要当前处于锁定状态且未处于正在解锁中，立即自动唤起系统级指纹/生物识别解锁
-      if (_appLocked && !_unlockingApp) {
-        _lockAndAuthenticate(settingsService: settings);
-      }
-    }
   }
 
   @override
@@ -198,8 +160,10 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     final settingsError = settingsAsync.asError?.error;
     final settingsService = settingsAsync.asData?.value;
     if (settingsService != null) {
-      _bindSettingsForAppLock(settingsService);
+      _bindAppLock(settingsService);
     }
+    final appLock = _appLock;
+    final appLockCovering = appLock?.locked ?? false;
     final bootstrapReady = settingsReady && diariesSettled && !_loaderHolding;
     final startupNotice = bootstrapReady && diariesBootstrapFailed
         ? _bootstrapL10n(settingsService).startupPreloadFailedNotice
@@ -227,7 +191,7 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
                 : AppBootstrapPhase.blank),
       showBrandMark: widget.launchBrandMark,
       // 应用锁遮罩盖着时首页入场无人可见，留到解锁时与遮罩淡出一起上演。
-      holdReveal: _appLocked || _unlockingApp,
+      holdReveal: appLockCovering,
       homeBuilder: (BuildContext context) => HomePage(
         startupNotice: startupNotice,
         homeHintVisibleListenable:
@@ -356,29 +320,50 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
                 child: child,
               )
             : child;
-        final scaledChild = MediaQuery(
+        final appLock = _appLock;
+        Widget scaledChild = MediaQuery(
           data: mediaQuery.copyWith(textScaler: effectiveTextScaler),
-          // 桌面窗口（如 Linux GTK）背景是透明的：路由淡入淡出时最底层页面
-          // 半透明，下面又没有不透明的东西，桌面壁纸会透出来。垫一层当前主题
-          // 的 surface 色兜底；移动端窗口自带不透明背景，保持原样不加。
-          child: AppPlatform.isDesktop
-              ? ColoredBox(color: theme.colorScheme.surface, child: themedChild)
-              : themedChild,
+          child: AppLockLayer(
+            locked: appLock?.locked ?? false,
+            overlayBuilder: (_) => AppLockOverlay(
+              unlocking: appLock?.unlocking ?? false,
+              autoPrompt: appLock?.options.autoPrompt ?? true,
+              onTapUnlock: () => unawaited(appLock?.manualUnlock()),
+              onPasscodeUnlocked: () => appLock?.passcodeUnlocked(),
+            ),
+            // 上锁日记本的重新上锁层在应用锁之下：两者同时盖着时先解应用锁。
+            child: NotebookLockLayer(
+              // 桌面窗口（如 Linux GTK）背景是透明的：路由淡入淡出时最底层
+              // 页面半透明，下面又没有不透明的东西，桌面壁纸会透出来。垫一层
+              // 当前主题的 surface 色兜底；移动端窗口自带不透明背景，保持原样
+              // 不加。
+              child: AppPlatform.isDesktop
+                  ? ColoredBox(
+                      color: theme.colorScheme.surface,
+                      child: themedChild,
+                    )
+                  : themedChild,
+            ),
+          ),
         );
+        // 闲置时上锁（桌面）：任何指针操作都算在用。只旁听、不参与命中，
+        // 下面的点按与拖动照常。
+        if (AppPlatform.supportsIdleLock && appLock != null) {
+          void note(PointerEvent _) => appLock.noteActivity();
+          scaledChild = Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: note,
+            onPointerMove: note,
+            onPointerHover: note,
+            onPointerSignal: note,
+            child: scaledChild,
+          );
+        }
         final region = AnnotatedRegion<SystemUiOverlayStyle>(
           value: systemOverlayStyle,
           child: HomeHintVisibilityScope(
             controller: _homeHintVisibilityController,
-            child: AppLockLayer(
-              locked: _appLocked || _unlockingApp,
-              overlayBuilder: (_) => _AppLockOverlay(
-                unlocking: _unlockingApp,
-                onTapUnlock: _handleManualUnlockTap,
-                onEmergencyDesktopUnlock: _handleEmergencyDesktopUnlock,
-              ),
-              // 上锁日记本的重新上锁层在应用锁之下：两者同时盖着时先解应用锁。
-              child: NotebookLockLayer(child: scaledChild),
-            ),
+            child: scaledChild,
           ),
         );
         // 组件材质（经典 / 玻璃）在 Theme 之下、Navigator 之上交给全应用：
@@ -418,214 +403,43 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp>
     );
   }
 
-  void _bindSettingsForAppLock(SettingsService settingsService) {
-    if (identical(_boundSettingsService, settingsService)) {
-      _ensureInitialAppLockCheck(settingsService);
+  /// 随设置服务创建应用锁控制器；首帧之后做一次冷启动检查。设置服务换了
+  /// 实例（只在测试里出现）时重建控制器并重新检查：宁可多锁一次。
+  void _bindAppLock(SettingsService settingsService) {
+    final current = _appLock;
+    if (current != null && identical(_appLockSettings, settingsService)) {
       return;
     }
-
-    _unbindAppLockListener();
-    _boundSettingsService = settingsService;
-    _appLockToggleListener = () {
-      _handleAppLockSettingChanged(
-        enabled: settingsService.isAppLockEnabled,
-        settingsService: settingsService,
-      );
-    };
-    settingsService.appLockEnabledNotifier.addListener(_appLockToggleListener!);
-    _ensureInitialAppLockCheck(settingsService);
-  }
-
-  void _unbindAppLockListener() {
-    final settingsService = _boundSettingsService;
-    final listener = _appLockToggleListener;
-    if (settingsService != null && listener != null) {
-      settingsService.appLockEnabledNotifier.removeListener(listener);
-    }
-    _boundSettingsService = null;
-    _appLockToggleListener = null;
-  }
-
-  void _ensureInitialAppLockCheck(SettingsService settingsService) {
-    if (_initialAppLockChecked) {
-      return;
-    }
-    _initialAppLockChecked = true;
+    _disposeAppLock();
+    _appLockSettings = settingsService;
+    final controller = AppLockController(
+      verifier: ref.read(identityVerifierProvider),
+      settings: settingsService,
+      platform: ref.read(appLockPlatformProvider),
+      options: ref.read(appLockOptionsProvider),
+      authReason: () => _bootstrapL10n(settingsService).appLockAuthReason,
+      // 应用锁与上锁日记本是同一个人、同一种验证方式：解开应用锁时，一并
+      // 解开同时盖着的日记本重锁遮罩，不连着验证两次。
+      onUnlocked: () => ref.read(homeNotebookScopeProvider.notifier).unlock(),
+    )..addListener(_handleAppLockChanged);
+    _appLock = controller;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
+      if (mounted && identical(_appLock, controller)) {
+        controller.start();
       }
-      _handleAppLockSettingChanged(
-        enabled: settingsService.isAppLockEnabled,
-        settingsService: settingsService,
-      );
     });
   }
 
-  void _handleAppLockSettingChanged({
-    required bool enabled,
-    required SettingsService settingsService,
-  }) {
-    if (!enabled) {
-      if (_appLocked || _unlockingApp) {
-        setState(() {
-          _appLocked = false;
-          _unlockingApp = false;
-        });
-      }
-      return;
-    }
-    _lockAndAuthenticate(settingsService: settingsService);
+  void _handleAppLockChanged() {
+    if (mounted) setState(() {});
   }
 
-  Future<void> _handleManualUnlockTap() async {
-    final settingsService = _boundSettingsService;
-    if (settingsService == null) {
-      if (mounted) {
-        setState(() {
-          _appLocked = false;
-          _unlockingApp = false;
-        });
-      }
-      return;
-    }
-
-    if (AppPlatform.isDesktop) {
-      // 桌面端（Windows / Linux / macOS）：
-      // 优先尝试调起系统级生物验证（Windows Hello）；
-      // 若硬件不支持、未录入凭据、验证未通过或抛错，直接放行解除遮罩，彻底杜绝“点击立即解锁无反应死锁”！
-      try {
-        final deviceAuth = ref.read(deviceAuthServiceProvider);
-        final isSupported = await deviceAuth.isSupported();
-        if (isSupported) {
-          final ok = await deviceAuth.authenticate(
-            reason: _bootstrapL10n(settingsService).appLockAuthReason,
-          );
-          if (ok) {
-            if (mounted) {
-              setState(() {
-                _appLocked = false;
-                _unlockingApp = false;
-              });
-            }
-            return;
-          }
-        }
-      } catch (e) {
-        debugPrint('桌面端手动解锁验证异常: $e');
-      }
-      // 桌面端设备无硬件、验证取消或抛错时，点击立即解锁直接放行进入主界面
-      if (mounted) {
-        setState(() {
-          _appLocked = false;
-          _unlockingApp = false;
-        });
-      }
-      return;
-    }
-
-    await _lockAndAuthenticate(settingsService: settingsService);
-  }
-
-  /// 桌面端应急解除应用锁：
-  /// 当桌面设备无指纹仪或 Windows Hello 无法响应时，重置应用锁配置并安全解除遮罩
-  Future<void> _handleEmergencyDesktopUnlock() async {
-    final settingsService = _boundSettingsService;
-    if (settingsService != null) {
-      await settingsService.setAppLockEnabled(false);
-    }
-    if (mounted) {
-      setState(() {
-        _appLocked = false;
-        _unlockingApp = false;
-      });
-    }
-  }
-
-  Future<void> _lockAndAuthenticate({
-    required SettingsService settingsService,
-  }) async {
-    // 若当前已在进行生物核验中，或用户未启用指纹锁，直接返回杜绝并发重入
-    if (_unlockingApp || !settingsService.isAppLockEnabled) {
-      return;
-    }
-    if (mounted) {
-      setState(() {
-        // 锁定界面并进入解锁中状态
-        _appLocked = true;
-        _unlockingApp = true;
-      });
-    }
-
-    try {
-      // 平台生物验证能力判断（针对 Linux 等不支持生物识别的桌面平台安全放行并重置开关）
-      if (!AppPlatform.supportsDeviceAuth) {
-        // 自动禁用不可用平台上的应用锁开关
-        await settingsService.setAppLockEnabled(false);
-        if (mounted) {
-          setState(() {
-            // 解除锁定遮罩
-            _appLocked = false;
-          });
-        }
-        return;
-      }
-
-      // 获取系统底层设备身份验证服务实例
-      final deviceAuth = ref.read(deviceAuthServiceProvider);
-
-      // 动态设备硬件及系统凭据能力检查：
-      // 若当前硬件无生物识别设备（无指纹仪/摄像头）或未设置 Windows Hello/PIN，
-      // 安全放行并自动将设置中的应用锁开关关闭，彻底解除死锁！
-      final isSupported = await deviceAuth.isSupported();
-      if (!isSupported) {
-        // 自动关闭应用锁开关
-        await settingsService.setAppLockEnabled(false);
-        if (mounted) {
-          setState(() {
-            // 解除锁定遮罩
-            _appLocked = false;
-          });
-        }
-        return;
-      }
-
-      // 唤起系统级原生指纹/生物识别对话框
-      final authenticated = await deviceAuth.authenticate(
-        reason: _bootstrapL10n(settingsService).appLockAuthReason,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        // [关键安全铁律]：
-        // 1. 在桌面端（Windows / Linux）：若系统返回未通过（或用户未配置），安全放行解除遮罩；
-        // 2. 在移动端：只有当系统明确返回 authenticated == true 时才解除应用遮罩；用户点击取消或未通过时保持锁定
-        if (AppPlatform.isDesktop && !authenticated) {
-          _appLocked = false;
-        } else {
-          _appLocked = !authenticated;
-        }
-      });
-    } catch (e) {
-      // 记录底层核验过程中抛出的任何异常
-      debugPrint('设备身份验证发生异常: $e');
-      if (mounted) {
-        setState(() {
-          // 桌面端遇异常直接安全放行，移动端保持锁定等待手动点击
-          _appLocked = !AppPlatform.isDesktop;
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          // 严格在 finally 保证重置正在解锁中状态，彻底根除转圈卡死死锁
-          _unlockingApp = false;
-        });
-      }
-    }
+  void _disposeAppLock() {
+    _appLock
+      ?..removeListener(_handleAppLockChanged)
+      ..dispose();
+    _appLock = null;
+    _appLockSettings = null;
   }
 }
 
@@ -668,109 +482,4 @@ class _AppMultiplierTextScaler implements TextScaler {
 
   @override
   int get hashCode => Object.hash(baseScaler, factor);
-}
-
-/// 应用锁遮罩层。
-///
-/// 设计目标：
-/// - 在应用锁开启时阻断所有交互；
-/// - 自动解锁中给出统一 loading 反馈；
-/// - 解锁失败后提供明确的手动重试入口；
-/// - 在桌面端（Windows / Linux / macOS）提供设备无生物硬件时的应急解除通道，彻底避免死锁。
-class _AppLockOverlay extends StatelessWidget {
-  const _AppLockOverlay({
-    required this.unlocking,
-    required this.onTapUnlock,
-    this.onEmergencyDesktopUnlock,
-  });
-
-  final bool unlocking;
-  final VoidCallback onTapUnlock;
-  final VoidCallback? onEmergencyDesktopUnlock;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
-    return ColoredBox(
-      color: colorScheme.surface.withValues(alpha: 0.98),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                FaIcon(
-                  FontAwesomeIcons.lock,
-                  size: 28,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  l10n.appLockTitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.appLockSubtitle,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                // 固定高度的槽位：取消生物识别后 64dp 指示器换回 48dp 按钮时
-                // 整块不再跳动，两者之间淡入淡出。
-                SizedBox(
-                  height: 64,
-                  child: AnimatedSwitcher(
-                    duration: ExpressiveMotion.duration(
-                      context,
-                      ExpressiveMotion.fast,
-                    ),
-                    switchInCurve: ExpressiveMotion.effects,
-                    switchOutCurve: ExpressiveMotion.exit,
-                    child: unlocking
-                        ? ExpressiveLoadingIndicator(
-                            key: const ValueKey<String>('unlocking'),
-                            size: 64,
-                            semanticLabel: l10n.appLockUnlocking,
-                          )
-                        : Center(
-                            key: const ValueKey<String>('unlock'),
-                            child: FilledButton.icon(
-                              onPressed: onTapUnlock,
-                              icon: const FaIcon(
-                                FontAwesomeIcons.key,
-                                size: 14,
-                              ),
-                              label: Text(l10n.appLockUnlockNow),
-                            ),
-                          ),
-                  ),
-                ),
-                // 桌面端专属：当电脑未配备指纹仪或 Windows Hello 无法弹出时，提供明确的安全解除选项
-                if (AppPlatform.isDesktop &&
-                    onEmergencyDesktopUnlock != null) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: onEmergencyDesktopUnlock,
-                    icon: const Icon(Icons.lock_open_rounded, size: 16),
-                    label: const Text('电脑无生物识别硬件？直接进入应用'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.primary,
-                      side: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

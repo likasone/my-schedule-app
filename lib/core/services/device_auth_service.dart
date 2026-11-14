@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:local_auth_android/local_auth_android.dart';
-import 'package:node_diary/core/services/app_platform.dart';
 
 /// 设备身份验证（指纹、面容或锁屏密码）。
 ///
@@ -9,26 +7,18 @@ import 'package:node_diary/core/services/app_platform.dart';
 /// 验证（生物识别或设备凭据任一可用），验证允许回落到锁屏密码
 /// （`biometricOnly: false`）。任何插件异常都按“不支持 / 未通过”处理，
 /// 调用方不必再包 try/catch。
+///
+/// 界面不直接调用：一律经 `IdentityVerifier`（按“验证方式”走系统验证或应用
+/// 密码，见 docs/rules/app_lock.md）。
 class DeviceAuthService {
   DeviceAuthService([LocalAuthentication? localAuthentication])
     : _localAuthentication = localAuthentication ?? LocalAuthentication();
 
   final LocalAuthentication _localAuthentication;
 
-  /// 这台设备能否验证身份：
-  /// - 在桌面平台（Windows / Linux）：由于无生物传感器时调用原生验证极易抛错死锁，
-  ///   桌面端必须要求检测到物理生物传感器（指纹仪/摄像头）才判定为支持；
-  /// - 在移动平台（Android / iOS）：支持锁屏密码或生物识别任一可用即可。
+  /// 这台设备能否验证身份：设置了锁屏密码，或至少能检查生物识别。
   Future<bool> isSupported() async {
     try {
-      if (AppPlatform.isDesktop) {
-        final canBiometrics = await _localAuthentication.canCheckBiometrics;
-        if (canBiometrics) {
-          return true;
-        }
-        final available = await _localAuthentication.getAvailableBiometrics();
-        return available.isNotEmpty;
-      }
       if (await _localAuthentication.isDeviceSupported()) {
         return true;
       }
@@ -53,13 +43,37 @@ class DeviceAuthService {
         biometricOnly: false,
         sensitiveTransaction: true,
         persistAcrossBackgrounding: persistAcrossBackgrounding,
-        authMessages: const <AuthMessages>[
-          // Android 原生指纹与生物识别中文提示（全版本通用核心参数）
-          AndroidAuthMessages(
-            signInTitle: '指纹与安全解锁',
-            cancelButton: '取消',
-          ),
-        ],
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 这台设备是否登记了指纹 / 面容等生物识别（应用密码的快捷解锁用）。
+  Future<bool> canUseBiometrics() async {
+    try {
+      if (!await _localAuthentication.canCheckBiometrics) {
+        return false;
+      }
+      final available = await _localAuthentication.getAvailableBiometrics();
+      return available.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 只用生物识别验证（`biometricOnly: true`，不回落到锁屏密码）：应用密码
+  /// 方式下的快捷解锁。平台须为 `AppPlatform.supportsBiometricOnly`。
+  Future<bool> authenticateBiometric({
+    required String reason,
+    bool persistAcrossBackgrounding = true,
+  }) async {
+    try {
+      return await _localAuthentication.authenticate(
+        localizedReason: reason,
+        biometricOnly: true,
+        sensitiveTransaction: true,
+        persistAcrossBackgrounding: persistAcrossBackgrounding,
       );
     } catch (_) {
       return false;

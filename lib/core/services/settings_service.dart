@@ -81,6 +81,7 @@ class SettingsService {
     required String? diarySavedColorsRaw,
     required String? appFeaturesRaw,
     required String? exploreLayoutRaw,
+    required String? appLockOptionsRaw,
   }) : themeModeNotifier = ValueNotifier<ThemeMode>(mode),
        themeSeedColorNotifier = ValueNotifier<Color>(themeSeedColor),
        homeTabSwitchCurveNotifier = ValueNotifier<HomeTabSwitchCurveType>(
@@ -135,7 +136,8 @@ class SettingsService {
          diarySavedColorsRaw,
        ),
        appFeaturesRawNotifier = ValueNotifier<String?>(appFeaturesRaw),
-       exploreLayoutRawNotifier = ValueNotifier<String?>(exploreLayoutRaw);
+       exploreLayoutRawNotifier = ValueNotifier<String?>(exploreLayoutRaw),
+       appLockOptionsRawNotifier = ValueNotifier<String?>(appLockOptionsRaw);
 
   final SharedPreferences _prefs;
   final ValueNotifier<ThemeMode> themeModeNotifier;
@@ -147,6 +149,7 @@ class SettingsService {
   final ValueNotifier<double> fontScaleNotifier;
   final ValueNotifier<Locale> localeNotifier;
   final ValueNotifier<bool> appLockEnabledNotifier;
+  final ValueNotifier<String?> appLockOptionsRawNotifier;
   final ValueNotifier<bool> tagFilterMemoryEnabledNotifier;
 
   /// 补写过去某天的日记时，是否在编辑页列出相册里这天拍的照片（默认开）。
@@ -273,6 +276,7 @@ class SettingsService {
   static const _keyAppUpdatePreferences = 'app.update.preferences';
   static const _keyAppLocaleCode = 'app.settings.locale_code';
   static const _keyAppLockEnabled = 'app.settings.app_lock_enabled';
+  static const _keyAppLockOptions = 'app.settings.app_lock_options';
 
   static Future<SettingsService> create() async {
     final prefs = await SharedPreferences.getInstance();
@@ -328,6 +332,7 @@ class SettingsService {
     final storedDiarySavedColors = prefs.get(_keyDiarySavedColors);
     final storedAppFeatures = prefs.get(_keyAppFeatures);
     final storedExploreLayout = prefs.get(_keyExploreLayout);
+    final storedAppLockOptions = prefs.get(_keyAppLockOptions);
     return SettingsService._(
       prefs: prefs,
       mode: mode,
@@ -376,6 +381,9 @@ class SettingsService {
       appFeaturesRaw: storedAppFeatures is String ? storedAppFeatures : null,
       exploreLayoutRaw: storedExploreLayout is String
           ? storedExploreLayout
+          : null,
+      appLockOptionsRaw: storedAppLockOptions is String
+          ? storedAppLockOptions
           : null,
     );
   }
@@ -810,6 +818,12 @@ class SettingsService {
   Future<void> setAppLockEnabled(bool enabled) async {
     appLockEnabledNotifier.value = enabled;
     await _writePreference(_prefs.setBool(_keyAppLockEnabled, enabled));
+  }
+
+  /// 保存应用锁的上锁时机与隐私选项（整份 JSON）。
+  Future<void> setAppLockOptionsRaw(String value) async {
+    appLockOptionsRawNotifier.value = value;
+    await _writePreference(_prefs.setString(_keyAppLockOptions, value));
   }
 
   // --- 日程、艾宾浩斯计划与随手记事数据持久化（支持 WebDAV 坚果云全链路 AES-256 加密同步） ---
