@@ -70,12 +70,41 @@ class LanSyncPairingAuthGate {
 
     // 优先经由 IdentityVerifier 执行验证（完美覆盖 Windows 桌面端独立密码解锁与移动端指纹）
     if (verifier != null) {
-      // 检查当前设备环境验证方式是否就绪（桌面端有密码，或移动端有锁屏）
+      final store = await verifier!.store();
+      final hasPasscode = store?.config.hasPasscode ?? false;
+
+      // 桌面端（Windows/Linux）：若设置了应用独立密码，必须弹出密码页面验证
+      if (AppPlatform.isDesktop) {
+        if (hasPasscode) {
+          if (context != null && context.mounted) {
+            final passed = await verifier!.verify(
+              context,
+              reason: reason,
+              purpose: IdentityPurpose.unlock,
+            );
+            return passed
+                ? LanSyncPairingAuthOutcome.allowed
+                : LanSyncPairingAuthOutcome.failed;
+          }
+          // 兜底直接系统验证（若有上下文但未 mounted）
+          final passed = await verifier!.verifySystem(
+            reason: reason,
+            persistAcrossBackgrounding: false,
+          );
+          return passed
+              ? LanSyncPairingAuthOutcome.allowed
+              : LanSyncPairingAuthOutcome.failed;
+        }
+
+        // 桌面端未设置应用独立密码：普通电脑无 Windows Hello 硬件，绝不阻断配对（直接安全放行）
+        return LanSyncPairingAuthOutcome.allowed;
+      }
+
+      // 移动端（Android/iOS）：检查锁屏或密码是否就绪
       final available = await verifier!.isAvailable();
       if (!available) {
         return LanSyncPairingAuthOutcome.unsupported;
       }
-      // 若带有有效的 BuildContext，弹出标准应用密码验证页 PasscodeVerifyPage
       if (context != null && context.mounted) {
         final passed = await verifier!.verify(
           context,
@@ -86,7 +115,6 @@ class LanSyncPairingAuthGate {
             ? LanSyncPairingAuthOutcome.allowed
             : LanSyncPairingAuthOutcome.failed;
       }
-      // 无 Context 时降级调用系统验证
       final passed = await verifier!.verifySystem(
         reason: reason,
         persistAcrossBackgrounding: false,

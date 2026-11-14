@@ -249,12 +249,14 @@ class LanSyncStore {
   Future<void> _writeJson(String name, Map<String, Object?> json) async {
     await stateDir.create(recursive: true);
     final target = File(p.join(stateDir.path, name));
+    final jsonStr = jsonEncode(json);
     final temp = File('${target.path}.tmp');
-    await temp.writeAsString(jsonEncode(json), flush: true);
+    await temp.writeAsString(jsonStr, flush: true);
     try {
       await temp.rename(target.path);
     } on FileSystemException {
-      // Windows 平台防覆盖冲突回退处理
+      // Windows 平台防覆盖冲突回退：
+      // 直接使用 writeAsString 覆盖目标文件（CREATE_ALWAYS 原生截断写入），彻底消灭 OS Error 183
       try {
         if (await target.exists()) {
           await target.delete();
@@ -263,8 +265,8 @@ class LanSyncStore {
         }
       } catch (_) {}
       try {
-        await temp.copy(target.path);
-        await temp.delete();
+        await target.writeAsString(jsonStr, flush: true);
+        if (await temp.exists()) await temp.delete();
       } catch (_) {
         if (!await target.exists()) rethrow;
       }

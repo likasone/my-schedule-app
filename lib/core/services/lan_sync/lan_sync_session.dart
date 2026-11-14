@@ -230,6 +230,8 @@ class LanSyncSession {
     return switch (error) {
       _SessionStop(:final failure) => failure,
       TimeoutException() => LanSyncFailure.timedOut,
+      SocketException() => LanSyncFailure.connectionLost,
+      FileSystemException() => LanSyncFailure.writeFailed,
       LanSyncChannelException(error: LanSyncChannelError.protocolError) =>
         LanSyncFailure.protocolError,
       LanSyncChannelException() => LanSyncFailure.connectionLost,

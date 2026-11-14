@@ -78,12 +78,21 @@ class LanSyncPairingFlow {
     final qrRoute = _qrRoute;
     final pageCurrent = ModalRoute.of(context)?.isCurrent ?? false;
     final qrCurrent = qrRoute != null && qrRoute.isCurrent;
-    if (!pageCurrent && !qrCurrent) {
-      unawaited(event.respond(false));
-      return;
+
+    // 若当前路由不是同步主页（例如盖着手动输入地址、排障面板或二维码面板）：
+    // 关掉子弹窗并展示配对面板，避免用户正在手动配对时配对请求被秒拒
+    if (!pageCurrent) {
+      final nav = Navigator.of(context);
+      if (qrCurrent) {
+        nav.pop();
+      } else if (nav.canPop()) {
+        nav.pop();
+      } else {
+        // 若同步页已被完全压入深层后台页面栈（非弹层），无人在场核对，安全拒绝
+        unawaited(event.respond(false));
+        return;
+      }
     }
-    // 二维码面板在最上面：关掉它（它关闭时会作废当前的码），换成配对面板。
-    if (qrCurrent) Navigator.of(context).pop();
     unawaited(_showSheet(context, event));
   }
 
