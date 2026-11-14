@@ -121,8 +121,9 @@ extension _Outgoing on LanSyncService {
       if (presence != null) (presence.address.address, presence.beacon.port),
     ];
     final host = device.lastHost;
-    final port = device.lastPort;
-    if (host != null && port != null && !targets.contains((host, port))) {
+    // 若 lastPort 为空（如手动配对且未收到信标），回退至默认端口尝试连接
+    final port = device.lastPort ?? hooks.preferredPort;
+    if (host != null && !targets.contains((host, port))) {
       targets.add((host, port));
     }
     return targets;

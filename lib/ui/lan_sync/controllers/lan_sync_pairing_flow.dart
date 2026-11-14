@@ -137,7 +137,11 @@ class LanSyncPairingFlow {
     final reason = sheetContext.l10n.lanSyncPairAuthReason(
       event.phase.value.peerName ?? event.peerName,
     );
-    final outcome = await _authGate().authorize(reason: reason);
+    // 传入 sheetContext 供桌面端或应用密码配置下唤起应用密码输入验证弹窗
+    final outcome = await _authGate().authorize(
+      context: sheetContext,
+      reason: reason,
+    );
     if (outcome == LanSyncPairingAuthOutcome.allowed) {
       await event.respond(true);
     }

@@ -204,12 +204,16 @@ extension _Initiator on LanSyncSession {
     _received = mine.tally;
     _setProgress((p) => p.copyWith(receivedDiaries: _received.diaries));
     if (theirRekeys.isNotEmpty) {
-      await _keepAlive(
-        () => _context.applier.adoptMediaRekeys(
-          theirRekeys,
-          includeSettings: _settingsIncluded,
-        ),
-      );
+      try {
+        await _keepAlive(
+          () => _context.applier.adoptMediaRekeys(
+            theirRekeys,
+            includeSettings: _settingsIncluded,
+          ),
+        );
+      } on Object catch (error, stack) {
+        debugPrint('LAN sync adoptMediaRekeys initiator failed: $error\n$stack');
+      }
     }
     await _send(LanSyncSessionMessages.finish, {
       'rekeys': [for (final rekey in mine.rekeys) rekey.toJson()],

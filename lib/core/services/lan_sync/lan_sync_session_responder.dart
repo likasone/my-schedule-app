@@ -201,12 +201,16 @@ extension _Responder on LanSyncSession {
     _setProgress((p) => p.copyWith(sentDiaries: _sent.diaries));
     final rekeys = _parseRekeys(message);
     if (rekeys.isNotEmpty) {
-      await _keepAlive(
-        () => _context.applier.adoptMediaRekeys(
-          rekeys,
-          includeSettings: _settingsIncluded,
-        ),
-      );
+      try {
+        await _keepAlive(
+          () => _context.applier.adoptMediaRekeys(
+            rekeys,
+            includeSettings: _settingsIncluded,
+          ),
+        );
+      } on Object catch (error, stack) {
+        debugPrint('LAN sync adoptMediaRekeys responder failed: $error\n$stack');
+      }
     }
     await _send(LanSyncSessionMessages.done);
   }

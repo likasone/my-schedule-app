@@ -122,7 +122,23 @@ class SyncMediaStaging {
         actualHash == null ? '大小不符：$actualSize ≠ $size' : 'sha256 不符',
       );
     }
-    await part.rename(_stagedPath(key));
+    try {
+      await part.rename(_stagedPath(key));
+    } on FileSystemException {
+      final staged = File(_stagedPath(key));
+      try {
+        if (await staged.exists()) {
+          await staged.delete();
+          await part.rename(staged.path);
+        } else {
+          await part.copy(staged.path);
+          await part.delete();
+        }
+      } catch (_) {
+        await part.copy(staged.path);
+        await part.delete();
+      }
+    }
     _verified[key] = (size: actualSize, sha256: actualHash!);
   }
 

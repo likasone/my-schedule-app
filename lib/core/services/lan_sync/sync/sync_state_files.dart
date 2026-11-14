@@ -43,7 +43,26 @@ class SyncStateFiles {
       gzip.encode(utf8.encode(jsonEncode(json))),
       flush: true,
     );
-    await temp.rename(target.path);
+    try {
+      // 优先直接调用平台原子重命名
+      await temp.rename(target.path);
+    } on FileSystemException {
+      // Windows 平台下若目标文件已存在或被文件系统句柄暂时占用，直接 rename 易抛出 OS Error 183；
+      // 执行安全降级替换：尝试删除已存在目标文件后重命名，若仍失败则通过复制覆盖并清理临时文件
+      try {
+        if (await target.exists()) {
+          await target.delete();
+          await temp.rename(target.path);
+          return;
+        }
+      } catch (_) {}
+      try {
+        await temp.copy(target.path);
+        await temp.delete();
+      } catch (_) {
+        if (!await target.exists()) rethrow;
+      }
+    }
   }
 
   /// 删除 [name]（及可能残留的临时文件）；不存在时什么也不做。删除失败照常

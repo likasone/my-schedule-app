@@ -131,7 +131,8 @@ extension _Server on LanSyncService {
     await _savePairedPeer(
       peer,
       host: remoteHost,
-      port: _presence[peer.deviceId]?.beacon.port,
+      // 若尚未收到组播信标（如防火墙屏蔽或手动输入 IP 配对），降级使用对端标准首选同步端口，避免存入 null 导致后续无法主动发起同步
+      port: _presence[peer.deviceId]?.beacon.port ?? hooks.preferredPort,
     );
     await result.channel.close();
     final pairing = slot.pairing;

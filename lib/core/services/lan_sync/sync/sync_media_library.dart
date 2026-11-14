@@ -86,7 +86,23 @@ class SyncMediaLibrary {
       final temp = File('$newPath.lan_sync_tmp');
       await temp.parent.create(recursive: true);
       await File(oldPath).copy(temp.path);
-      await temp.rename(newPath);
+      try {
+        await temp.rename(newPath);
+      } on FileSystemException {
+        final target = File(newPath);
+        try {
+          if (await target.exists()) {
+            await target.delete();
+            await temp.rename(newPath);
+          } else {
+            await temp.copy(newPath);
+            await temp.delete();
+          }
+        } catch (_) {
+          await temp.copy(newPath);
+          await temp.delete();
+        }
+      }
       await File(newPath).setLastModified(_clock());
       adoptable.add(rekey);
     }

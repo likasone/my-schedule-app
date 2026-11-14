@@ -152,6 +152,23 @@ class LanSyncIdentityStore {
     final target = _file;
     final temp = File('${target.path}.tmp');
     await temp.writeAsString(jsonEncode(identity._toJson()), flush: true);
-    await temp.rename(target.path);
+    try {
+      await temp.rename(target.path);
+    } on FileSystemException {
+      // Windows 平台防覆盖冲突回退处理
+      try {
+        if (await target.exists()) {
+          await target.delete();
+          await temp.rename(target.path);
+          return;
+        }
+      } catch (_) {}
+      try {
+        await temp.copy(target.path);
+        await temp.delete();
+      } catch (_) {
+        if (!await target.exists()) rethrow;
+      }
+    }
   }
 }
