@@ -572,6 +572,7 @@ class MemoItem {
     this.updatedAt,
     this.isPinned = false,
     this.tag = '闪念',
+    this.scheduledDate,
   });
 
   /// 便签唯一标识符
@@ -598,6 +599,9 @@ class MemoItem {
   /// 分类标签（如：闪念、灵感、待办、备忘、随想）
   final String tag;
 
+  /// 若已转化为日程待办，记录转入的目标执行日期（YYYY-MM-DD）
+  final String? scheduledDate;
+
   /// 转换为 JSON 存储 Map
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -608,6 +612,7 @@ class MemoItem {
     'updatedAt': updatedAt?.toIso8601String(),
     'isPinned': isPinned,
     'tag': tag,
+    'scheduledDate': scheduledDate,
   };
 
   /// 从 JSON 容错反序列化，无缝兼容旧版本的纯文本 String 格式
@@ -633,6 +638,7 @@ class MemoItem {
             : null,
         isPinned: json['isPinned'] as bool? ?? false,
         tag: json['tag'] as String? ?? '闪念',
+        scheduledDate: json['scheduledDate'] as String?,
       );
     }
     return MemoItem(
@@ -650,6 +656,7 @@ class MemoItem {
     DateTime? updatedAt,
     bool? isPinned,
     String? tag,
+    String? scheduledDate,
   }) {
     return MemoItem(
       id: id,
@@ -660,6 +667,7 @@ class MemoItem {
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
       tag: tag ?? this.tag,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
     );
   }
 }

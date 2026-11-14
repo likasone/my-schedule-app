@@ -36,6 +36,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   /// 计划列表状态筛选分类（'all': 全部, 'active': 进行中, 'completed': 已达成）
   String _selectedPlanFilter = 'all';
 
+  /// 日程待办视图模式：false 为经典详细大卡片模式，true 为高密紧凑清单模式（屏效提升 300%）
+  bool _isCompactMode = false;
+
   /// 花笺（Floral Notepaper）拟真 6 色低饱和东方信笺纸色板
   static const List<({String name, Color lightBg, Color darkBg, Color border, Color accent})> floralSkins = [
     (name: '霜白', lightBg: Color(0xFFFBF9F5), darkBg: Color(0xFF222120), border: Color(0xFFE8E1D3), accent: Color(0xFF6B6B62)),
@@ -709,15 +712,72 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       children: [
+        // 顶部高密视图切换工具栏：展示未完成待办统计与「高密清单 ⇄ 详细卡片」切换按钮
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10.0, left: 4.0, right: 4.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '待办总览 · 剩余 ${pendingEntries.length + overdueEntries.length} 项进行中',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                ),
+              ),
+              InkWell(
+                onTap: () => setState(() => _isCompactMode = !_isCompactMode),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isCompactMode
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _isCompactMode
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isCompactMode ? Icons.view_headline : Icons.view_agenda_outlined,
+                        size: 14,
+                        color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isCompactMode ? '高密清单' : '详细卡片',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // 1. 顶部历史逾期智能收纳盒（折叠归集，支持一键延期、分摊与标记完成）
         if (overdueEntries.isNotEmpty) ...[
           _buildOverdueBox(context, overdueEntries, notifier, state.effectiveDateIso),
           const SizedBox(height: 12),
         ],
 
-        // 2. 今日未完成主干待办事项列表（聚焦当下核心要务）
+        // 2. 今日未完成主干待办事项列表（聚焦当下核心要务，支持紧凑模式与详细卡片双模）
         if (pendingEntries.isNotEmpty) ...[
-          ...pendingEntries.map((entry) => _buildScheduleEntryCard(context, entry, notifier)),
+          ...pendingEntries.map((entry) => _isCompactMode
+              ? _buildCompactScheduleEntryRow(context, entry, notifier)
+              : _buildScheduleEntryCard(context, entry, notifier)),
         ] else if (overdueEntries.isEmpty && completedEntries.isNotEmpty) ...[
           // 今日所有任务已全部勾选达成的灵动祝贺卡
           Container(
@@ -907,7 +967,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: overdueEntries
-                    .map((e) => _buildScheduleEntryCard(context, e, notifier, isOverdue: true))
+                    .map((e) => _isCompactMode
+                        ? _buildCompactScheduleEntryRow(context, e, notifier, isOverdue: true)
+                        : _buildScheduleEntryCard(context, e, notifier, isOverdue: true))
                     .toList(),
               ),
             ),
@@ -969,7 +1031,9 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: completedEntries
-                    .map((e) => _buildScheduleEntryCard(context, e, notifier))
+                    .map((e) => _isCompactMode
+                        ? _buildCompactScheduleEntryRow(context, e, notifier)
+                        : _buildScheduleEntryCard(context, e, notifier))
                     .toList(),
               ),
             ),
@@ -1316,7 +1380,143 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 徽章类型标签渲染
+  /// 构建高密紧凑清单单行条目（高度仅约 46dp，一屏容纳 12~15 项，大幅消灭翻页查找成本）
+  Widget _buildCompactScheduleEntryRow(
+    BuildContext context,
+    ScheduleEntry entry,
+    ScheduleNotifier notifier, {
+    bool isOverdue = false,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isReview = entry.kind == ScheduleEntryKind.review || entry.kind == ScheduleEntryKind.remedial;
+
+    // 优先级条带颜色
+    final priorityColor = switch (entry.priority) {
+      SchedulePriority.high => Colors.redAccent,
+      SchedulePriority.medium => Colors.orangeAccent,
+      SchedulePriority.low => Colors.green,
+      _ => Colors.transparent,
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6.0),
+      decoration: BoxDecoration(
+        color: entry.isCompleted
+            ? colorScheme.surfaceContainerLow.withValues(alpha: 0.5)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: entry.isCompleted
+              ? colorScheme.outlineVariant.withValues(alpha: 0.2)
+              : (isOverdue ? Colors.deepOrange.withValues(alpha: 0.4) : colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showEditScheduleDialog(context, entry, notifier),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+            child: Row(
+              children: [
+                // 1. 打卡勾选框
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Checkbox(
+                    value: entry.isCompleted,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                    onChanged: (_) => notifier.toggleEntryCompletion(entry.id),
+                  ),
+                ),
+                const SizedBox(width: 4),
+
+                // 2. 优先级色条（高/中/低）
+                if (entry.priority != SchedulePriority.none) ...[
+                  Container(
+                    width: 3.5,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: priorityColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+
+                // 3. 阶段标识简明徽标
+                if (isReview) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '复${entry.stepIndex + 1}',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+
+                // 4. 任务主标题（单行截断，超出一行省略）
+                Expanded(
+                  child: Text(
+                    entry.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      decoration: entry.isCompleted ? TextDecoration.lineThrough : null,
+                      color: entry.isCompleted ? colorScheme.outline : colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+
+                // 5. 提醒时间徽标（若存在）
+                if (entry.reminderTime != null) ...[
+                  const SizedBox(width: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.alarm, size: 12, color: colorScheme.primary),
+                      const SizedBox(width: 2),
+                      Text(
+                        DateFormat('HH:mm').format(entry.reminderTime!),
+                        style: TextStyle(fontSize: 11, color: colorScheme.primary, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // 6. 快捷删除与编辑
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  color: theme.hintColor,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                  tooltip: '编辑',
+                  onPressed: () => _showEditScheduleDialog(context, entry, notifier),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  color: theme.hintColor,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                  tooltip: '删除',
+                  onPressed: () => _confirmDeleteScheduleEntry(context, entry, notifier),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   Widget _buildKindBadge(BuildContext context, ScheduleEntryKind kind, int stepIndex) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -1516,9 +1716,31 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                               minHeight: 6,
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              '起始日期: ${plan.startDate}  •  周期阶段: ${relatedEntries.length} 节',
-                              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '起始日期: ${plan.startDate}  •  周期阶段: ${relatedEntries.length} 节',
+                                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: progress >= 1.0
+                                        ? Colors.green.withValues(alpha: 0.15)
+                                        : Colors.blue.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    progress >= 1.0 ? '🏆 已达成' : '🔥 攻坚中',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: progress >= 1.0 ? Colors.green[700] : Colors.blue[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -1663,7 +1885,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     itemCount: memos.length,
                     itemBuilder: (context, index) {
                       final memo = memos[index];
-                      return _buildMemoCard(context, memo, notifier);
+                      return _buildMemoCard(context, memo, notifier, searchQuery: state.memoSearchQuery);
                     },
                   ),
           ),
@@ -1778,12 +2000,58 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 单项便签卡片渲染（融合花笺拟真信笺纸色彩、抬头、置顶标记、标签、时间戳、一键复制、一键转日程与沉浸编辑）
+  /// 构建支持搜索关键字荧光高亮的文本组件（秒级在一屏上百条便签中定位目标词）
+  Widget _buildHighlightedText({
+    required String text,
+    required String query,
+    required TextStyle baseStyle,
+    required Color highlightColor,
+  }) {
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty || !text.toLowerCase().contains(cleanQuery.toLowerCase())) {
+      return Text(text, style: baseStyle);
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = cleanQuery.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+
+    while (start < text.length) {
+      final matchIndex = lowerText.indexOf(lowerQuery, start);
+      if (matchIndex == -1) {
+        spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+        break;
+      }
+
+      if (matchIndex > start) {
+        spans.add(TextSpan(text: text.substring(start, matchIndex), style: baseStyle));
+      }
+
+      final matchedChunk = text.substring(matchIndex, matchIndex + cleanQuery.length);
+      spans.add(
+        TextSpan(
+          text: matchedChunk,
+          style: baseStyle.copyWith(
+            backgroundColor: highlightColor,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+
+      start = matchIndex + cleanQuery.length;
+    }
+
+    return RichText(text: TextSpan(children: spans));
+  }
+
+  /// 单项便签卡片渲染（融合花笺拟真信笺纸色彩、抬头、置顶标记、标签、时间戳、一键复制、一键转日程、排期徽标与搜索荧光高亮）
   Widget _buildMemoCard(
     BuildContext context,
     MemoItem memo,
-    ScheduleNotifier notifier,
-  ) {
+    ScheduleNotifier notifier, {
+    String searchQuery = '',
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -1809,7 +2077,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 卡片顶栏：花笺名色标 + 分类标签 + 时间戳 + 置顶标记
+            // 卡片顶栏：花笺名色标 + 分类标签 + 时间戳 + 已排期徽标 + 置顶标记
             Row(
               children: [
                 Container(
@@ -1851,6 +2119,29 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                     color: textColor.withValues(alpha: 0.45),
                   ),
                 ),
+                // 已转日程排期双向徽标
+                if (memo.scheduledDate != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.event_available, size: 11, color: Colors.teal),
+                        const SizedBox(width: 3),
+                        Text(
+                          '已排期: ${memo.scheduledDate}',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 if (memo.isPinned) ...[
                   Container(
@@ -1873,32 +2164,36 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             ),
             const SizedBox(height: 10),
 
-            // 信笺抬头标题（若存在）
+            // 信笺抬头标题（支持搜索荧光高亮）
             if (memo.title.trim().isNotEmpty) ...[
-              Text(
-                memo.title.trim(),
-                style: TextStyle(
+              _buildHighlightedText(
+                text: memo.title.trim(),
+                query: searchQuery,
+                baseStyle: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: textColor,
                 ),
+                highlightColor: Colors.amber.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 6),
             ],
 
-            // 便签正文（轻触直接进入沉浸式花笺编辑器）
+            // 便签正文（轻触直接进入沉浸式花笺编辑器，支持搜索荧光高亮）
             InkWell(
               onTap: () => _showFloralMemoEditor(context, notifier, initialMemo: memo),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2.0),
-                child: Text(
-                  memo.content,
-                  style: TextStyle(
+                child: _buildHighlightedText(
+                  text: memo.content,
+                  query: searchQuery,
+                  baseStyle: TextStyle(
                     fontSize: 14,
                     height: 1.5,
                     color: textColor.withValues(alpha: 0.9),
                   ),
+                  highlightColor: Colors.amber.withValues(alpha: 0.4),
                 ),
               ),
             ),

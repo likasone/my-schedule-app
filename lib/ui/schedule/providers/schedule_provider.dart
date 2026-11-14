@@ -833,7 +833,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     state = state.copyWith(selectedMemoTag: tag);
   }
 
-  /// 将随手记事一键转化为正式日程待办（并设置定时强提醒）
+  /// 将随手记事一键转化为正式日程待办（并设置定时强提醒，并在便签上记录排期徽标）
   Future<void> convertMemoToSchedule({
     required String memoId,
     required DateTime scheduleTime,
@@ -851,6 +851,18 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       notes: memo.content,
       hasReminder: hasReminder,
     );
+
+    // 在便签本身反向标记已排期日期，形成双向闭环状态
+    final scheduledDateIso = PlanScheduler.formatIsoDate(scheduleTime);
+    final updatedMemos = state.memos.map((m) {
+      if (m.id == memoId) {
+        return m.copyWith(scheduledDate: scheduledDateIso);
+      }
+      return m;
+    }).toList();
+
+    state = state.copyWith(memos: updatedMemos);
+    await _persist(memos: updatedMemos);
   }
 
   /// 批量顺延/推迟指定逾期待办事项至指定日期（如一键顺延至今日）
