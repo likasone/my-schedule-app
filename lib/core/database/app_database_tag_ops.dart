@@ -25,7 +25,10 @@ mixin _AppDatabaseTagOps on _$AppDatabase {
       tags,
     )..where((Tags t) => t.name.equals(normalizedName))).getSingleOrNull();
     if (existing != null) {
-      if (existing.color != color) {
+      // 绝不用透明色（0）覆盖已有标签的颜色：批量导入曾以 color: 0 复用同名
+      // 标签，把用户手工调好的颜色整批清零，'#'、选中描边与浅色主题下的名称
+      // 文字随之整个消失（ARGB 全透明）。0 一律视为“未指定颜色”。
+      if (color != 0 && existing.color != color) {
         await (update(tags)..where((Tags t) => t.id.equals(existing.id))).write(
           TagsCompanion(color: Value<int>(color)),
         );
@@ -126,5 +129,15 @@ mixin _AppDatabaseTagOps on _$AppDatabase {
       )..where((DiaryTags t) => t.tagId.equals(tagId))).go();
       await (delete(tags)..where((Tags t) => t.id.equals(tagId))).go();
     });
+  }
+
+  /// 修复库中现存的透明色（0）标签。
+  /// 历史原因某些导入逻辑使用了 color = 0，在 Flutter 中 ARGB 为全透明，
+  /// 导致 '#' 符号不可见、占位偏移、描边透明、浅色模式下文字消失。
+  /// 将所有 color == 0 的标签补为系统默认的可见蓝色 (0xFF1E88E5)。
+  Future<int> sanitizeTransparentTags({int fallbackColor = 0xFF1E88E5}) async {
+    return (update(tags)..where((Tags t) => t.color.equals(0))).write(
+      TagsCompanion(color: Value<int>(fallbackColor)),
+    );
   }
 }

@@ -64,7 +64,8 @@ class DiaryItemTagRow extends StatelessWidget {
         for (final tag in visibleTags)
           _DiaryTagText(
             label: tag.name,
-            hashColor: Color(tag.color),
+            // 遇到历史残留透明色（0）时回退到主题主色，避免 '#' 号隐形但占位导致文字中心右偏
+            hashColor: tag.color == 0 ? colorScheme.primary : Color(tag.color),
             textColor: labelColor,
             style: style,
             scale: scale,

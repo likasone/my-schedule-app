@@ -37,6 +37,7 @@
 //   在任何写入之前中止，两边都不写。
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -183,9 +184,8 @@ class LanSyncSession {
       }
     } catch (error, stack) {
       failure = _failureOf(error);
-      if (failure == LanSyncFailure.unknown) {
-        debugPrint('LAN sync session failed: $error\n$stack');
-      }
+      // 记录真实异常类型与详情，杜绝异常被吞噬导致无法定位根本原因
+      debugPrint('LAN sync session failed with [$failure] caused by: ${error.runtimeType}: $error\n$stack');
       // 对方中止、对方拒绝、连接已断时不必（也无法）再告诉对方。
       final wire = error is _SessionStop ? error.wire : null;
       if (error is! _HelloRejected &&
@@ -227,6 +227,9 @@ class LanSyncSession {
     if (_cancelled) return LanSyncFailure.cancelled;
     final fromPeer = _inbox.peerStop;
     if (fromPeer != null) return fromPeer.failure;
+    if (error.toString().contains('SqliteException')) {
+      return LanSyncFailure.writeFailed;
+    }
     return switch (error) {
       _SessionStop(:final failure) => failure,
       TimeoutException() => LanSyncFailure.timedOut,
@@ -238,6 +241,7 @@ class LanSyncSession {
       SyncMediaVerificationException() => LanSyncFailure.transferFailed,
       FormatException() ||
       ArgumentError() ||
+      TypeError() ||
       StateError() => LanSyncFailure.protocolError,
       _ => LanSyncFailure.unknown,
     };

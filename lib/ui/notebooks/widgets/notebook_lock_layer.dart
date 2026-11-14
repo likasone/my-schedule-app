@@ -7,7 +7,7 @@ import 'package:node_diary/l10n/app_localizations.dart';
 
 import '../../../app/app_lock_layer.dart';
 import '../../../app/theme/app_spacing.dart';
-import '../../../core/services/device_auth_service.dart';
+import '../../app_lock/controllers/identity_verifier.dart';
 import '../controllers/notebook_lock_flow.dart';
 import '../providers/home_notebook_scope_provider.dart';
 
@@ -79,11 +79,11 @@ class _NotebookLockLayerState extends ConsumerState<NotebookLockLayer> {
       _backToAll();
       return;
     }
-    final auth = ref.read(deviceAuthServiceProvider);
+    final verifier = ref.read(identityVerifierProvider);
     final reason = context.l10n.notebookUnlockReason(notebook.name);
     setState(() => _authenticating = true);
-    final supported = await auth.isSupported();
-    final passed = supported && await auth.authenticate(reason: reason);
+    final supported = await verifier.isAvailable();
+    final passed = supported && await verifier.verify(context, reason: reason);
     if (!mounted) {
       return;
     }

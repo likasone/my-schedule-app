@@ -91,6 +91,8 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
     unawaited(ref.read(diaryDraftLegacyMigrationProvider.future));
     // 已经建过纪念日的老用户升级后保留纪念日（新默认关闭）。
     unawaited(ref.read(appFeaturesLegacyMigrationProvider.future));
+    // 自动修复历史脏数据中颜色为全透明（color == 0）的标签。
+    unawaited(ref.read(tagColorSanitizationProvider.future));
     // 常驻监听正文外观：设置就绪后即开始注册所选的导入字体，打开第一篇日记
     // 时通常已就绪，正文不会先按内置字体排一遍再换字体。
     ref.listenManual(diaryTextAppearanceProvider, (_, _) {});
@@ -330,6 +332,7 @@ class _NodeDiaryAppState extends ConsumerState<NodeDiaryApp> {
               autoPrompt: appLock?.options.autoPrompt ?? true,
               onTapUnlock: () => unawaited(appLock?.manualUnlock()),
               onPasscodeUnlocked: () => appLock?.passcodeUnlocked(),
+              onEmergencyUnlock: () => unawaited(appLock?.emergencyReset()),
             ),
             // 上锁日记本的重新上锁层在应用锁之下：两者同时盖着时先解应用锁。
             child: NotebookLockLayer(

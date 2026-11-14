@@ -5,6 +5,7 @@ import 'package:node_diary/l10n/app_localizations.dart';
 
 import '../../../app/theme/expressive_motion.dart';
 import '../../../core/services/app_passcode/app_passcode_store.dart';
+import '../../../core/services/app_platform.dart';
 import '../../widgets/expressive_loading_indicator.dart';
 import 'app_lock_surface.dart';
 import 'passcode_unlock_view.dart';
@@ -27,6 +28,7 @@ class AppLockOverlay extends ConsumerWidget {
     this.autoPrompt = true,
     required this.onTapUnlock,
     required this.onPasscodeUnlocked,
+    this.onEmergencyUnlock,
   });
 
   /// 正在判断验证方式或正在进行系统验证。
@@ -36,6 +38,7 @@ class AppLockOverlay extends ConsumerWidget {
   final bool autoPrompt;
   final VoidCallback onTapUnlock;
   final VoidCallback onPasscodeUnlocked;
+  final VoidCallback? onEmergencyUnlock;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,6 +60,18 @@ class AppLockOverlay extends ConsumerWidget {
                     autoBiometric: autoPrompt,
                     persistBiometricAcrossBackgrounding: true,
                     onUnlocked: onPasscodeUnlocked,
+                    secondaryAction: AppPlatform.isDesktop && onEmergencyUnlock != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: TextButton.icon(
+                                onPressed: onEmergencyUnlock,
+                                icon: const Icon(Icons.shield_outlined, size: 16),
+                                label: const Text('应急解除应用锁'),
+                              ),
+                            ),
+                          )
+                        : null,
                     viewportHeight: viewportHeight,
                   ),
             )
@@ -64,6 +79,7 @@ class AppLockOverlay extends ConsumerWidget {
               key: const ValueKey<String>('app_lock_system'),
               unlocking: unlocking,
               onTapUnlock: onTapUnlock,
+              onEmergencyUnlock: onEmergencyUnlock,
             ),
     );
   }
@@ -80,10 +96,12 @@ class _SystemLockOverlay extends StatelessWidget {
     super.key,
     required this.unlocking,
     required this.onTapUnlock,
+    this.onEmergencyUnlock,
   });
 
   final bool unlocking;
   final VoidCallback onTapUnlock;
+  final VoidCallback? onEmergencyUnlock;
 
   @override
   Widget build(BuildContext context) {
@@ -149,6 +167,15 @@ class _SystemLockOverlay extends StatelessWidget {
                           ),
                   ),
                 ),
+                if (AppPlatform.isDesktop && onEmergencyUnlock != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: TextButton.icon(
+                      onPressed: onEmergencyUnlock,
+                      icon: const Icon(Icons.shield_outlined, size: 16),
+                      label: const Text('应急解除应用锁'),
+                    ),
+                  ),
               ],
             ),
           ),

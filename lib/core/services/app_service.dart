@@ -70,6 +70,17 @@ final appFeaturesLegacyMigrationProvider = FutureProvider<void>((
   }
 });
 
+/// 启动时自愈全透明（color == 0）的历史脏标签数据。
+/// 冷启动时触发一次，若发现透明标签则自动重置为默认可见颜色，一劳永逸。
+final tagColorSanitizationProvider = FutureProvider<void>((Ref ref) async {
+  try {
+    final db = ref.watch(appDatabaseProvider);
+    await db.sanitizeTransparentTags();
+  } catch (error, stackTrace) {
+    debugPrint('Tag color sanitization skipped: $error\n$stackTrace');
+  }
+});
+
 /// 导入的正文字体存储服务；单例保证导入与删除串行写清单。
 final diaryFontStorageServiceProvider = Provider<DiaryFontStorageService>(
   (Ref ref) => DiaryFontStorageService(),

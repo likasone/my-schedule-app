@@ -65,11 +65,11 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in diaryRows)
           SyncRawDiary(
             localId: _syncInt(row.data['id']),
-            diaryId: row.data['diary_id'] as String,
-            title: row.data['title'] as String,
-            content: row.data['content'] as String,
-            cover: row.data['cover'] as String?,
-            metadata: row.data['metadata'] as String,
+            diaryId: _syncStr(row.data['diary_id']),
+            title: _syncStr(row.data['title']),
+            content: _syncStr(row.data['content']),
+            cover: _syncStrOrNull(row.data['cover']),
+            metadata: _syncStr(row.data['metadata']),
             createdAt: _syncInt(row.data['created_at']),
             updatedAt: _syncInt(row.data['updated_at']),
             isArchived: _syncBool(row.data['is_archived']),
@@ -85,7 +85,7 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in tagRows)
           SyncRawTag(
             localId: _syncInt(row.data['id']),
-            name: row.data['name'] as String,
+            name: _syncStr(row.data['name']),
             color: _syncInt(row.data['color']),
           ),
       ],
@@ -100,17 +100,17 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in notebookRows)
           SyncRawNotebook(
             localId: _syncInt(row.data['id']),
-            notebookId: row.data['notebook_id'] as String,
-            name: row.data['name'] as String,
-            kind: row.data['kind'] as String,
-            visibility: row.data['visibility'] as String,
-            payload: row.data['payload'] as String,
+            notebookId: _syncStr(row.data['notebook_id']),
+            name: _syncStr(row.data['name']),
+            kind: _syncStr(row.data['kind']),
+            visibility: _syncStr(row.data['visibility']),
+            payload: _syncStr(row.data['payload']),
             sortOrder: _syncInt(row.data['sort_order']),
             isPinned: _syncBool(row.data['is_pinned']),
             isClosed: _syncBool(row.data['is_closed']),
             createdAt: _syncInt(row.data['created_at']),
             updatedAt: _syncInt(row.data['updated_at']),
-            parentId: row.data['parent_id'] as String?,
+            parentId: _syncStrOrNull(row.data['parent_id']),
           ),
       ],
       memberships: <SyncRawMembership>[
@@ -118,7 +118,7 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
           SyncRawMembership(
             diaryLocalId: _syncInt(row.data['diary_id']),
             notebookLocalId: _syncInt(row.data['notebook_id']),
-            chapterId: row.data['chapter_id'] as String?,
+            chapterId: _syncStrOrNull(row.data['chapter_id']),
             position: _syncInt(row.data['position']),
             addedAt: _syncInt(row.data['added_at']),
           ),
@@ -127,10 +127,10 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in commentRows)
           SyncRawComment(
             localId: _syncInt(row.data['id']),
-            commentId: row.data['comment_id'] as String,
-            diaryId: row.data['diary_id'] as String,
-            content: row.data['content'] as String,
-            mood: row.data['mood'] as String?,
+            commentId: _syncStr(row.data['comment_id']),
+            diaryId: _syncStr(row.data['diary_id']),
+            content: _syncStr(row.data['content']),
+            mood: _syncStrOrNull(row.data['mood']),
             createdAt: _syncInt(row.data['created_at']),
             editedAt: _syncIntOrNull(row.data['edited_at']),
           ),
@@ -139,9 +139,9 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in templateRows)
           SyncRawTemplate(
             localId: _syncInt(row.data['id']),
-            templateId: row.data['template_id'] as String,
-            name: row.data['name'] as String,
-            payload: row.data['payload'] as String,
+            templateId: _syncStr(row.data['template_id']),
+            name: _syncStr(row.data['name']),
+            payload: _syncStr(row.data['payload']),
             sortOrder: _syncInt(row.data['sort_order']),
             createdAt: _syncInt(row.data['created_at']),
             updatedAt: _syncInt(row.data['updated_at']),
@@ -151,17 +151,17 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
         for (final row in anniversaryRows)
           SyncRawAnniversary(
             localId: _syncInt(row.data['id']),
-            anniversaryId: row.data['anniversary_id'] as String,
-            title: row.data['title'] as String,
-            baseDate: row.data['base_date'] as String,
-            recurrence: row.data['recurrence'] as String,
+            anniversaryId: _syncStr(row.data['anniversary_id']),
+            title: _syncStr(row.data['title']),
+            baseDate: _syncStr(row.data['base_date']),
+            recurrence: _syncStr(row.data['recurrence']),
             lunarYear: _syncIntOrNull(row.data['lunar_year']),
             lunarMonth: _syncIntOrNull(row.data['lunar_month']),
             lunarDay: _syncIntOrNull(row.data['lunar_day']),
-            linkedDiaryId: row.data['linked_diary_id'] as String?,
-            note: row.data['note'] as String,
+            linkedDiaryId: _syncStrOrNull(row.data['linked_diary_id']),
+            note: _syncStr(row.data['note']),
             isPinned: _syncBool(row.data['is_pinned']),
-            metadata: row.data['metadata'] as String,
+            metadata: _syncStr(row.data['metadata']),
             createdAt: _syncInt(row.data['created_at']),
             updatedAt: _syncInt(row.data['updated_at']),
           ),
@@ -169,20 +169,53 @@ mixin _AppDatabaseSyncOps on _$AppDatabase {
       dayMoods: <SyncRawDayMood>[
         for (final row in dayMoodRows)
           SyncRawDayMood(
-            day: row.data['day'] as String,
-            mood: row.data['mood'] as String,
+            day: _syncStr(row.data['day']),
+            mood: _syncStr(row.data['mood']),
             updatedAt: _syncInt(row.data['updated_at']),
           ),
       ],
     );
   }
-  }
 }
 
-/// SQLite 整数列读出来是 int；损坏数据里偶尔是浮点数，按截断取整。
-int _syncInt(Object? value) => (value as num).toInt();
+/// SQLite 整数列读出来是 int；损坏数据里偶尔是浮点数或字符串，按截断取整与容错解析。
+int _syncInt(Object? value, [int fallback = 0]) {
+  if (value == null) return fallback;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final parsed = num.tryParse(value);
+    if (parsed != null) return parsed.toInt();
+  }
+  return fallback;
+}
 
-int? _syncIntOrNull(Object? value) => value == null ? null : _syncInt(value);
+int? _syncIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final parsed = num.tryParse(value);
+    if (parsed != null) return parsed.toInt();
+  }
+  return null;
+}
+
+/// 安全读取文本列，杜绝 null 导致的强转 TypeError
+String _syncStr(Object? value, [String fallback = '']) {
+  if (value == null) return fallback;
+  return value.toString();
+}
+
+String? _syncStrOrNull(Object? value) {
+  if (value == null) return null;
+  return value.toString();
+}
 
 /// Drift 的布尔列存 0/1。
-bool _syncBool(Object? value) => value is bool ? value : _syncInt(value) != 0;
+bool _syncBool(Object? value) {
+  if (value is bool) return value;
+  if (value is num) return value.toInt() != 0;
+  if (value is String) {
+    return value == '1' || value.toLowerCase() == 'true';
+  }
+  return false;
+}

@@ -414,6 +414,20 @@ class AppLockController extends ChangeNotifier {
     }
   }
 
+  /// 桌面端应急解除应用锁：
+  /// 当桌面设备忘记密码或生物识别不可用时，重置应用锁并清除密码保护，避免设备死锁。
+  Future<void> emergencyReset() async {
+    await _settings.setAppLockEnabled(false);
+    final store = await _verifier.store();
+    if (store != null) {
+      await store.clear();
+    }
+    _locked = false;
+    _unlocking = false;
+    _notify();
+    _onUnlocked?.call();
+  }
+
   @override
   void dispose() {
     _disposed = true;

@@ -309,7 +309,8 @@ class _DiaryTagFilterBarState extends State<DiaryTagFilterBar> {
 
     final tag = widget.tags[index - 1];
     final selected = widget.selectedTagFilterIds.contains(tag.id);
-    final tagColor = Color(tag.color);
+    // 遇到历史残留透明色（0）时回退到主题色，杜绝描边与底色完全透明导致视觉异常
+    final tagColor = tag.color == 0 ? colorScheme.primary : Color(tag.color);
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     // “控件”为玻璃时，未选中胶囊的底色换成玻璃底色（半透明的中性色，高

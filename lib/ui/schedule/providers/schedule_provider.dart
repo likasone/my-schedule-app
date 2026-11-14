@@ -1156,7 +1156,12 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               final tagIds = <int>[];
               for (final tagName in rawTags) {
                 // 若标签不存在则自动插入，存在则复用现有标签
-                final tagId = await db.createTag(name: tagName, color: 0);
+                final tagId = await db.createTag(
+                  name: tagName,
+                  // 不能用 0：标签色是 ARGB，0 表示全透明，会让标签的 '#'、
+                  // 选中描边与浅色主题下的名称文字整个消失。
+                  color: 0xFF1E88E5,
+                );
                 tagIds.add(tagId);
               }
 
@@ -1379,7 +1384,11 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               }
 
               final db = ref.read(appDatabaseProvider);
-              final tagId = await db.createTag(name: '每日复盘', color: 0);
+              final tagId = await db.createTag(
+                  name: '每日复盘',
+                  // 不能用 0：0 是 ARGB 全透明，标签会看不见。
+                  color: 0xFF1E88E5,
+                );
               final contentDocJson = plainTextToContentJson(diaryBody);
 
               final metaMap = <String, Object?>{

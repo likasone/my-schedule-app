@@ -85,17 +85,8 @@ jobs:
           if [[ -n "$changes" ]]; then
             echo "$changes"
             git --no-pager diff
-            if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-              echo "Auto-committing generated localization and drift changes..."
-              git config user.name "github-actions[bot]"
-              git config user.email "github-actions[bot]@users.noreply.github.com"
-              git add lib/
-              git commit -m "chore: auto-commit generated code from flutter gen-l10n [skip ci]" || true
-              git push origin main || true
-            else
-              echo "::error::Changed files: $(echo "$changes" | tr '\n' '; ')"
-              exit 1
-            fi
+            echo "::error::Changed files: $(echo "$changes" | tr '\n' '; ')"
+            exit 1
           fi
 
   test-shards:
@@ -137,7 +128,7 @@ jobs:
             exit 1
           fi
           echo "Shard $((SHARD_INDEX + 1))/$SHARD_TOTAL: ${#shard_files[@]} of ${#test_files[@]} test files"
-          flutter test --no-pub --coverage "${shard_files[@]}" || true
+          flutter test --no-pub --coverage "${shard_files[@]}"
 
       - name: Upload shard coverage
         if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
@@ -161,7 +152,8 @@ jobs:
           SHARD_RESULT: ${{ needs.test-shards.result }}
         run: |
           if [[ "$SHARD_RESULT" != 'success' ]]; then
-            echo "::warning::Some test suites reported issues: $SHARD_RESULT"
+            echo "::error::Some test suites reported issues: $SHARD_RESULT"
+            exit 1
           fi
 
       - name: Checkout
