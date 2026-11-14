@@ -97,7 +97,8 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;
         }
-        rethrow;
+        // 把现场诊断拼进异常文本：Release 包看不到日志，报错弹窗是唯一稳定的取证通道。
+        throw StateError('$e\n【写库诊断】${await _dbWriteDiagnostics()}');
       }
     }
   }
@@ -220,7 +221,8 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;
         }
-        rethrow;
+        // 把现场诊断拼进异常文本：Release 包看不到日志，报错弹窗是唯一稳定的取证通道。
+        throw StateError('$e\n【写库诊断】${await _dbWriteDiagnostics()}');
       }
     }
   }
@@ -261,7 +263,8 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;
         }
-        rethrow;
+        // 把现场诊断拼进异常文本：Release 包看不到日志，报错弹窗是唯一稳定的取证通道。
+        throw StateError('$e\n【写库诊断】${await _dbWriteDiagnostics()}');
       }
     }
   }
@@ -546,4 +549,39 @@ String _newBusinessUuid() {
       '${hex.substring(12, 16)}-'
       '${hex.substring(16, 20)}-'
       '${hex.substring(20)}';
+}
+
+/// 写库失败的现场诊断：记录**本进程实际使用的数据目录**、该目录**从本进程内**
+/// 能不能写入、数据库文件是否存在与最后修改时间。
+///
+/// 为什么要有它：Windows 上 `SqliteException(8)` 的成因可能是权限、被别的进程
+/// 独占、或应用被以受限令牌启动。前两种可以从外部验证，第三种只有进程内部
+/// 才知道。Release 包没有可看的日志，所以把结论直接放进异常文本，由界面的
+/// “保存失败: …”提示原样显示出来。
+Future<String> _dbWriteDiagnostics() async {
+  final buffer = StringBuffer('exe=${Platform.resolvedExecutable}');
+  try {
+    final root = await appDataRootDirectory();
+    buffer.write(' | dir=${root.path}');
+    final probe = File(p.join(root.path, '.write_probe_sync'));
+    try {
+      probe.writeAsStringSync('1', flush: true);
+      probe.deleteSync();
+      buffer.write(' | dirWritable=YES');
+    } catch (error) {
+      buffer.write(' | dirWritable=NO($error)');
+    }
+    final db = File(p.join(root.path, 'node_diary.sqlite'));
+    if (db.existsSync()) {
+      buffer.write(
+        ' | dbBytes=${db.lengthSync()}'
+        ' | dbLastWrite=${db.lastModifiedSync().toIso8601String()}',
+      );
+    } else {
+      buffer.write(' | dbMissing');
+    }
+  } catch (error) {
+    buffer.write(' | diagFailed=$error');
+  }
+  return buffer.toString();
 }
