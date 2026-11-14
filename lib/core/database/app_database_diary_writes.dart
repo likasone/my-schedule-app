@@ -141,10 +141,13 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
         throw StateError('未找到 diaryId=$diaryId 对应的日记');
       }
 
+      // 提取非空强类型的自增主键 ID，避免在内部闭包中因类型提升限制报错
+      final effectiveLocalId = diary.id;
+
       // 精确使用确定命中的自增整型主键 id 进行更新，避免 UUID 匹配异常
       await (update(
         diaries,
-      )..where((Diaries t) => t.id.equals(diary.id))).write(
+      )..where((Diaries t) => t.id.equals(effectiveLocalId))).write(
         DiariesCompanion(
           title: Value<String>(title.trim()),
           content: Value<String>(contentDocJson),
@@ -166,11 +169,11 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
         ),
       );
 
-      await _replaceDiaryTags(diary.id, normalizedTagIds);
+      await _replaceDiaryTags(effectiveLocalId, normalizedTagIds);
       if (notebookIds != null) {
         try {
           await _replaceDiaryNotebooks(
-            diary.id,
+            effectiveLocalId,
             notebookIds.toSet(),
             chapterIds: notebookChapterIds,
           );
