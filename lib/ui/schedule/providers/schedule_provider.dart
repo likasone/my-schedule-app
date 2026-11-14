@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/app_data_directory.dart';
 import '../../../core/services/plan_scheduler.dart';
 import '../../../core/services/reminder_service.dart';
 
@@ -274,6 +276,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
         memos: loadedMemos,
         isLoading: false,
       );
+
+      // 启动第三方自动导入热目录异步检测（Hot Folder / Inbox）
+      Future.microtask(scanAndAutoImportHotFolder);
     } catch (e) {
       debugPrint('加载日程存储发生异常: $e');
       state = state.copyWith(isLoading: false);
@@ -1107,5 +1112,79 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     );
 
     return totalCount;
+  }
+
+  /// 扫描第三方程序自动导入热目录（Auto-Import Hot Folder / Inbox）
+  /// [第三方程序对接标准]：外部程序（Python、Node.js、批处理脚本等）只需将符合模板规范的 .json 文件
+  /// 复制保存至本应用的 auto_import/ 目录下，应用启动或刷新时将全自动完成静默导入、去重合并入库，
+  /// 并自动将原文件重命名为 .imported 归档，彻底免去人工在界面上的点击操作。
+  Future<int> scanAndAutoImportHotFolder() async {
+    try {
+      final List<Directory> candidateDirs = [];
+
+      // 1. 优先扫描桌面端可执行程序所在同级目录下的 auto_import 文件夹（便携与绿色部署友好）
+      try {
+        final exeFile = File(Platform.resolvedExecutable);
+        final exeFolder = Directory(exeFile.parent.path);
+        candidateDirs.add(Directory('${exeFolder.path}${Platform.pathSeparator}auto_import'));
+      } catch (_) {}
+
+      // 2. 扫描跨平台文档/数据根目录下的 auto_import 文件夹（全平台兼容）
+      try {
+        final appDir = await appDataRootDirectory();
+        candidateDirs.add(Directory('${appDir.path}${Platform.pathSeparator}auto_import'));
+      } catch (_) {}
+
+      int totalImportedCount = 0;
+
+      for (final dir in candidateDirs) {
+        // 若目录尚不存在，自动创建目录并写入中文对接说明与参考模板
+        if (!await dir.exists()) {
+          try {
+            await dir.create(recursive: true);
+            final readmeFile = File('${dir.path}${Platform.pathSeparator}README_导入说明.txt');
+            if (!await readmeFile.exists()) {
+              await readmeFile.writeAsString(
+                '【第三方程序直接导入说明】\r\n'
+                '1. 外部程序只需将符合规范的日程与计划 JSON 文件（以 .json 结尾）写入本文件夹。\r\n'
+                '2. 本应用启动或重新切回前台时，将自动扫描、校验并安全合并导入。\r\n'
+                '3. 导入成功后，本应用会自动将文件改名为 .imported 归档，防止重复导入。\r\n'
+              );
+            }
+          } catch (_) {}
+          continue;
+        }
+
+        // 检索该目录下所有待处理的 JSON 文件（过滤掉以 .imported 结尾的已归档文件）
+        final files = dir.listSync().whereType<File>().where((f) {
+          final filename = f.path.split(Platform.pathSeparator).last.toLowerCase();
+          return filename.endsWith('.json') && !filename.contains('.imported');
+        });
+
+        for (final file in files) {
+          try {
+            // 读取文件文本内容
+            final content = await file.readAsString();
+            if (content.trim().isNotEmpty) {
+              // 调用底层合并导入接口（保持去重合并安全模式）
+              final count = await importScheduleDataJson(content, overwrite: false);
+              totalImportedCount += count;
+              debugPrint('[AutoImport] 成功自动导入第三方数据文件: ${file.path}, 新增/更新 $count 条记录');
+
+              // 导入成功后重命名为 .imported 归档文件，保证操作幂等
+              final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
+              await file.rename(archiveName);
+            }
+          } catch (err) {
+            debugPrint('[AutoImport] 解析第三方文件失败 ${file.path}: $err');
+          }
+        }
+      }
+
+      return totalImportedCount;
+    } catch (e) {
+      debugPrint('[AutoImport] 自动扫描热目录失败: $e');
+      return 0;
+    }
   }
 }

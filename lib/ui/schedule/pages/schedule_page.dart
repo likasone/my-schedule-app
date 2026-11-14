@@ -212,11 +212,14 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                           PopupMenuButton<String>(
                             tooltip: '更多数据管理与选项',
                             icon: const Icon(Icons.more_vert, size: 20),
-                            onSelected: (val) {
+                            onSelected: (val) async {
                               if (val == 'import') {
                                 _showImportScheduleDialog(context, notifier);
                               } else if (val == 'export') {
                                 _showExportScheduleDialog(context, notifier);
+                              } else if (val == 'scan_auto_import') {
+                                final count = await notifier.scanAndAutoImportHotFolder();
+                                _showScheduleSnackBar(count > 0 ? '🎉 自动导入成功！共计从 auto_import 目录合并 $count 条第三方数据' : 'auto_import 热目录暂无可处理的新数据文件');
                               } else if (val == 'test_reminder') {
                                 notifier.triggerTestReminder();
                               }
@@ -239,6 +242,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                                     Icon(Icons.file_upload_outlined, size: 18, color: Colors.blue),
                                     SizedBox(width: 8),
                                     Text('导出日程与计划'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'scan_auto_import',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.sync_alt, size: 18, color: Colors.teal),
+                                    SizedBox(width: 8),
+                                    Text('扫描第三方热导入目录'),
                                   ],
                                 ),
                               ),
@@ -311,11 +324,14 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         PopupMenuButton<String>(
                           tooltip: '更多数据管理与选项',
                           icon: const Icon(Icons.more_vert, size: 20),
-                          onSelected: (val) {
+                          onSelected: (val) async {
                             if (val == 'import') {
                               _showImportScheduleDialog(context, notifier);
                             } else if (val == 'export') {
                               _showExportScheduleDialog(context, notifier);
+                            } else if (val == 'scan_auto_import') {
+                              final count = await notifier.scanAndAutoImportHotFolder();
+                              _showScheduleSnackBar(count > 0 ? '🎉 自动导入成功！共计从 auto_import 目录合并 $count 条第三方数据' : 'auto_import 热目录暂无可处理的新数据文件');
                             } else if (val == 'test_reminder') {
                               notifier.triggerTestReminder();
                             }
@@ -338,6 +354,16 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                                   Icon(Icons.file_upload_outlined, size: 18, color: Colors.blue),
                                   SizedBox(width: 8),
                                   Text('导出日程与计划'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'scan_auto_import',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.sync_alt, size: 18, color: Colors.teal),
+                                  SizedBox(width: 8),
+                                  Text('扫描第三方热导入目录'),
                                 ],
                               ),
                             ),
