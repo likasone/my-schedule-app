@@ -23,7 +23,6 @@ class SchedulePage extends ConsumerStatefulWidget {
 }
 
 class _SchedulePageState extends ConsumerState<SchedulePage> {
-  final TextEditingController _quickMemoController = TextEditingController();
   String _selectedNewMemoTag = '闪念';
   bool _isNewMemoPinned = false;
   int _selectedNewMemoColor = 0; // 花笺纸色索引（0: 霜白, 1: 樱落, 2: 竹韵, 3: 麦穗, 4: 晴川, 5: 暮薰）
@@ -82,7 +81,6 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
   @override
   void dispose() {
-    _quickMemoController.dispose();
     super.dispose();
   }
 
@@ -97,6 +95,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      // 方案 A：便签视图下常驻右下角悬浮按钮（FAB），彻底释放首屏空间给历史便签
+      floatingActionButton: state.selectedTab == 2
+          ? FloatingActionButton.extended(
+              onPressed: () => _showFloralMemoEditor(context, notifier),
+              icon: const Icon(Icons.edit_note, size: 22),
+              label: const Text('记灵感', style: TextStyle(fontWeight: FontWeight.bold)),
+              elevation: 4,
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -1251,235 +1258,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
           const SizedBox(height: 10),
 
-          // 3. 记事新建卡片（采用花笺纸质感底色与自适应多行输入，彻底解决输入框过小问题）
-          if (!isSearching) ...[
-            Builder(
-              builder: (context) {
-                final isDarkTheme = theme.brightness == Brightness.dark;
-                final activeSkin = floralSkins[_selectedNewMemoColor.clamp(0, floralSkins.length - 1)];
-                final cardBg = isDarkTheme ? activeSkin.darkBg : activeSkin.lightBg;
-                final cardBorder = activeSkin.border;
-
-                return Container(
-                  padding: const EdgeInsets.all(14.0),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: cardBorder, width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 输入框与全屏信笺按钮
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _quickMemoController,
-                              minLines: 3,
-                              maxLines: 7,
-                              scrollPadding: const EdgeInsets.only(bottom: 240),
-                              decoration: InputDecoration(
-                                hintText: '花笺随想：随时记下闪念、要点、工作灵感...\n(输入框已全面扩展，支持多行随笔)',
-                                hintStyle: TextStyle(
-                                  color: isDarkTheme ? Colors.white38 : Colors.black38,
-                                  fontSize: 13,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.open_in_full, size: 17, color: activeSkin.accent),
-                            tooltip: '全屏沉浸信笺',
-                            onPressed: () => _showFloralMemoEditor(context, notifier),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // 花笺 6 色调色板选择条
-                      Row(
-                        children: [
-                          Text(
-                            '花笺:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkTheme ? Colors.white60 : Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          ...floralSkins.asMap().entries.map((entrySkin) {
-                            final idx = entrySkin.key;
-                            final s = entrySkin.value;
-                            final isSel = _selectedNewMemoColor == idx;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() => _selectedNewMemoColor = idx);
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 6),
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: isDarkTheme ? s.darkBg : s.lightBg,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSel ? s.accent : s.border,
-                                    width: isSel ? 2.0 : 1.0,
-                                  ),
-                                ),
-                                child: isSel
-                                    ? Icon(Icons.check, size: 10, color: s.accent)
-                                    : null,
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // 响应式底部工具栏：移动端/安卓窄屏自适应分层，桌面端宽屏两端对齐
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isCompact = constraints.maxWidth < 520;
-
-                          // 1. 快速便签标签胶囊列表
-                          final tagsBlock = Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: ['闪念', '灵感', '待办', '备忘'].map((tag) {
-                              final isSel = _selectedNewMemoTag == tag;
-                              return _buildQuickMemoTagCapsule(
-                                context: context,
-                                tag: tag,
-                                isSelected: isSel,
-                                onTap: () {
-                                  setState(() => _selectedNewMemoTag = tag);
-                                },
-                              );
-                            }).toList(),
-                          );
-
-                          // 2. 置顶开关按钮组件
-                          final pinButton = InkWell(
-                            onTap: () {
-                              setState(() => _isNewMemoPinned = !_isNewMemoPinned);
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _isNewMemoPinned
-                                    ? Colors.amber.withValues(alpha: 0.15)
-                                    : colorScheme.surfaceContainerLow.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: _isNewMemoPinned
-                                      ? Colors.amber.withValues(alpha: 0.6)
-                                      : colorScheme.outlineVariant.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _isNewMemoPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                                    size: 15,
-                                    color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _isNewMemoPinned ? '已置顶' : '置顶',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: _isNewMemoPinned ? Colors.amber[800] : colorScheme.onSurfaceVariant,
-                                      fontWeight: _isNewMemoPinned ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-
-                          // 3. 记一笔核心添加按钮组件
-                          final submitButton = FilledButton.icon(
-                            onPressed: () {
-                              final text = _quickMemoController.text.trim();
-                              if (text.isNotEmpty) {
-                                notifier.addQuickMemo(
-                                  text,
-                                  colorIndex: _selectedNewMemoColor,
-                                  tag: _selectedNewMemoTag,
-                                  isPinned: _isNewMemoPinned,
-                                );
-                                _quickMemoController.clear();
-                                setState(() => _isNewMemoPinned = false);
-                              }
-                            },
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('记一笔'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: activeSkin.accent,
-                              foregroundColor: Colors.white,
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-
-                          if (isCompact) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                tagsBlock,
-                                const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    pinButton,
-                                    submitButton,
-                                  ],
-                                ),
-                              ],
-                            );
-                          }
-
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              tagsBlock,
-                              Row(
-                                children: [
-                                  pinButton,
-                                  const SizedBox(width: 8),
-                                  submitButton,
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-
-          const SizedBox(height: 12),
-
-          // 3. 便签列表展示
+          // 3. 便签列表展示（顶格满屏展开，彻底消灭顶部大输入卡片遮挡，释放全部视界给历史便签）
           Expanded(
             child: memos.isEmpty
                 ? Center(
@@ -1495,16 +1274,24 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                         Text(
                           state.memoSearchQuery.isNotEmpty
                               ? '未找到匹配“${state.memoSearchQuery}”的便签'
-                              : '便签板暂无内容，随时记下灵感并支持一键转日程',
+                              : '便签板暂无内容，点击右下角「记灵感」开启沉浸记录',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        if (!isSearching) ...[
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: () => _showFloralMemoEditor(context, notifier),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('记第一笔灵感'),
+                          ),
+                        ],
                       ],
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.only(bottom: 88), // 底部留足空间，与右下角 FAB 完美错落防遮挡
                     itemCount: memos.length,
                     itemBuilder: (context, index) {
                       final memo = memos[index];
