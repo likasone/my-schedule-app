@@ -129,6 +129,10 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
   static const _plansStorageKey = 'app_schedule_plans_v1';
   static const _entriesStorageKey = 'app_schedule_entries_v1';
   static const _memosStorageKey = 'app_schedule_memos_v1';
+  /// 标记是否已完成生命周期首次示例初始化的持久化键名，杜绝用户清空数据后重启死灰复燃
+  static const _demoInitializedStorageKey = 'app_schedule_demo_initialized_v1';
+  /// 自动导入（Hot Folder）已处理文件的指纹记录集合键名，确保重启后绝不重复重放
+  static const _autoImportFingerprintsKey = 'app_auto_imported_file_sigs_v1';
 
   @override
   ScheduleState build() {
@@ -239,8 +243,16 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
         } catch (_) {}
       }
 
-      // 若本地为空，初始化开箱即用的预设示例，让用户首次启动立刻看到内容
-      if (loadedPlans.isEmpty && loadedEntries.isEmpty) {
+      // 检查是否已经完成过生命周期的示例初始化（防止用户手动清空所有数据后，下次重启被误判为新用户而重新灌入示例）
+      final isDemoInitialized = prefs.getBool(_demoInitializedStorageKey);
+
+      // 仅当从未初始化过、且本地没有任何历史存储键时（彻底的首次全新冷启动），才生成开箱即用示例
+      final isFirstEverLaunch = isDemoInitialized == null &&
+          plansJson == null &&
+          entriesJson == null &&
+          memosJson == null;
+
+      if (isFirstEverLaunch && loadedPlans.isEmpty && loadedEntries.isEmpty) {
         final now = DateTime.now();
         final todayIso = PlanScheduler.formatIsoDate(now);
         final demoPlan = PlanItem(
@@ -254,23 +266,31 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
 
         loadedPlans = [demoPlan];
         loadedEntries = demoEntries;
-        loadedMemos = [
-          MemoItem(
-            id: 'memo_demo_01',
-            content: '欢迎使用日程与计划中心！这里支持任务规划、智能艾宾浩斯复习和随手记事。',
-            createdAt: now,
-            isPinned: true,
-            tag: '备忘',
-          ),
-          MemoItem(
-            id: 'memo_demo_02',
-            content: 'Windows 桌面端与安卓端已实现全链路安全存储、加密同步与高穿透系统级提醒。',
-            createdAt: now,
-            tag: '灵感',
-          ),
-        ];
+        // 仅在本地便签也为空时才补全初始便签，绝不覆盖已有便签
+        if (loadedMemos.isEmpty) {
+          loadedMemos = [
+            MemoItem(
+              id: 'memo_demo_01',
+              content: '欢迎使用日程与计划中心！这里支持任务规划、智能艾宾浩斯复习和随手记事。',
+              createdAt: now,
+              isPinned: true,
+              tag: '备忘',
+            ),
+            MemoItem(
+              id: 'memo_demo_02',
+              content: 'Windows 桌面端与安卓端已实现全链路安全存储、加密同步与高穿透系统级提醒。',
+              createdAt: now,
+              tag: '灵感',
+            ),
+          ];
+        }
 
+        // 立即固化已初始化状态标记，永不复发
+        await prefs.setBool(_demoInitializedStorageKey, true);
         await _persist(loadedPlans, loadedEntries, loadedMemos);
+      } else if (isDemoInitialized != true) {
+        // 如果是从历史版本升级上来或者已有数据，自动打上已初始化标记，确保后续用户删光所有条目后绝不复活
+        await prefs.setBool(_demoInitializedStorageKey, true);
       }
 
       state = state.copyWith(
@@ -1303,6 +1323,9 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       } catch (_) {}
 
       int totalImportedCount = 0;
+      final prefs = await SharedPreferences.getInstance();
+      final importedSigs = (prefs.getStringList(_autoImportFingerprintsKey) ?? []).toSet();
+      bool sigsChanged = false;
 
       for (final dir in candidateDirs) {
         // 若目录尚不存在，自动创建目录并写入中文对接说明与参考模板
@@ -1330,6 +1353,14 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
 
         for (final file in jsonFiles) {
           try {
+            // 获取文件元数据指纹（文件规范路径 + 大小 + 最后修改毫秒），杜绝跨版本或只读文件反复重放
+            final fileStat = file.statSync();
+            final fileSig = '${file.path}_${fileStat.size}_${fileStat.modified.millisecondsSinceEpoch}';
+            if (importedSigs.contains(fileSig)) {
+              // 此文件指纹已记录为已导入，直接跳过，杜绝重复导入已删除的计划
+              continue;
+            }
+
             // 读取文件文本内容
             final content = await file.readAsString();
             if (content.trim().isNotEmpty) {
@@ -1337,6 +1368,10 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               final count = await importScheduleDataJson(content, overwrite: false);
               totalImportedCount += count;
               debugPrint('[AutoImport] 成功自动导入第三方数据文件: ${file.path}, 新增/更新 $count 条记录');
+
+              // 记录指纹，哪怕后续文件重命名失败也绝不重复灌入
+              importedSigs.add(fileSig);
+              sigsChanged = true;
 
               // 导入成功后重命名为 .imported 归档文件，保证操作幂等
               final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
@@ -1366,6 +1401,14 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
 
         for (final file in mdFiles) {
           try {
+            // 获取 Markdown 文件元数据指纹
+            final fileStat = file.statSync();
+            final fileSig = '${file.path}_${fileStat.size}_${fileStat.modified.millisecondsSinceEpoch}';
+            if (importedSigs.contains(fileSig)) {
+              // 此 Markdown 文件已记录为已导入，跳过
+              continue;
+            }
+
             final content = await file.readAsString();
             if (content.trim().isNotEmpty) {
               final filename = file.path.split(Platform.pathSeparator).last;
@@ -1418,6 +1461,10 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               totalImportedCount++;
               debugPrint('[AutoImport] 成功自动导入第三方复盘 Markdown: ${file.path}');
 
+              // 记录指纹
+              importedSigs.add(fileSig);
+              sigsChanged = true;
+
               final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
               try {
                 // 优先尝试标准重命名操作
@@ -1436,6 +1483,11 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
             debugPrint('[AutoImport] 解析 Markdown 文件失败 ${file.path}: $err');
           }
         }
+      }
+
+      // 将最新已导入指纹持久化入库
+      if (sigsChanged) {
+        await prefs.setStringList(_autoImportFingerprintsKey, importedSigs.toList());
       }
 
       return totalImportedCount;

@@ -267,5 +267,38 @@ void main() {
       // 关联的所有复习日程节点被级联清理
       expect(state.entries.any((e) => e.planId == plan.id), isFalse);
     });
+
+    test('用户删除所有计划与便签后，再次重启加载不会死灰复燃重新生成示例', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // 等待首次冷启动异步加载完成
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final notifier = container.read(scheduleProvider.notifier);
+      final state = container.read(scheduleProvider);
+
+      // 用户把所有开箱即用的预设计划和便签全部手动删除
+      for (final plan in List.of(state.plans)) {
+        await notifier.deletePlan(plan.id);
+      }
+      for (final memo in List.of(state.memos)) {
+        await notifier.deleteMemo(memo.id);
+      }
+
+      final emptyState = container.read(scheduleProvider);
+      expect(emptyState.plans, isEmpty);
+      expect(emptyState.entries, isEmpty);
+      expect(emptyState.memos, isEmpty);
+
+      // 模拟用户完全退出应用后重新启动，触发 _loadFromStorage
+      await notifier.reloadFromStorage();
+
+      final reloadedState = container.read(scheduleProvider);
+      // 验证核心目标：已删除的数据绝对不会死灰复燃！保持清空状态！
+      expect(reloadedState.plans, isEmpty);
+      expect(reloadedState.entries, isEmpty);
+      expect(reloadedState.memos, isEmpty);
+    });
   });
 }
