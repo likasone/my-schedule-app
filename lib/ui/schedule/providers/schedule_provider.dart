@@ -1247,7 +1247,18 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
 
               // 导入成功后重命名为 .imported 归档文件，保证操作幂等
               final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
-              await file.rename(archiveName);
+              try {
+                // 优先尝试标准重命名操作
+                await file.rename(archiveName);
+              } catch (_) {
+                // Windows 平台容错：若原文件被第三方进程锁定导致 rename 失败，采用安全复制后删除原文件策略
+                try {
+                  await file.copy(archiveName);
+                  await file.delete();
+                } catch (e) {
+                  debugPrint('[AutoImport] 归档重命名失败，原文件可能被独占锁定: $e');
+                }
+              }
             }
           } catch (err) {
             debugPrint('[AutoImport] 解析第三方文件失败 ${file.path}: $err');
@@ -1311,7 +1322,18 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
               debugPrint('[AutoImport] 成功自动导入第三方复盘 Markdown: ${file.path}');
 
               final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
-              await file.rename(archiveName);
+              try {
+                // 优先尝试标准重命名操作
+                await file.rename(archiveName);
+              } catch (_) {
+                // Windows 平台容错：若原文件被第三方进程锁定导致 rename 失败，采用安全复制后删除原文件策略
+                try {
+                  await file.copy(archiveName);
+                  await file.delete();
+                } catch (e) {
+                  debugPrint('[AutoImport] Markdown 归档重命名失败: $e');
+                }
+              }
             }
           } catch (err) {
             debugPrint('[AutoImport] 解析 Markdown 文件失败 ${file.path}: $err');

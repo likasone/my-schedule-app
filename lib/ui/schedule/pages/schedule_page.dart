@@ -1795,7 +1795,10 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
                 IconButton(
                   tooltip: '删除便签',
                   icon: const Icon(Icons.delete_outline, size: 16),
-                  onPressed: () => notifier.deleteMemo(memo.id),
+                  onPressed: () async {
+                    // 确保便签异步删除落盘彻底完成
+                    await notifier.deleteMemo(memo.id);
+                  },
                 ),
               ],
             ),
@@ -2059,9 +2062,10 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            onPressed: () {
-              notifier.deleteScheduleEntry(entry.id);
+            onPressed: () async {
               Navigator.of(ctx).pop();
+              // 确保异步持久化落盘彻底完成，防止桌面端立即关闭时数据丢失
+              await notifier.deleteScheduleEntry(entry.id);
             },
             child: const Text('确认删除'),
           ),
@@ -2096,9 +2100,10 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            onPressed: () {
-              notifier.deletePlan(plan.id);
+            onPressed: () async {
               Navigator.of(ctx).pop();
+              // 确保计划及关联复习节点级联删除持久化落盘彻底完成
+              await notifier.deletePlan(plan.id);
             },
             child: const Text('确认删除'),
           ),
