@@ -91,6 +91,7 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
             errorStr.contains('code 8') ||
             errorStr.contains('code 5') ||
             errorStr.contains('database is locked');
+        logDbDiagnostic('[WRITE_FAIL] op=createDiary, attempt=$attempts, error=$e');
         if (isLockOrReadonly && attempts < 5) {
           // 遇到并发读锁或杀毒软件索引锁冲突时，按 150ms 步进弹性退避重试 (最多 5 次)
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
@@ -213,6 +214,7 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
             errorStr.contains('code 8') ||
             errorStr.contains('code 5') ||
             errorStr.contains('database is locked');
+        logDbDiagnostic('[WRITE_FAIL] op=updateDiary, attempt=$attempts, error=$e');
         if (isLockOrReadonly && attempts < 5) {
           // 遇到并发读锁或杀毒软件锁冲突时，退避重试 (150ms, 300ms, 450ms, 600ms)
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
@@ -254,6 +256,7 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
             errorStr.contains('code 8') ||
             errorStr.contains('code 5') ||
             errorStr.contains('database is locked');
+        logDbDiagnostic('[WRITE_FAIL] op=updateDiaryContent, attempt=$attempts, error=$e');
         if (isLockOrReadonly && attempts < 5) {
           await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;

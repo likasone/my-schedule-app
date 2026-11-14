@@ -173,6 +173,25 @@ class AppDatabase extends _$AppDatabase
 
 /// 打开 SQLite 连接。
 ///
+/// 在 Release/Debug 下将关键数据库诊断信息持久化追加到数据目录的 `db_probe.log`。
+/// 供 Windows 平台排查写锁、权限拦截与日志模式问题。
+void _writeDbProbeLog(Directory root, String message) {
+  try {
+    final logFile = File(p.join(root.path, 'db_probe.log'));
+    final now = DateTime.now().toIso8601String();
+    logFile.writeAsStringSync('[$now][PID:$pid] $message\n', mode: FileMode.append, flush: true);
+  } catch (_) {}
+}
+
+/// 全局暴露的数据库诊断与异常日志记录接口。
+void logDbDiagnostic(String message) {
+  try {
+    appDataRootDirectory().then((root) {
+      _writeDbProbeLog(root, message);
+    }).catchError((_) {});
+  } catch (_) {}
+}
+
 /// 数据库存储在应用数据根目录（[appDataRootDirectory]：手机为文档目录，
 /// 桌面为应用支持目录），文件名固定为 `node_diary.sqlite`。
 /// 使用后台 isolate 建库，避免阻塞主线程。
@@ -181,18 +200,14 @@ LazyDatabase _openConnection() {
     final root = await appDataRootDirectory();
     final file = File(p.join(root.path, 'node_diary.sqlite'));
 
-    // 启动前主动探测数据库目录的可写性，排查 Windows 权限或杀毒软件拦截导致无法写回滚日志
+    // 启动前主动探测数据库目录的可写性，并将真因持久化记录到 db_probe.log（Release 包下亦完全生效）
     try {
       final probeFile = File(p.join(root.path, '.db_dir_probe'));
       await probeFile.writeAsString('1', flush: true);
       await probeFile.delete();
+      _writeDbProbeLog(root, '[PROBE_OK] 数据库目录写权限正常: ${root.path}');
     } catch (error) {
-      // 仅打印诊断警告，不阻断正常初始化
-      assert(() {
-        // ignore: avoid_print
-        print('Database directory write probe warning: $error');
-        return true;
-      }());
+      _writeDbProbeLog(root, '[PROBE_FAIL] 数据库目录写探测失败: $error');
     }
 
     return NativeDatabase.createInBackground(
@@ -200,8 +215,15 @@ LazyDatabase _openConnection() {
       setup: (database) {
         // 归正为稳定的传统 DELETE 日志模式，彻底消除 WAL 多文件 (-wal, -shm) 在 Windows 平台的锁与同步冲突；
         // 配置 5000ms 繁忙等待超时，在遇到短时文件写锁争用时底层自旋等待最多 5 秒，彻底消除 SqliteException 8 / 5。
-        database.execute('PRAGMA journal_mode = DELETE;');
-        database.execute('PRAGMA busy_timeout = 5000;');
+        try {
+          database.execute('PRAGMA journal_mode = DELETE;');
+          database.execute('PRAGMA busy_timeout = 5000;');
+          final jm = database.select('PRAGMA journal_mode;').firstOrNull?[0];
+          final bt = database.select('PRAGMA busy_timeout;').firstOrNull?[0];
+          _writeDbProbeLog(root, '[SETUP_OK] journal_mode=$jm, busy_timeout=${bt}ms');
+        } catch (e) {
+          _writeDbProbeLog(root, '[SETUP_FAIL] PRAGMA 设置异常: $e');
+        }
       },
     );
   });

@@ -15068,7 +15068,7 @@
   "@lanSyncSyncFailTicketExpired": {
     "description": "Failed sync: QR ticket expired, with the next step."
   },
-  "lanSyncSyncFailWriteFailed": "写入本机失败，可能是存储空间不足。请清理空间后重试。",
+  "lanSyncSyncFailWriteFailed": "写入本机失败（数据库被占用或只读，请稍后重试）。",
   "@lanSyncSyncFailWriteFailed": {
     "description": "Failed sync: local write failed, with the next step."
   },

@@ -10462,7 +10462,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncSyncFailTicketExpired => '二维码已失效，请重新扫码连接。';
 
   @override
-  String get lanSyncSyncFailWriteFailed => '写入本机失败，可能是存储空间不足。请清理空间后重试。';
+  String get lanSyncSyncFailWriteFailed => '写入本机失败（数据库被占用或只读，请稍后重试）。';
 
   @override
   String get lanSyncSyncFailUnknown => '同步没有完成，请重试。';

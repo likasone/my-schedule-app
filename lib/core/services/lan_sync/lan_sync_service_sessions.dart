@@ -121,9 +121,9 @@ extension _Sessions on LanSyncService {
         platform: hello.platform,
         publicKey: hello.publicKey,
         pairedAt: nowUtc,
-        // 新配对时初始化 lastSyncAt 为当前时间，避免首同步判定无共同祖先冲突 (firstSync)
-        // 引发自动同步无限抛出 needsConfirmation 并标记 needsAttention 自锁
-        lastSyncAt: sameKey ? existing.lastSyncAt : nowUtc,
+        // 新配对设备保持 lastSyncAt 为 null，保留首次同步冲突时的“以哪边为准”决策权；
+        // 自锁问题已在手动同步时自动清除 needsAttention 并在修复 TypeError 与 SqliteException 8 后彻底解除。
+        lastSyncAt: sameKey ? existing.lastSyncAt : null,
         lastHost: host ?? existing?.lastHost,
         lastPort: port ?? existing?.lastPort,
         autoSync: existing?.autoSync ?? true,

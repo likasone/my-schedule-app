@@ -51,6 +51,7 @@ import 'lan_sync_session_context.dart';
 import 'lan_sync_session_plan_wire.dart';
 import 'lan_sync_session_protocol.dart';
 import 'lan_sync_session_types.dart';
+import '../../database/app_database.dart';
 import 'sync/sync_apply.dart';
 import 'sync/sync_local_plan_side.dart';
 import 'sync/sync_local_state.dart';
@@ -228,6 +229,7 @@ class LanSyncSession {
     final fromPeer = _inbox.peerStop;
     if (fromPeer != null) return fromPeer.failure;
     if (error.toString().contains('SqliteException')) {
+      logDbDiagnostic('[SYNC_WRITE_FAIL_SQLITE] $error');
       return LanSyncFailure.writeFailed;
     }
     return switch (error) {
