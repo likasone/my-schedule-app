@@ -27,6 +27,15 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   bool _isNewMemoPinned = false;
   int _selectedNewMemoColor = 0; // 花笺纸色索引（0: 霜白, 1: 樱落, 2: 竹韵, 3: 麦穗, 4: 晴川, 5: 暮薰）
 
+  /// 历史逾期待办折叠盒状态（默认展开）
+  bool _isOverdueExpanded = true;
+
+  /// 已完成事项折叠盒状态（默认收起，优先将首屏视界让给未完成要务）
+  bool _isCompletedExpanded = false;
+
+  /// 计划列表状态筛选分类（'all': 全部, 'active': 进行中, 'completed': 已达成）
+  String _selectedPlanFilter = 'all';
+
   /// 花笺（Floral Notepaper）拟真 6 色低饱和东方信笺纸色板
   static const List<({String name, Color lightBg, Color darkBg, Color border, Color accent})> floralSkins = [
     (name: '霜白', lightBg: Color(0xFFFBF9F5), darkBg: Color(0xFF222120), border: Color(0xFFE8E1D3), accent: Color(0xFF6B6B62)),
@@ -652,7 +661,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 视图 1：今日待办与艾宾浩斯复习任务列表
+  /// 视图 1：今日待办与艾宾浩斯复习任务列表（三级分流：历史逾期收纳盒、今日待办区、已完成折叠抽屉）
   Widget _buildTodayView(
     BuildContext context,
     ScheduleState state,
@@ -691,339 +700,619 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        final isReview = entry.kind == ScheduleEntryKind.review ||
-            entry.kind == ScheduleEntryKind.remedial;
+    // 智能三级分流（消除平铺信息过载）：历史逾期未打卡、今日进行中待办、已打卡完成事项
+    final overdueEntries = entries.where((e) => e.originalDueDate != null && !e.isCompleted).toList();
+    final pendingEntries = entries.where((e) => e.originalDueDate == null && !e.isCompleted).toList();
+    final completedEntries = entries.where((e) => e.isCompleted).toList();
+    final completionRate = state.todayCompletionRate;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18.0)),
-          color: entry.isCompleted
-              ? colorScheme.surfaceContainerLow.withValues(alpha: 0.6)
-              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
-          elevation: entry.isCompleted ? 0 : 1,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      children: [
+        // 1. 顶部历史逾期智能收纳盒（折叠归集，支持一键延期、分摊与标记完成）
+        if (overdueEntries.isNotEmpty) ...[
+          _buildOverdueBox(context, overdueEntries, notifier, state.effectiveDateIso),
+          const SizedBox(height: 12),
+        ],
+
+        // 2. 今日未完成主干待办事项列表（聚焦当下核心要务）
+        if (pendingEntries.isNotEmpty) ...[
+          ...pendingEntries.map((entry) => _buildScheduleEntryCard(context, entry, notifier)),
+        ] else if (overdueEntries.isEmpty && completedEntries.isNotEmpty) ...[
+          // 今日所有任务已全部勾选达成的灵动祝贺卡
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    // 打卡勾选框
-                    Checkbox(
-                      value: entry.isCompleted,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      onChanged: (_) => notifier.toggleEntryCompletion(entry.id),
-                    ),
-                    const SizedBox(width: 8),
-                    // 阶段类型标识徽章
-                    _buildKindBadge(context, entry.kind, entry.stepIndex),
-                    const SizedBox(width: 8),
-                    // 任务标题与优先级徽章
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              entry.title,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                decoration: entry.isCompleted ? TextDecoration.lineThrough : null,
-                                color: entry.isCompleted ? colorScheme.outline : colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          if (entry.isAllDay) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text('全天', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                          if (entry.priority != SchedulePriority.none) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: switch (entry.priority) {
-                                  SchedulePriority.high => Colors.red.withValues(alpha: 0.15),
-                                  SchedulePriority.medium => Colors.orange.withValues(alpha: 0.15),
-                                  SchedulePriority.low => Colors.green.withValues(alpha: 0.15),
-                                  _ => Colors.grey.withValues(alpha: 0.15),
-                                },
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                entry.priority.label,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: switch (entry.priority) {
-                                    SchedulePriority.high => Colors.red[700],
-                                    SchedulePriority.medium => Colors.orange[800],
-                                    SchedulePriority.low => Colors.green[700],
-                                    _ => Colors.grey,
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                Icon(Icons.stars_rounded, color: colorScheme.primary, size: 36),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎉 太棒了！今日待办已全部达成',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
-                    ),
-                    // 编辑日程待办按钮（唤起小米待办全能编辑弹窗）
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      color: theme.hintColor,
-                      tooltip: '编辑日程',
-                      onPressed: () => _showEditScheduleDialog(context, entry, notifier),
-                    ),
-                    // 删除日程待办按钮
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      color: theme.hintColor,
-                      tooltip: '删除日程',
-                      onPressed: () => _confirmDeleteScheduleEntry(context, entry, notifier),
-                    ),
-                  ],
-                ),
-                if (entry.notes.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 48.0),
-                    child: Text(
-                      entry.notes,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 4),
+                      Text(
+                        '今日待办与复习均已顺利核销，可在下方查看已完成清单',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-                // 历史逾期顺延提示
-                if (entry.originalDueDate != null && !entry.isCompleted) ...[
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 48.0),
-                    child: Row(
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 3. 底部已完成事项折叠抽屉（默认收起，释放首屏空间）
+        if (completedEntries.isNotEmpty) ...[
+          _buildCompletedBox(context, completedEntries, notifier, completionRate),
+        ],
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// 构建顶部历史逾期智能收纳盒
+  Widget _buildOverdueBox(
+    BuildContext context,
+    List<ScheduleEntry> overdueEntries,
+    ScheduleNotifier notifier,
+    String todayIso,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final overdueIds = overdueEntries.map((e) => e.id).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF332014) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? const Color(0xFF7C3D12) : const Color(0xFFFED7AA),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 标题行与批处理操作条
+          InkWell(
+            onTap: () => setState(() => _isOverdueExpanded = !_isOverdueExpanded),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.history_toggle_off, color: Colors.deepOrange, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.history_toggle_off, size: 14, color: colorScheme.error),
-                        const SizedBox(width: 4),
                         Text(
-                          '逾期前移自 ${entry.originalDueDate}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.error,
+                          '历史逾期待办 (${overdueEntries.length} 项)',
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: Colors.deepOrange,
                           ),
+                        ),
+                        Text(
+                          '过去未打卡已自动前移 · 点击可展开或批处理',
+                          style: TextStyle(fontSize: 11, color: theme.hintColor),
                         ),
                       ],
                     ),
                   ),
+                  // 批处理快捷菜单
+                  PopupMenuButton<String>(
+                    tooltip: '逾期批处理',
+                    icon: const Icon(Icons.more_horiz, size: 20, color: Colors.deepOrange),
+                    onSelected: (val) async {
+                      if (val == 'reschedule_all') {
+                        await notifier.batchRescheduleEntries(overdueIds, todayIso);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已将所有逾期任务正式顺延至今日排程')),
+                          );
+                        }
+                      } else if (val == 'distribute_all') {
+                        await notifier.batchDistributeOverdueEntries(overdueIds, itemsPerDay: 3);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已将逾期任务阶梯分摊至未来工作日（每日3项）')),
+                          );
+                        }
+                      } else if (val == 'complete_all') {
+                        await notifier.batchCompleteEntries(overdueIds);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已批量标记所有逾期任务为已完成')),
+                          );
+                        }
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'reschedule_all',
+                        child: Row(
+                          children: [
+                            Icon(Icons.today, size: 17, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('全部延期至今日'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'distribute_all',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_view_week, size: 17, color: Colors.teal),
+                            SizedBox(width: 8),
+                            Text('阶梯分摊至工作日 (每日3项)'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'complete_all',
+                        child: Row(
+                          children: [
+                            Icon(Icons.done_all, size: 17, color: Colors.green),
+                            SizedBox(width: 8),
+                            Text('一键全部标记完成'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    _isOverdueExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.deepOrange,
+                  ),
                 ],
-                // 提醒时间与状态专属标签行
-                if (entry.reminderTime != null || entry.repeatRule != ScheduleRepeatRule.none) ...[
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 48.0),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        if (entry.reminderTime != null)
-                          InkWell(
-                            onTap: () => notifier.toggleEntryReminder(entry.id),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: entry.hasReminder
-                                    ? (entry.isCompleted
-                                        ? colorScheme.surfaceContainer
-                                        : colorScheme.primaryContainer.withValues(alpha: 0.7))
-                                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: entry.hasReminder
-                                      ? colorScheme.primary.withValues(alpha: 0.4)
-                                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    entry.hasReminder ? Icons.alarm_on : Icons.alarm_off,
-                                    size: 13,
-                                    color: entry.hasReminder
-                                        ? colorScheme.primary
-                                        : colorScheme.outline,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${DateFormat('HH:mm').format(entry.reminderTime!)} '
-                                    '${entry.hasReminder ? '强提醒已就绪' : '提醒已暂停 (点击开启)'}',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: entry.hasReminder
-                                          ? colorScheme.onPrimaryContainer
-                                          : colorScheme.outline,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
+              ),
+            ),
+          ),
+
+          // 展开的逾期条目列表
+          if (_isOverdueExpanded) ...[
+            Divider(
+              height: 1,
+              thickness: 0.8,
+              color: isDark ? const Color(0xFF7C3D12) : const Color(0xFFFED7AA),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: overdueEntries
+                    .map((e) => _buildScheduleEntryCard(context, e, notifier, isOverdue: true))
+                    .toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 构建底部已完成事项折叠抽屉
+  Widget _buildCompletedBox(
+    BuildContext context,
+    List<ScheduleEntry> completedEntries,
+    ScheduleNotifier notifier,
+    double rate,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isCompletedExpanded = !_isCompletedExpanded),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, size: 18, color: colorScheme.outline),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '已完成 (${completedEntries.length} 项) · 完成率 ${(rate * 100).toInt()}%',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.outline,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _isCompletedExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: colorScheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isCompletedExpanded) ...[
+            Divider(height: 1, thickness: 0.5, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: completedEntries
+                    .map((e) => _buildScheduleEntryCard(context, e, notifier))
+                    .toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 渲染单项日程待办卡片组件（支持 Checklist、优先级、复习反馈、提醒与操作）
+  Widget _buildScheduleEntryCard(
+    BuildContext context,
+    ScheduleEntry entry,
+    ScheduleNotifier notifier, {
+    bool isOverdue = false,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isReview = entry.kind == ScheduleEntryKind.review || entry.kind == ScheduleEntryKind.remedial;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18.0)),
+      color: entry.isCompleted
+          ? colorScheme.surfaceContainerLow.withValues(alpha: 0.6)
+          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+      elevation: entry.isCompleted ? 0 : 1,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // 打卡勾选框
+                Checkbox(
+                  value: entry.isCompleted,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  onChanged: (_) => notifier.toggleEntryCompletion(entry.id),
+                ),
+                const SizedBox(width: 8),
+                // 阶段类型标识徽章
+                _buildKindBadge(context, entry.kind, entry.stepIndex),
+                const SizedBox(width: 8),
+                // 任务标题与优先级徽章
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            decoration: entry.isCompleted ? TextDecoration.lineThrough : null,
+                            color: entry.isCompleted ? colorScheme.outline : colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      if (entry.isAllDay) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('全天', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                      if (entry.priority != SchedulePriority.none) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: switch (entry.priority) {
+                              SchedulePriority.high => Colors.red.withValues(alpha: 0.15),
+                              SchedulePriority.medium => Colors.orange.withValues(alpha: 0.15),
+                              SchedulePriority.low => Colors.green.withValues(alpha: 0.15),
+                              _ => Colors.grey.withValues(alpha: 0.15),
+                            },
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            entry.priority.label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: switch (entry.priority) {
+                                SchedulePriority.high => Colors.red[700],
+                                SchedulePriority.medium => Colors.orange[800],
+                                SchedulePriority.low => Colors.green[700],
+                                _ => Colors.grey,
+                              },
                             ),
                           ),
-                        if (entry.repeatRule != ScheduleRepeatRule.none)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: colorScheme.secondary.withValues(alpha: 0.4),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // 编辑日程待办按钮（唤起小米待办全能编辑弹窗）
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: theme.hintColor,
+                  tooltip: '编辑日程',
+                  onPressed: () => _showEditScheduleDialog(context, entry, notifier),
+                ),
+                // 删除日程待办按钮
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: theme.hintColor,
+                  tooltip: '删除日程',
+                  onPressed: () => _confirmDeleteScheduleEntry(context, entry, notifier),
+                ),
+              ],
+            ),
+            if (entry.notes.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 48.0),
+                child: Text(
+                  entry.notes,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+            // 历史逾期顺延提示
+            if (entry.originalDueDate != null && !entry.isCompleted) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 48.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.history_toggle_off, size: 14, color: colorScheme.error),
+                    const SizedBox(width: 4),
+                    Text(
+                      '逾期前移自 ${entry.originalDueDate}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            // 提醒时间与状态专属标签行
+            if (entry.reminderTime != null || entry.repeatRule != ScheduleRepeatRule.none) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 48.0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (entry.reminderTime != null)
+                      InkWell(
+                        onTap: () => notifier.toggleEntryReminder(entry.id),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: entry.hasReminder
+                                ? (entry.isCompleted
+                                    ? colorScheme.surfaceContainer
+                                    : colorScheme.primaryContainer.withValues(alpha: 0.7))
+                                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: entry.hasReminder
+                                  ? colorScheme.primary.withValues(alpha: 0.4)
+                                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                entry.hasReminder ? Icons.alarm_on : Icons.alarm_off,
+                                size: 13,
+                                color: entry.hasReminder
+                                    ? colorScheme.primary
+                                    : colorScheme.outline,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${DateFormat('HH:mm').format(entry.reminderTime!)} '
+                                '${entry.hasReminder ? '强提醒已就绪' : '提醒已暂停 (点击开启)'}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: entry.hasReminder
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.outline,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (entry.repeatRule != ScheduleRepeatRule.none)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: colorScheme.secondary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.repeat, size: 13, color: colorScheme.secondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '周期: ${entry.repeatRule.label}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSecondaryContainer,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+            // 小米笔记待办：子步骤 Checklist 清单展示与快捷核销
+            if (entry.subTasks.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 48.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '子步骤清单',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          Text(
+                            '${entry.subTasks.where((s) => s.isCompleted).length}/${entry.subTasks.length} 完成',
+                            style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ...entry.subTasks.map((sub) {
+                        return InkWell(
+                          onTap: () => notifier.toggleSubTaskCompletion(entry.id, sub.id),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.repeat, size: 13, color: colorScheme.secondary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '周期: ${entry.repeatRule.label}',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSecondaryContainer,
-                                    fontWeight: FontWeight.bold,
+                                Icon(
+                                  sub.isCompleted ? Icons.check_box_outlined : Icons.check_box_outline_blank,
+                                  size: 16,
+                                  color: sub.isCompleted ? colorScheme.primary : colorScheme.outline,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    sub.title,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      decoration: sub.isCompleted ? TextDecoration.lineThrough : null,
+                                      color: sub.isCompleted ? colorScheme.outline : colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ],
-                // 小米笔记待办：子步骤 Checklist 清单展示与快捷核销
-                if (entry.subTasks.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 48.0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '子步骤清单',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                              Text(
-                                '${entry.subTasks.where((s) => s.isCompleted).length}/${entry.subTasks.length} 完成',
-                                style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          ...entry.subTasks.map((sub) {
-                            return InkWell(
-                              onTap: () => notifier.toggleSubTaskCompletion(entry.id, sub.id),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      sub.isCompleted ? Icons.check_box_outlined : Icons.check_box_outline_blank,
-                                      size: 16,
-                                      color: sub.isCompleted ? colorScheme.primary : colorScheme.outline,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        sub.title,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          decoration: sub.isCompleted ? TextDecoration.lineThrough : null,
-                                          color: sub.isCompleted ? colorScheme.outline : colorScheme.onSurface,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                // 艾宾浩斯复习专属：记忆反馈反馈按钮条（牢固 / 模糊 / 遗忘）
-                if (isReview && !entry.isCompleted) ...[
-                  const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        '记忆反馈:',
-                        style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildFeedbackButton(
-                        context,
-                        label: '牢固',
-                        color: Colors.green,
-                        onTap: () => notifier.toggleEntryCompletion(
-                          entry.id,
-                          feedback: ReviewFeedback.remembered,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildFeedbackButton(
-                        context,
-                        label: '模糊',
-                        color: Colors.orange,
-                        onTap: () => notifier.toggleEntryCompletion(
-                          entry.id,
-                          feedback: ReviewFeedback.fuzzy,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildFeedbackButton(
-                        context,
-                        label: '遗忘',
-                        color: Colors.red,
-                        onTap: () => notifier.toggleEntryCompletion(
-                          entry.id,
-                          feedback: ReviewFeedback.forgotten,
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                   ),
+                ),
+              ),
+            ],
+            // 艾宾浩斯复习专属：记忆反馈反馈按钮条（牢固 / 模糊 / 遗忘）
+            if (isReview && !entry.isCompleted) ...[
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    '记忆反馈:',
+                    style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFeedbackButton(
+                    context,
+                    label: '牢固',
+                    color: Colors.green,
+                    onTap: () => notifier.toggleEntryCompletion(
+                      entry.id,
+                      feedback: ReviewFeedback.remembered,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildFeedbackButton(
+                    context,
+                    label: '模糊',
+                    color: Colors.orange,
+                    onTap: () => notifier.toggleEntryCompletion(
+                      entry.id,
+                      feedback: ReviewFeedback.fuzzy,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildFeedbackButton(
+                    context,
+                    label: '遗忘',
+                    color: Colors.red,
+                    onTap: () => notifier.toggleEntryCompletion(
+                      entry.id,
+                      feedback: ReviewFeedback.forgotten,
+                    ),
+                  ),
                 ],
-              ],
-            ),
-          ),
-        );
-      },
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1100,7 +1389,7 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     );
   }
 
-  /// 视图 2：全部计划管理看板
+  /// 视图 2：全部计划管理看板（支持进行中 / 已达成状态过滤分流）
   Widget _buildPlansView(
     BuildContext context,
     ScheduleState state,
@@ -1119,80 +1408,159 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: plans.length,
-      itemBuilder: (context, index) {
-        final plan = plans[index];
-        final relatedEntries = state.entries.where((e) => e.planId == plan.id).toList();
-        final progress = PlanScheduler.calculatePlanProgress(relatedEntries);
+    // 统计各计划的实际完成进度并计算分流状态
+    final planProgressMap = <String, double>{};
+    for (final plan in plans) {
+      final related = state.entries.where((e) => e.planId == plan.id).toList();
+      planProgressMap[plan.id] = PlanScheduler.calculatePlanProgress(related);
+    }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
-          child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        plan.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+    final activePlans = plans.where((p) => (planProgressMap[p.id] ?? 0) < 1.0).toList();
+    final completedPlans = plans.where((p) => (planProgressMap[p.id] ?? 0) >= 1.0).toList();
+
+    final filteredPlans = switch (_selectedPlanFilter) {
+      'active' => activePlans,
+      'completed' => completedPlans,
+      _ => plans,
+    };
+
+    return Column(
+      children: [
+        // 顶部计划状态过滤胶囊选择条
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+          child: Row(
+            children: [
+              _buildPlanFilterChip('all', '全部 (${plans.length})', theme, colorScheme),
+              const SizedBox(width: 8),
+              _buildPlanFilterChip('active', '进行中 (${activePlans.length})', theme, colorScheme),
+              const SizedBox(width: 8),
+              _buildPlanFilterChip('completed', '已达成 (${completedPlans.length})', theme, colorScheme),
+            ],
+          ),
+        ),
+
+        // 计划列表渲染
+        Expanded(
+          child: filteredPlans.isEmpty
+              ? Center(
+                  child: Text(
+                    _selectedPlanFilter == 'active'
+                        ? '太棒了！所有计划均已达成 100%'
+                        : '暂无已达成归档的计划',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  itemCount: filteredPlans.length,
+                  itemBuilder: (context, index) {
+                    final plan = filteredPlans[index];
+                    final relatedEntries = state.entries.where((e) => e.planId == plan.id).toList();
+                    final progress = planProgressMap[plan.id] ?? 0.0;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12.0),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    plan.title,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${(progress * 100).toInt()}%',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
+                                  color: theme.hintColor,
+                                  tooltip: '编辑计划',
+                                  onPressed: () => _showEditPlanDialog(context, plan, notifier),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  color: theme.hintColor,
+                                  tooltip: '删除计划',
+                                  onPressed: () => _confirmDeletePlan(context, plan, notifier),
+                                ),
+                              ],
+                            ),
+                            if (plan.notes.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                plan.notes,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            LinearProgressIndicator(
+                              value: progress,
+                              borderRadius: BorderRadius.circular(4),
+                              minHeight: 6,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '起始日期: ${plan.startDate}  •  周期阶段: ${relatedEntries.length} 节',
+                              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    Text(
-                      '${(progress * 100).toInt()}%',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      color: theme.hintColor,
-                      tooltip: '编辑计划',
-                      onPressed: () => _showEditPlanDialog(context, plan, notifier),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      color: theme.hintColor,
-                      tooltip: '删除计划',
-                      onPressed: () => _confirmDeletePlan(context, plan, notifier),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-                if (plan.notes.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    plan.notes,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: progress,
-                  borderRadius: BorderRadius.circular(4),
-                  minHeight: 6,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '起始日期: ${plan.startDate}  •  周期阶段: ${relatedEntries.length} 节',
-                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.outline),
-                ),
-              ],
-            ),
+        ),
+      ],
+    );
+  }
+
+  /// 计划分类状态过滤胶囊组件
+  Widget _buildPlanFilterChip(
+    String filterKey,
+    String label,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final isSelected = _selectedPlanFilter == filterKey;
+    return InkWell(
+      onTap: () => setState(() => _selectedPlanFilter = filterKey),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
-        );
-      },
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 

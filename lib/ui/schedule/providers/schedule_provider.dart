@@ -853,6 +853,82 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     );
   }
 
+  /// 批量顺延/推迟指定逾期待办事项至指定日期（如一键顺延至今日）
+  Future<void> batchRescheduleEntries(List<String> entryIds, String newDateIso) async {
+    final targetIds = entryIds.toSet();
+    final updatedEntries = state.entries.map((entry) {
+      if (targetIds.contains(entry.id)) {
+        // 更新执行日期，并清除历史逾期标记
+        return entry.copyWith(
+          scheduledDate: newDateIso,
+          clearOriginalDueDate: true,
+        );
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries);
+    await _persist(entries: updatedEntries);
+  }
+
+  /// 批量标记完成指定待办事项
+  Future<void> batchCompleteEntries(List<String> entryIds) async {
+    final targetIds = entryIds.toSet();
+    final now = DateTime.now();
+    final updatedEntries = state.entries.map((entry) {
+      if (targetIds.contains(entry.id)) {
+        return entry.copyWith(
+          isCompleted: true,
+          completedAt: now,
+        );
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries);
+    await _persist(entries: updatedEntries);
+  }
+
+  /// 批量将逾期待办事项阶梯式分摊到后续工作日（避免全堆在今天造成认知过载）
+  Future<void> batchDistributeOverdueEntries(List<String> entryIds, {int itemsPerDay = 3}) async {
+    if (entryIds.isEmpty) return;
+    final targetIds = entryIds.toSet();
+    final now = DateTime.now();
+    int assignedInDay = 0;
+    int dayOffset = 0;
+
+    // 辅助闭包：跳过周六周日获取有效工作日
+    DateTime getNextWorkingDay(DateTime date) {
+      var d = date;
+      while (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) {
+        d = d.add(const Duration(days: 1));
+      }
+      return d;
+    }
+
+    var targetDate = getNextWorkingDay(now);
+
+    final updatedEntries = state.entries.map((entry) {
+      if (targetIds.contains(entry.id)) {
+        if (assignedInDay >= itemsPerDay) {
+          assignedInDay = 0;
+          dayOffset++;
+          targetDate = getNextWorkingDay(now.add(Duration(days: dayOffset)));
+        }
+        assignedInDay++;
+        final assignedDateIso = PlanScheduler.formatIsoDate(targetDate);
+        return entry.copyWith(
+          scheduledDate: assignedDateIso,
+          clearOriginalDueDate: true,
+        );
+      }
+      return entry;
+    }).toList();
+
+    state = state.copyWith(entries: updatedEntries);
+    await _persist(entries: updatedEntries);
+  }
+
   /// 删除指定单项日程待办（并同步取消相关的系统/桌面强提醒）
   Future<void> deleteScheduleEntry(String entryId) async {
     ScheduleEntry? targetEntry;
