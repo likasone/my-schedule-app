@@ -943,13 +943,24 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
                 } catch (_) {
                   _metadataJson = detail.diary.metadata;
                 }
-                // 面板字段从 metadata 读回；封面与标签以日记表的列为准。
+                // 面板字段从 metadata 读回；封面与标签以日记表的列为准；
+                // 若详情聚合的 tags 为空，尝试从 metadata 里的 tagIds 字段安全提取兜底，防止误清空
+                Set<int> initialTagIds = detail.tags.map((Tag tag) => tag.id).toSet();
+                if (initialTagIds.isEmpty && detail.diary.metadata.isNotEmpty) {
+                  try {
+                    final decoded = jsonDecode(detail.diary.metadata);
+                    if (decoded is Map && decoded['tagIds'] is List) {
+                      initialTagIds = (decoded['tagIds'] as List)
+                          .whereType<num>()
+                          .map((n) => n.toInt())
+                          .toSet();
+                    }
+                  } catch (_) {}
+                }
                 _meta.restore(
                   PublishMetadataComposer.parse(detail.diary.metadata).copyWith(
                     cover: normalizeOptionalText(detail.diary.cover),
-                    tagIds: Set<int>.unmodifiable(
-                      detail.tags.map((Tag tag) => tag.id),
-                    ),
+                    tagIds: Set<int>.unmodifiable(initialTagIds),
                   ),
                 );
                 _draftPublishAt = detail.diary.createdAt;
@@ -1063,6 +1074,10 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
                                       await _controller.flushEditAutoSave();
                                   if (saved && mounted) {
                                     _showHint('修改已保存');
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    _showHint('保存失败: $e');
                                   }
                                 } finally {
                                   if (mounted) setState(() => _saving = false);
@@ -1254,6 +1269,10 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
                           final saved = await _controller.flushEditAutoSave();
                           if (saved && mounted) {
                             _showHint('修改已保存');
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            _showHint('保存失败: $e');
                           }
                         } finally {
                           if (mounted) setState(() => _saving = false);

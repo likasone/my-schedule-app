@@ -359,9 +359,18 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
   /// 刻意不排除私密日记：这是“按 id 直接打开”（编辑页、私密日记本里的预览
   /// 等），调用方已经拿到了 id，说明它来自一个允许看到它的范围。
   Future<DiaryWithTags?> getDiaryWithTagsByDiaryId(String diaryId) async {
-    final diary = await (select(
+    Diary? diary = await (select(
       diaries,
     )..where((Diaries t) => t.diaryId.equals(diaryId))).getSingleOrNull();
+    // 若按业务 diaryId 未命中，尝试按自增整型主键 id 查找兜底（兼容从某些内部索引或特殊场景传入数字 id 的情况）
+    if (diary == null) {
+      final parsedLocalId = int.tryParse(diaryId);
+      if (parsedLocalId != null) {
+        diary = await (select(
+          diaries,
+        )..where((Diaries t) => t.id.equals(parsedLocalId))).getSingleOrNull();
+      }
+    }
     if (diary == null) {
       return null;
     }
@@ -383,16 +392,18 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
       return;
     }
 
-    // 对齐原版实现，在事务内直接批量写入关联记录，杜绝事务内嵌套查询导致的锁冲突或标签被误判过滤
-    await batch((Batch batch) {
-      batch.insertAll(
-        diaryTags,
-        normalizedTagIds.map(
-          (int tagId) =>
-              DiaryTagsCompanion.insert(diaryId: diaryId, tagId: tagId),
-        ),
-      );
-    });
+    // 逐条安全写入关联记录，避免事务内嵌套 batch 导致的驱动锁阻塞或冲突中断事务；
+    // 采用 insertOrIgnore 模式防御唯一键与主键重复，并对单条外键异常进行防御性捕获
+    for (final tagId in normalizedTagIds) {
+      try {
+        await into(diaryTags).insert(
+          DiaryTagsCompanion.insert(diaryId: diaryId, tagId: tagId),
+          mode: InsertMode.insertOrIgnore,
+        );
+      } catch (_) {
+        // 若某个 tagId 在 tags 表中已不存在（如跨设备同步或草稿遗留），忽略单条失效关联，确保日记修改与同步流程不被中断
+      }
+    }
   }
 
   /// 查询某条日记绑定的全部标签。

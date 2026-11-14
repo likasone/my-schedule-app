@@ -126,6 +126,8 @@ class DiaryMetaActions {
           .read(appDatabaseProvider)
           .createTag(name: tag.name, color: tag.color);
       if (!context.mounted) return;
+      // 立即刷新全局标签缓存，确保面板与各处 UI 能够即时响应新标签定义并正确渲染标签胶囊
+      _ref.invalidate(tagListProvider);
       draft.setTagSelected(tagId, true);
     } catch (error) {
       debugPrint('Tag creation failed: $error');

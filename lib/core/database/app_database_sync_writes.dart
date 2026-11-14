@@ -31,9 +31,16 @@ mixin _AppDatabaseSyncWrites
     required int newTagColor,
   }) async {
     final existing = await _syncDiaryLocalId(row.diaryId.value);
-    final localId = existing ?? await into(diaries).insert(row);
+    final int localId;
     if (existing != null) {
+      localId = existing;
       await (update(diaries)..where((t) => t.id.equals(existing))).write(row);
+    } else {
+      // 采用 insertOrReplace 模式保证幂等写入，杜绝极端并发或残留键下的 UNIQUE 约束冲突
+      localId = await into(diaries).insert(
+        row,
+        mode: InsertMode.insertOrReplace,
+      );
     }
     final tagIds = <int>{};
     for (final name in tagNames) {

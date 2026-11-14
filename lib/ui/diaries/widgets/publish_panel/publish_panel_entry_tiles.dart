@@ -46,23 +46,15 @@ class PublishTagTile extends ConsumerWidget {
               Text(l10n.autoT0109, style: PublishPanelTile.titleStyle(context)),
               const SizedBox(width: 12),
               Expanded(
-                child: tagIds.isEmpty
-                    ? Text(
+                child: selectedTags.isNotEmpty
+                    // 与日记卡片同一套标签微胶囊（DESIGN.md §5.2），最多三个，其余以 +N 汇总，窄屏时换行而不是横向滚动
+                    ? DiaryItemTagRow(tags: selectedTags, maxVisibleTags: 3)
+                    : Text(
                         l10n.autoT0164,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
-                      )
-                    : selectedTags.isNotEmpty
-                        // 与日记卡片同一套标签微胶囊（DESIGN.md §5.2），最多三个，
-                        // 其余以 +N 汇总，窄屏时换行而不是横向滚动。
-                        ? DiaryItemTagRow(tags: selectedTags, maxVisibleTags: 3)
-                        : Text(
-                            '已选择 ${tagIds.length} 个标签',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                      ),
               ),
               const SizedBox(width: 8),
               const FaIcon(FontAwesomeIcons.angleRight, size: 14),

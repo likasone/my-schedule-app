@@ -606,11 +606,23 @@ ORDER BY updated_at DESC
 
       final tags = <Tag>[];
       for (final dynamic item in decoded) {
-        // 宽松校验 Map 类型（兼容 Map<dynamic, dynamic> 与各类 Dart AOT 运行时 Map 子类型）
+        // 宽松校验 Map 类型与内层转义字符串（兼容跨平台 SQLite json_group_array 返回原生 JSON 或字符串字面量）
+        Map? mapItem;
         if (item is Map) {
-          final idRaw = item['id'];
-          final nameRaw = item['name'];
-          final colorRaw = item['color'];
+          mapItem = item;
+        } else if (item is String) {
+          try {
+            final parsed = jsonDecode(item);
+            if (parsed is Map) {
+              mapItem = parsed;
+            }
+          } catch (_) {}
+        }
+
+        if (mapItem != null) {
+          final idRaw = mapItem['id'];
+          final nameRaw = mapItem['name'];
+          final colorRaw = mapItem['color'];
           if (idRaw is num && nameRaw != null && colorRaw is num) {
             tags.add(
               Tag(
