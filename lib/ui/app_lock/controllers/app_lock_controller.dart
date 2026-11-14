@@ -425,7 +425,7 @@ class AppLockController extends ChangeNotifier {
     _locked = false;
     _unlocking = false;
     _notify();
-    _onUnlocked?.call();
+    onUnlocked?.call();
   }
 
   @override
