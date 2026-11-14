@@ -24,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
 
 import '../../../core/services/app_platform.dart';
+import '../../../core/services/app_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../home/widgets/home_hint_visibility_scope.dart';
 import '../models/app_lock_options.dart';
