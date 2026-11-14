@@ -862,7 +862,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     }).toList();
 
     state = state.copyWith(memos: updatedMemos);
-    await _persist(memos: updatedMemos);
+    await _persist(state.plans, state.entries, updatedMemos);
   }
 
   /// 批量顺延/推迟指定逾期待办事项至指定日期（如一键顺延至今日）
@@ -880,7 +880,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     }).toList();
 
     state = state.copyWith(entries: updatedEntries);
-    await _persist(entries: updatedEntries);
+    await _persist(state.plans, updatedEntries, state.memos);
   }
 
   /// 批量标记完成指定待办事项
@@ -898,7 +898,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     }).toList();
 
     state = state.copyWith(entries: updatedEntries);
-    await _persist(entries: updatedEntries);
+    await _persist(state.plans, updatedEntries, state.memos);
   }
 
   /// 批量将逾期待办事项阶梯式分摊到后续工作日（避免全堆在今天造成认知过载）
@@ -938,7 +938,7 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
     }).toList();
 
     state = state.copyWith(entries: updatedEntries);
-    await _persist(entries: updatedEntries);
+    await _persist(state.plans, updatedEntries, state.memos);
   }
 
   /// 删除指定单项日程待办（并同步取消相关的系统/桌面强提醒）

@@ -1274,6 +1274,26 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
     );
   }
 
+  /// 桌面端保存或快捷键轻提示
+  void _showHint(String message) {
+    if (!mounted) return;
+    unawaited(
+      HomeHintVisibilityScope.showTrackedSnackBar(
+        context: context,
+        snackBar: SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 2),
+          margin: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            PublishDiaryPanel.collapsedFootprint + 8,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 绑定设置服务中的工具栏可见性配置。
   ///
   /// 设置页保存后只会更新 [SettingsService] 内部 ValueNotifier，
