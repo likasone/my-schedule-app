@@ -51,34 +51,54 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
       }
     } catch (_) {}
 
-    return transaction<String>(() async {
-      final localDiaryId = await into(diaries).insert(
-        DiariesCompanion.insert(
-          diaryId: diaryId,
-          title: Value<String>(title.trim()),
-          content: contentDocJson,
-          contentText: contentText,
-          cover: Value<String?>(normalizedCover),
-          metadata: Value<String>(normalizedMetadata),
-          createdAt: now,
-          updatedAt: now,
-          capsuleUnlockAt: Value<DateTime?>(capsuleUnlockAt),
-          capsuleLockedAt: Value<DateTime?>(capsuleLockedAt),
-        ),
-      );
-
-      await _replaceDiaryTags(localDiaryId, normalizedTagIds);
-      if (notebookIds != null && notebookIds.isNotEmpty) {
-        try {
-          await _replaceDiaryNotebooks(
-            localDiaryId,
-            notebookIds.toSet(),
-            chapterIds: notebookChapterIds,
+    // 弹性重试机制：应对 Windows/各平台偶发瞬时锁争用与只读锁 (SqliteException 8 / 5)
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        return await transaction<String>(() async {
+          final localDiaryId = await into(diaries).insert(
+            DiariesCompanion.insert(
+              diaryId: diaryId,
+              title: Value<String>(title.trim()),
+              content: contentDocJson,
+              contentText: contentText,
+              cover: Value<String?>(normalizedCover),
+              metadata: Value<String>(normalizedMetadata),
+              createdAt: now,
+              updatedAt: now,
+              capsuleUnlockAt: Value<DateTime?>(capsuleUnlockAt),
+              capsuleLockedAt: Value<DateTime?>(capsuleLockedAt),
+            ),
           );
-        } catch (_) {}
+
+          await _replaceDiaryTags(localDiaryId, normalizedTagIds);
+          if (notebookIds != null && notebookIds.isNotEmpty) {
+            try {
+              await _replaceDiaryNotebooks(
+                localDiaryId,
+                notebookIds.toSet(),
+                chapterIds: notebookChapterIds,
+              );
+            } catch (_) {}
+          }
+          return diaryId;
+        });
+      } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+        final isLockOrReadonly = errorStr.contains('readonly') ||
+            errorStr.contains('busy') ||
+            errorStr.contains('code 8') ||
+            errorStr.contains('code 5') ||
+            errorStr.contains('database is locked');
+        if (isLockOrReadonly && attempts < 4) {
+          // 遇到并发读锁或杀毒软件索引锁冲突时，退避重试 (100ms, 200ms, 300ms)
+          await Future<void>.delayed(Duration(milliseconds: 100 * attempts));
+          continue;
+        }
+        rethrow;
       }
-      return diaryId;
-    });
+    }
   }
 
   /// 更新日记并覆盖标签绑定关系。
@@ -124,62 +144,83 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
       }
     } catch (_) {}
 
-    await transaction<void>(() async {
-      Diary? diary = await (select(
-        diaries,
-      )..where((Diaries t) => t.diaryId.equals(diaryId))).getSingleOrNull();
-      // 若按业务 diaryId 未命中，尝试按自增整型主键 id 查找兜底（兼容从某些内部索引或特殊场景传入数字 id 的情况）
-      if (diary == null) {
-        final parsedLocalId = int.tryParse(diaryId);
-        if (parsedLocalId != null) {
-          diary = await (select(
+    // 弹性重试机制：应对 Windows 平台瞬时文件锁、杀毒软件扫描锁或 SqliteException 8 (readonly) / 5 (busy)
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        await transaction<void>(() async {
+          Diary? diary = await (select(
             diaries,
-          )..where((Diaries t) => t.id.equals(parsedLocalId))).getSingleOrNull();
-        }
-      }
-      if (diary == null) {
-        throw StateError('未找到 diaryId=$diaryId 对应的日记');
-      }
+          )..where((Diaries t) => t.diaryId.equals(diaryId))).getSingleOrNull();
+          // 若按业务 diaryId 未命中，尝试按自增整型主键 id 查找兜底（兼容从某些内部索引或特殊场景传入数字 id 的情况）
+          if (diary == null) {
+            final parsedLocalId = int.tryParse(diaryId);
+            if (parsedLocalId != null) {
+              diary = await (select(
+                diaries,
+              )..where((Diaries t) => t.id.equals(parsedLocalId))).getSingleOrNull();
+            }
+          }
+          if (diary == null) {
+            throw StateError('未找到 diaryId=$diaryId 对应的日记');
+          }
 
-      // 提取非空强类型的自增主键 ID，避免在内部闭包中因类型提升限制报错
-      final effectiveLocalId = diary.id;
+          // 提取非空强类型的自增主键 ID，避免在内部闭包中因类型提升限制报错
+          final effectiveLocalId = diary.id;
 
-      // 精确使用确定命中的自增整型主键 id 进行更新，避免 UUID 匹配异常
-      await (update(
-        diaries,
-      )..where((Diaries t) => t.id.equals(effectiveLocalId))).write(
-        DiariesCompanion(
-          title: Value<String>(title.trim()),
-          content: Value<String>(contentDocJson),
-          contentText: Value<String>(contentText),
-          cover: Value<String?>(normalizedCover),
-          metadata: Value<String>(normalizedMetadata),
-          createdAt: Value<DateTime>.absentIfNull(createdAt),
-          updatedAt: Value<DateTime>(DateTime.now()),
-          capsuleUnlockAt: capsule == null
-              ? const Value<DateTime?>.absent()
-              : Value<DateTime?>(capsule.unlockAt),
-          capsuleLockedAt: capsule == null
-              ? const Value<DateTime?>.absent()
-              : Value<DateTime?>(capsule.lockedAt),
-          isArchived: const Value<bool>(false),
-          archivedAt: const Value<DateTime?>(null),
-          isDeleted: const Value<bool>(false),
-          deletedAt: const Value<DateTime?>(null),
-        ),
-      );
-
-      await _replaceDiaryTags(effectiveLocalId, normalizedTagIds);
-      if (notebookIds != null) {
-        try {
-          await _replaceDiaryNotebooks(
-            effectiveLocalId,
-            notebookIds.toSet(),
-            chapterIds: notebookChapterIds,
+          // 精确使用确定命中的自增整型主键 id 进行更新，避免 UUID 匹配异常
+          await (update(
+            diaries,
+          )..where((Diaries t) => t.id.equals(effectiveLocalId))).write(
+            DiariesCompanion(
+              title: Value<String>(title.trim()),
+              content: Value<String>(contentDocJson),
+              contentText: Value<String>(contentText),
+              cover: Value<String?>(normalizedCover),
+              metadata: Value<String>(normalizedMetadata),
+              createdAt: Value<DateTime>.absentIfNull(createdAt),
+              updatedAt: Value<DateTime>(DateTime.now()),
+              capsuleUnlockAt: capsule == null
+                  ? const Value<DateTime?>.absent()
+                  : Value<DateTime?>(capsule.unlockAt),
+              capsuleLockedAt: capsule == null
+                  ? const Value<DateTime?>.absent()
+                  : Value<DateTime?>(capsule.lockedAt),
+              isArchived: const Value<bool>(false),
+              archivedAt: const Value<DateTime?>(null),
+              isDeleted: const Value<bool>(false),
+              deletedAt: const Value<DateTime?>(null),
+            ),
           );
-        } catch (_) {}
+
+          await _replaceDiaryTags(effectiveLocalId, normalizedTagIds);
+          if (notebookIds != null) {
+            try {
+              await _replaceDiaryNotebooks(
+                effectiveLocalId,
+                notebookIds.toSet(),
+                chapterIds: notebookChapterIds,
+              );
+            } catch (_) {}
+          }
+        });
+        break; // 成功执行，跳出循环
+      } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+        final isLockOrReadonly = errorStr.contains('readonly') ||
+            errorStr.contains('busy') ||
+            errorStr.contains('code 8') ||
+            errorStr.contains('code 5') ||
+            errorStr.contains('database is locked');
+        if (isLockOrReadonly && attempts < 4) {
+          // 遇到并发读锁或杀毒软件锁冲突时，退避重试 (100ms, 200ms, 300ms)
+          await Future<void>.delayed(Duration(milliseconds: 100 * attempts));
+          continue;
+        }
+        rethrow;
       }
-    });
+    }
   }
 
   /// 只更新正文（富文本 JSON 与纯文本）与 `updatedAt`。
@@ -192,15 +233,34 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
     required String contentDocJson,
     required String contentText,
   }) async {
-    await (update(
-      diaries,
-    )..where((Diaries t) => t.diaryId.equals(diaryId))).write(
-      DiariesCompanion(
-        content: Value<String>(contentDocJson),
-        contentText: Value<String>(contentText),
-        updatedAt: Value<DateTime>(DateTime.now()),
-      ),
-    );
+    int attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        await (update(
+          diaries,
+        )..where((Diaries t) => t.diaryId.equals(diaryId))).write(
+          DiariesCompanion(
+            content: Value<String>(contentDocJson),
+            contentText: Value<String>(contentText),
+            updatedAt: Value<DateTime>(DateTime.now()),
+          ),
+        );
+        break;
+      } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+        final isLockOrReadonly = errorStr.contains('readonly') ||
+            errorStr.contains('busy') ||
+            errorStr.contains('code 8') ||
+            errorStr.contains('code 5') ||
+            errorStr.contains('database is locked');
+        if (isLockOrReadonly && attempts < 4) {
+          await Future<void>.delayed(Duration(milliseconds: 100 * attempts));
+          continue;
+        }
+        rethrow;
+      }
+    }
   }
 
   /// 更新时间胶囊解封时间，不触碰正文以避免未解封管理页泄露内容。
