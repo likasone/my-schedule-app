@@ -72,4 +72,16 @@ abstract final class AppPlatform {
   /// 扫码配对：mobile_scanner 没有 Linux / Windows 实现，桌面只负责显示二维码，
   /// 由手机来扫。
   static bool get supportsQrScan => isAndroid;
+
+  /// 应用锁的“锁屏时上锁”：只有 Android 原生通道（`AppLockChannel` 监听
+  /// `ACTION_SCREEN_OFF`）能感知手机熄屏。桌面改用“闲置时上锁”（[supportsIdleLock]）。
+  static bool get supportsScreenOffLock => isAndroid;
+
+  /// 防截屏（窗口 `FLAG_SECURE`：截屏、录屏与多任务切换卡片中展现安全遮罩）：
+  /// 只有 Android 有这个系统级窗口安全标志。
+  static bool get supportsSecureScreen => isAndroid;
+
+  /// 应用锁的“闲置时上锁”：只在桌面端（Windows / Linux / macOS）。
+  /// 闲置按全局鼠标指针与实体键盘敲击事件动态计算超时（默认 5 分钟），超时后自动进入锁屏保护。
+  static bool get supportsIdleLock => isDesktop;
 }

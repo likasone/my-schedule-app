@@ -77,12 +77,12 @@ class AppLockSettingsFlow {
     if (settings.isAppLockEnabled && current.loosenedBy(next)) {
       final verified = await _verifier.verify(
         context,
-        reason: context.l10n.appLockLoosenReason,
+        reason: context.l10n.appLockDisableAuthReason,
         purpose: IdentityPurpose.sensitive,
       );
       if (!context.mounted) return;
       if (!verified) {
-        _hint(context, context.l10n.appLockLoosenVerifyFailed);
+        _hint(context, context.l10n.appLockDisableVerifyFailed);
         return;
       }
     }

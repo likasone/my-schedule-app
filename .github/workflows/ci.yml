@@ -59,14 +59,7 @@ jobs:
 
       - name: Analyze
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: |
-          flutter analyze --no-pub > analyze_err.txt 2>&1 || {
-            cat analyze_err.txt
-            while IFS= read -r line; do
-              echo "::error::$line"
-            done < analyze_err.txt
-            exit 1
-          }
+        run: flutter analyze --no-pub
 
       - name: Check ARB metadata
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
