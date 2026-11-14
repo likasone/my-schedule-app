@@ -36,6 +36,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonUndo => 'Undo';
 
   @override
+  String get commonDragToReorder => 'Drag to reorder';
+
+  @override
   String get commonSelectAll => 'Select all';
 
   @override
@@ -119,12 +122,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTitle => 'Settings';
 
   @override
-  String get settingsThemeMode => 'Theme';
-
-  @override
-  String get settingsThemeColor => 'Theme';
-
-  @override
   String get settingsFontScale => 'Font size';
 
   @override
@@ -177,21 +174,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguage => 'Language';
 
   @override
-  String get settingsLanguageSubtitle => 'Switch app language';
-
-  @override
-  String get settingsAppearanceLanguage => 'Appearance & Language';
-
-  @override
   String get settingsAppLock => 'App Lock';
 
   @override
   String get settingsAppLockSubtitle =>
-      'Require authentication every time the app enters foreground';
+      'Require authentication when opening the app';
 
   @override
   String get appLockNotSupported =>
-      'This device does not support local authentication, so app lock cannot be enabled.';
+      'This device has no screen lock, so app lock can\'t use system verification. Switch to an app passcode instead.';
 
   @override
   String get appLockTitle => 'App Locked';
@@ -216,21 +207,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsEditorTitle => 'Editor';
 
   @override
-  String get settingsEditorSubtitle =>
-      'Fonts, spacing, toolbar, and mood emojis';
-
-  @override
-  String get settingsEditorGroup => 'Editor';
-
-  @override
-  String get settingsEditorToolsGroup => 'Toolbar & mood';
+  String get settingsEditorSubtitle => 'Fonts, layout, toolbar and code blocks';
 
   @override
   String get settingsMoodOptionsTitle => 'Mood emojis';
-
-  @override
-  String get settingsMoodOptionsSubtitle =>
-      'Customize the emoji and color of 10 moods';
 
   @override
   String settingsMoodOptionsSlotLabel(String index) {
@@ -257,28 +237,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsDataPrivacy => 'Data & Privacy';
-
-  @override
-  String get settingsDataPrivacySubtitle =>
-      'Manage backups, app lock, and recycle bin';
-
-  @override
-  String get settingsDataPrivacyTitle => 'Data & Privacy';
-
-  @override
   String get settingsDataManagement => 'Data Management';
 
   @override
   String get settingsDataManagementSubtitle =>
-      'Import/export backups and diary files';
+      'Backup and restore, import and export, cloud backup';
 
   @override
   String get settingsTagManagement => 'Tag Management';
-
-  @override
-  String get settingsTagManagementSubtitle =>
-      'Deleting a tag only unlinks it from diaries';
 
   @override
   String get settingsTagMemory => 'Tag memory';
@@ -291,14 +257,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRecycleBin => 'Recycle Bin';
 
   @override
-  String get settingsRecycleBinSubtitle =>
-      'Restore or permanently remove deleted diaries';
-
-  @override
   String get settingsAbout => 'About';
-
-  @override
-  String get settingsAboutSubtitle => 'App info, repo, and version';
 
   @override
   String get languageDialogTitle => 'Select language';
@@ -631,7 +590,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPrivacyDialogMessage =>
-      'Your diaries, tags, and media files are stored locally on this device and are not uploaded to cloud services by default.';
+      'Your diaries, tags, and media files are stored locally on this device and are not uploaded to cloud services by default. The AI assistant is off by default; when on, it sends only what an AI feature needs, directly to the AI service you configure, and your key stays on this device.';
 
   @override
   String get aboutOpenSourceLicenses => 'Third-party open-source licenses';
@@ -1607,7 +1566,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceAuthUnavailable =>
-      'This device has no system verification (fingerprint, face or password), so locking isn\'t available';
+      'This device has no system verification. Set an app passcode in Settings → App lock & passcode to use locking';
 
   @override
   String get calendarYearSaveImage => 'Save this year as an image…';
@@ -1731,6 +1690,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Swipe up here or tap to collapse the tags';
 
   @override
+  String diaryTagPullHint(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Pull down to see all $count tags',
+      one: 'Pull down to see all $count tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diaryTagPullHintDesktop(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Drag down or click to see all $count tags',
+      one: 'Drag down or click to see all $count tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diaryTagExpand => 'Expand tags';
+
+  @override
   String get diaryPinnedBadge => 'Pinned';
 
   @override
@@ -1765,6 +1749,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'File import is not available on this platform.';
 
   @override
+  String get diaryMediaFromLibrary => 'Choose from gallery';
+
+  @override
+  String get diaryMediaTakePhoto => 'Take photo';
+
+  @override
+  String get diaryMediaRecordVideo => 'Record video';
+
+  @override
+  String get diaryMediaCameraPermissionDenied =>
+      'Camera access is off. Allow Jotsy to use the camera in system settings.';
+
+  @override
+  String get diaryMediaCameraUnavailable =>
+      'No camera is available on this device.';
+
+  @override
   String get attachmentOpen => 'Open attachment';
 
   @override
@@ -1779,6 +1780,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageLoadFailed => 'The image is missing or can\'t be loaded.';
+
+  @override
+  String get imageHeifUnsupported =>
+      'HEIC photos can\'t be shown on this computer';
+
+  @override
+  String get imageHeifUnsupportedHint =>
+      'Open Jotsy on your phone and it converts this photo to JPEG automatically. Sync again and it will show up here.';
+
+  @override
+  String get imageOpenInOtherApp => 'Open in another app';
 
   @override
   String get attachmentNoApp => 'No installed app can open this file.';
@@ -3194,6 +3206,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'TTF, OTF or TTC; it becomes the body font once imported';
 
   @override
+  String get diaryTypographyApplyToApp => 'Use for the whole app';
+
+  @override
+  String get diaryTypographyApplyToAppHint =>
+      'When off, the font is used only for diary titles, text and diary cards';
+
+  @override
   String get diaryTypographyImporting => 'Importing font…';
 
   @override
@@ -3272,7 +3291,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryTypographyScopeHint =>
-      'Applies when writing, reading and publishing diaries; the font is also used for titles.';
+      'Size, spacing and indent apply when writing, reading and publishing diaries.';
 
   @override
   String get diaryTypographyMoreSettings => 'More settings';
@@ -3703,7 +3722,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryCardStyleShowUntitled =>
-      'Show “Untitled” when there is no title';
+      'Use the first line as the title when there is none';
 
   @override
   String get diaryCardStyleShowUntitledSubtitle =>
@@ -4087,6 +4106,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get diaryCardStyleSampleBody4 =>
       'Saw a ginger cat napping in the sun on the steps on my way home. Just watching it made me relax.';
+
+  @override
+  String get diaryCardStyleSampleLead4 => 'A ginger cat on the steps';
 
   @override
   String get diaryCardStyleSampleCapsuleTitle => 'A letter to myself next year';
@@ -4554,6 +4576,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryPreviewStyleTitleColor => 'Custom title color';
 
   @override
+  String get diaryPreviewStyleTitleDivider => 'Line below title';
+
+  @override
+  String get diaryPreviewStyleTitleDividerSubtitle =>
+      'A light, thin line between the title and the text';
+
+  @override
+  String get diaryPreviewStyleTitleBodyGap => 'Space before text';
+
+  @override
+  String get diaryPreviewStyleTitleBodyGapSubtitle =>
+      'With the line on, this space is kept above and below it';
+
+  @override
   String get diaryPreviewStyleMetaPosition => 'Position';
 
   @override
@@ -4671,6 +4707,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get diaryPreviewStyleTextSelectionSubtitle =>
       'Select and copy parts of the entry';
+
+  @override
+  String get diaryPreviewStyleDoubleTapEdit => 'Double-tap to edit';
+
+  @override
+  String get diaryPreviewStyleDoubleTapEditSubtitle =>
+      'Opens the editor with the cursor where you tapped';
 
   @override
   String diaryPreviewStyleSampleOf(int index, int count) {
@@ -4802,14 +4845,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cloudBackupEmpty =>
-      'No backup locations yet. Add a cloud drive, WebDAV server or object storage to upload full backups and restore them on a new device.';
+      'No backup locations yet. Add a cloud drive, WebDAV server or object storage to back up your data and restore it on a new device.';
 
   @override
   String get cloudBackupAdd => 'Add backup location';
 
   @override
   String get cloudBackupHint =>
-      'Addresses, passwords and drive authorizations stay on this device and are never written into backups. Uploads are full backup ZIPs, optionally encrypted.';
+      'Addresses, passwords and drive authorizations stay on this device and are never written into backups. “Back up” is incremental and uploads only what is new or changed; you can also upload a full ZIP, optionally encrypted.';
 
   @override
   String get cloudBackupSheetTitle => 'Choose a backup location';
@@ -5021,7 +5064,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudBackupTestConnection => 'Test connection';
 
   @override
-  String get cloudBackupUploadBackup => 'Upload backup';
+  String get cloudBackupUploadBackup => 'Upload full ZIP';
 
   @override
   String get cloudBackupRefreshBackups => 'Refresh';
@@ -5420,6 +5463,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Renders the diary as it looks in the preview';
 
   @override
+  String get diaryShareLongImageToGallery => 'Save long image to gallery';
+
+  @override
+  String get diaryShareLongImageToGallerySubtitle =>
+      'Saves the same long image straight to your photo gallery';
+
+  @override
   String diaryShareRequiresImage(String app) {
     return '$app needs at least one image';
   }
@@ -5480,6 +5530,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryExportSelected => 'Export';
+
+  @override
+  String get diaryTagBatchAction => 'Set tags';
+
+  @override
+  String diaryTagBatchTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Tags for $count entries',
+      one: 'Tags for 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diaryTagBatchDone => 'Done';
+
+  @override
+  String diaryTagBatchUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Updated tags of $count entries',
+      one: 'Updated tags of 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diaryTagBatchFailed => 'Couldn\'t update tags. Please try again.';
 
   @override
   String get dataMgmtExportDiaries => 'Export diaries';
@@ -5706,7 +5787,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryDayPhotosAccessBody =>
-      'Allow photo access to see the photos you took on this day and add some to this entry.';
+      'Allow photo access to see the photos and videos you took on this day and add some to this entry.';
 
   @override
   String get diaryDayPhotosDeniedBody =>
@@ -5741,7 +5822,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get diaryDayPhotosLimited => 'Showing only photos you allowed';
+  String get diaryDayPhotosLimited =>
+      'Showing only photos and videos you allowed';
 
   @override
   String get diaryDayPhotosManageLimited => 'Select more';
@@ -5766,8 +5848,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count photos couldn\'t be read and were skipped',
-      one: '1 photo couldn\'t be read and was skipped',
+      other: '$count items couldn\'t be read and were skipped',
+      one: '1 item couldn\'t be read and was skipped',
     );
     return '$_temp0';
   }
@@ -5792,7 +5874,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsOpenDiaryInEditorSubtitle =>
-      'Tap a diary to start editing right away instead of opening the preview first.';
+      'Tap a diary to edit it right away, laid out just like the preview.';
+
+  @override
+  String get diaryReadingEditInfo => 'Edit details';
+
+  @override
+  String get diaryReadingDone => 'Done';
+
+  @override
+  String get diaryReadingReloaded =>
+      'This diary was changed elsewhere, so the latest version is shown.';
 
   @override
   String get diaryDayPhotosSetCover => 'Set as cover';
@@ -5819,7 +5911,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryDayPhotosMenu => 'Photos from this day';
 
   @override
-  String get diaryDayPhotosEmpty => 'No photos taken this day';
+  String get diaryDayPhotosEmpty => 'No photos or videos taken this day';
+
+  @override
+  String diaryDayPhotosTitleVideos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count videos',
+      one: '1 video',
+    );
+    return '$_temp0 from this day';
+  }
+
+  @override
+  String diaryDayPhotosTitleMixed(int photos, int videos) {
+    String _temp0 = intl.Intl.pluralLogic(
+      photos,
+      locale: localeName,
+      other: '$photos photos',
+      one: '1 photo',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      videos,
+      locale: localeName,
+      other: '$videos videos',
+      one: '1 video',
+    );
+    return '$_temp0 and $_temp1 from this day';
+  }
+
+  @override
+  String diaryDayPhotosSheetTitleMedia(String date) {
+    return 'Photos and videos from $date';
+  }
+
+  @override
+  String diaryDayPhotosSelectedItems(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String diaryDayPhotosInsertCountItems(int count) {
+    return 'Insert $count';
+  }
+
+  @override
+  String diaryDayPhotosVideoLabel(String time, String duration) {
+    return 'Video taken at $time, $duration long';
+  }
+
+  @override
+  String diaryDayPhotosVideoInsertedLabel(String time, String duration) {
+    return 'Video taken at $time, $duration long, added';
+  }
+
+  @override
+  String get diaryDayPhotosVideoAccess =>
+      'Videos from this day aren\'t available yet';
+
+  @override
+  String get diaryDayPhotosSelect => 'Select';
+
+  @override
+  String get diaryDayPhotosDeselect => 'Deselect';
+
+  @override
+  String get diaryDayPhotosInserted => 'Added';
+
+  @override
+  String get diaryDayPhotosPreview => 'Preview';
+
+  @override
+  String get diaryDayPhotosPreviewFailed => 'This photo can\'t be shown';
 
   @override
   String get diaryLongImageBadge => 'Long image';
@@ -5832,6 +5996,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryImageMenuResize => 'Resize';
+
+  @override
+  String get diaryImageMenuThumbnail => 'Show as thumbnail';
+
+  @override
+  String get diaryImageMenuFullSize => 'Show at normal size';
 
   @override
   String get diaryImageMenuCopy => 'Copy';
@@ -5851,10 +6021,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diaryDraftsTitle => 'Drafts';
-
-  @override
-  String get diaryDraftsSettingsSubtitle =>
-      'Unpublished entries you can keep writing or delete';
 
   @override
   String get diaryDraftsEmpty =>
@@ -6319,6 +6485,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryTemplateVarTimeLabel => 'Time';
 
   @override
+  String get diaryTemplateVarTime12hLabel => 'Time (12-hour)';
+
+  @override
+  String get diaryTemplateVarTime12hFormat => 'h:mm a';
+
+  @override
   String get diaryTemplateVarYearToken => 'year';
 
   @override
@@ -6620,9 +6792,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryTemplatesMoreActions => 'More actions';
 
   @override
-  String get diaryTemplatesDragHandle => 'Drag to reorder';
-
-  @override
   String get diaryTemplatesDuplicate => 'Duplicate';
 
   @override
@@ -6740,6 +6909,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Variables are filled in from the entry\'s date when the template is applied. Lunar dates and solar terms use Chinese names.';
 
   @override
+  String diaryTemplateEditorTimeFormatHint(String example) {
+    return 'Time takes a format after a colon, such as $example: H for the hour (h for 12-hour), mm for minutes, ss for seconds and a for AM/PM; put any other letters in single quotes. A format that can\'t be read is left as written.';
+  }
+
+  @override
   String diaryTemplateEditorVariableExample(String example) {
     return 'Today: $example';
   }
@@ -6853,10 +7027,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notebookTitle => 'Notebooks';
-
-  @override
-  String get notebookSettingsSubtitle =>
-      'Organize, reorder and merge your notebooks';
 
   @override
   String get notebookNew => 'New notebook';
@@ -7189,9 +7359,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notebookMoreActions => 'More actions';
 
   @override
-  String get notebookDragHandle => 'Drag to reorder';
-
-  @override
   String notebookSubCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -7383,7 +7550,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notebookLockUnsupportedMessage =>
-      'This device has no screen lock, so your identity can\'t be verified and locked notebooks can\'t be opened. Set a screen lock in system settings to open them.';
+      'This device has no screen lock, so your identity can\'t be verified and locked notebooks can\'t be opened. Set a screen lock in system settings, or switch to an app passcode in Settings → App lock & passcode.';
 
   @override
   String get notebookLockUnsupportedAction => 'Got it';
@@ -7523,9 +7690,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notebookContentsSealed => 'Sealed time capsule';
 
   @override
-  String get notebookContentsDragHandle => 'Drag to reorder';
-
-  @override
   String get notebookContentsChapterActions => 'Chapter actions';
 
   @override
@@ -7539,6 +7703,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notebookChapterMoveDown => 'Move down';
+
+  @override
+  String get notebookChapterCollapse => 'Collapse chapter';
+
+  @override
+  String get notebookChapterExpand => 'Expand chapter';
 
   @override
   String get notebookChapterTitleLabel => 'Chapter name';
@@ -10659,6 +10829,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diaryCommentActionsHint => 'edit, copy or delete';
 
   @override
+  String get diaryCommentAddImages => 'Add photos';
+
+  @override
+  String diaryCommentImagesFull(int max) {
+    return 'Up to $max photos';
+  }
+
+  @override
+  String diaryCommentImagesTruncated(int max) {
+    return 'A comment can have up to $max photos — the extra ones weren’t added';
+  }
+
+  @override
+  String get diaryCommentImageAddFailed =>
+      'Couldn’t add the photo. Please try again.';
+
+  @override
+  String get diaryCommentImagePermissionDenied =>
+      'No permission to read photos';
+
+  @override
+  String get diaryCommentImageRemove => 'Remove photo';
+
+  @override
+  String get diaryCommentImageAdding => 'Adding photos';
+
+  @override
+  String diaryCommentImageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos',
+      one: '1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diaryCommentImageLabel(int index, int count) {
+    return 'Photo $index of $count';
+  }
+
+  @override
   String diaryCommentsCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -11079,7 +11292,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lanSyncFirstUseStep2 =>
-      'On the other device, open Settings › Data & Privacy › LAN sync';
+      'On the other device, open Settings › LAN sync';
 
   @override
   String get lanSyncFirstUseStep3 =>
@@ -11662,6 +11875,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncItemDayMoods => 'Day moods';
 
   @override
+  String get lanSyncItemTodos => 'To-dos';
+
+  @override
   String get lanSyncItemSettings => 'Settings';
 
   @override
@@ -11862,4 +12078,4130 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get lanSyncForgetBody =>
       'No diary is deleted on either device. To sync again you\'ll need to pair again.';
+
+  @override
+  String get settingsFeaturesAi => 'AI assistant';
+
+  @override
+  String get settingsFeaturesAiSubtitle =>
+      'Write, reflect, recap and chat with your own AI API';
+
+  @override
+  String get aiPersonaAssistantName => 'Diary assistant';
+
+  @override
+  String get aiPersonaAssistantDesc =>
+      'Clear and objective, good for questions and summaries';
+
+  @override
+  String get aiPersonaAssistantPrompt =>
+      'You are the user\'s diary assistant. You can read the diary entries the user shares with you. Base your answers on those entries, and keep them clear, objective and well organised. Say so when you are unsure, and never invent things that are not in the diary.';
+
+  @override
+  String get aiPersonaListenerName => 'Warm listener';
+
+  @override
+  String get aiPersonaListenerDesc => 'Understands first, then answers gently';
+
+  @override
+  String get aiPersonaListenerPrompt =>
+      'You are a warm, patient listener. After reading the user\'s diary, first show that you understand and acknowledge the feelings in it, then respond gently. Do not judge or lecture, give little advice, and offer empathy and affirmation instead. You may end with one gentle question that invites the user to reflect a little more.';
+
+  @override
+  String get aiPersonaFriendName => 'Close friend';
+
+  @override
+  String get aiPersonaFriendDesc => 'Chats casually like an old friend';
+
+  @override
+  String get aiPersonaFriendPrompt =>
+      'You are a friend the user has known for years. You talk naturally, casually and sincerely, you can joke and you can be serious. Respond the way a friend would after reading their diary: mention details you noticed, share how you feel, and give practical advice only when it helps.';
+
+  @override
+  String get aiPersonaCoachName => 'Growth coach';
+
+  @override
+  String get aiPersonaCoachDesc =>
+      'Spots your progress and the next small step';
+
+  @override
+  String get aiPersonaCoachPrompt =>
+      'You are a positive, practical growth coach. Find the effort, progress and things worth praising in the diary, point out patterns that could improve, and suggest one to three concrete, doable small actions. Be encouraging without being vague.';
+
+  @override
+  String get aiPersonaAnalystName => 'Thoughtful analyst';
+
+  @override
+  String get aiPersonaAnalystDesc => 'Calmly untangles what happened and why';
+
+  @override
+  String get aiPersonaAnalystPrompt =>
+      'You are a calm, rational analyst. Help the user untangle what happened in the diary, the reasons behind it and the options they have. Separate facts from feelings and point out angles they may have missed. Be concise and structured.';
+
+  @override
+  String get aiPersonaCounselorName => 'Counselor style';
+
+  @override
+  String get aiPersonaCounselorDesc =>
+      'Asks questions that help you see your feelings';
+
+  @override
+  String get aiPersonaCounselorPrompt =>
+      'You respond the way a counselor often does: listen, reflect back and clarify, and use open questions to help the user notice their emotions and needs, without rushing to conclusions or advice. You are not professional therapy. If the diary mentions thoughts of hurting themselves or others, gently encourage the user to reach out to people around them or to professional help.';
+
+  @override
+  String get aiPersonaPoetName => 'Poet';
+
+  @override
+  String get aiPersonaPoetDesc => 'Answers your day in poetic language';
+
+  @override
+  String get aiPersonaPoetPrompt =>
+      'You are a gentle poet. Respond to the user\'s diary in vivid, poetic but not obscure language. You may write a short prose poem or a few lines of verse that capture the mood and images of the day.';
+
+  @override
+  String get aiPersonaPhilosopherName => 'Philosopher';
+
+  @override
+  String get aiPersonaPhilosopherDesc => 'Thinks about it from a wider view';
+
+  @override
+  String get aiPersonaPhilosopherPrompt =>
+      'You are a friendly philosopher. Start from the small, concrete things in the diary and connect them to bigger questions such as meaning, choice, time and relationships. Use fitting ideas or metaphors, stay approachable, and come back to the user\'s own life at the end.';
+
+  @override
+  String get aiPersonaFutureSelfName => 'Future self';
+
+  @override
+  String get aiPersonaFutureSelfDesc => 'A reply from you, ten years later';
+
+  @override
+  String get aiPersonaFutureSelfPrompt =>
+      'You are the user ten years from now, rereading this diary entry. Write a short letter to your past self in the first person: gentle, knowing how things unfolded, with the calm and wisdom that time brings, but do not invent specific future events.';
+
+  @override
+  String get aiPersonaRoastName => 'Roasting buddy';
+
+  @override
+  String get aiPersonaRoastDesc => 'Sharp tongue, soft heart';
+
+  @override
+  String get aiPersonaRoastPrompt =>
+      'You are a buddy with a sharp tongue and a soft heart. Tease what happened in the diary with humour and exaggeration, but never mock the user\'s real pain or touch sensitive topics such as appearance or identity. Let your care show at the end.';
+
+  @override
+  String get aiActionContinue => 'Continue';
+
+  @override
+  String get aiActionContinuePrompt =>
+      'Continue the diary below in the same voice and tone with one natural paragraph of about 80 to 150 words. Write only the new text and do not repeat what is already there.';
+
+  @override
+  String get aiActionPolish => 'Polish';
+
+  @override
+  String get aiActionPolishPrompt =>
+      'Polish the text below so it reads more smoothly and naturally. Fix awkward phrasing, keep the meaning, tone and first-person voice, and do not make it longer.';
+
+  @override
+  String get aiActionExpand => 'Expand';
+
+  @override
+  String get aiActionExpandPrompt =>
+      'Expand the text below with more details, feelings and imagery so it becomes richer, roughly doubling its length. Keep the original tone and point of view.';
+
+  @override
+  String get aiActionShorten => 'Shorten';
+
+  @override
+  String get aiActionShortenPrompt =>
+      'Shorten the text below to about half its length. Keep the key information and feelings and remove repetition and filler.';
+
+  @override
+  String get aiActionProofread => 'Fix errors';
+
+  @override
+  String get aiActionProofreadPrompt =>
+      'Fix spelling, punctuation and grammar mistakes in the text below. Leave everything else exactly as it is and do not rewrite it.';
+
+  @override
+  String get aiActionToneFormal => 'More formal';
+
+  @override
+  String get aiActionToneFormalPrompt =>
+      'Rewrite the text below in a more formal, polished tone while keeping its meaning.';
+
+  @override
+  String get aiActionToneCasual => 'More casual';
+
+  @override
+  String get aiActionToneCasualPrompt =>
+      'Rewrite the text below in a more relaxed, conversational tone, as if chatting with a friend, while keeping its meaning.';
+
+  @override
+  String get aiActionToneWarm => 'Warmer';
+
+  @override
+  String get aiActionToneWarmPrompt =>
+      'Rewrite the text below to sound warmer and gentler, with more kindness and care, while keeping its meaning.';
+
+  @override
+  String get aiActionToneHumor => 'Funnier';
+
+  @override
+  String get aiActionToneHumorPrompt =>
+      'Rewrite the text below to be funnier, with a playful metaphor or a bit of self-deprecation, while keeping its meaning.';
+
+  @override
+  String get aiActionToneLiterary => 'More literary';
+
+  @override
+  String get aiActionToneLiteraryPrompt =>
+      'Rewrite the text below in a more literary style, with finer description and fitting figures of speech, without piling on ornate words. Keep its meaning.';
+
+  @override
+  String get aiActionTranslate => 'Translate';
+
+  @override
+  String get aiActionTranslatePrompt =>
+      'Translate the text below. If it is mainly Chinese, translate it into English; otherwise translate it into Simplified Chinese. Output only the translation.';
+
+  @override
+  String get aiActionSummarize => 'Summarize';
+
+  @override
+  String get aiActionSummarizePrompt =>
+      'Summarize the main points of the text below in two or three sentences.';
+
+  @override
+  String get aiActionBulletPoints => 'Bullet points';
+
+  @override
+  String get aiActionBulletPointsPrompt =>
+      'Turn the text below into a clear bullet list (a Markdown unordered list) with short items.';
+
+  @override
+  String get aiActionExtractTodos => 'Extract to-dos';
+
+  @override
+  String get aiActionExtractTodosPrompt =>
+      'Find the tasks, plans and follow-ups mentioned in the text below and list them as a Markdown task list, one per line starting with \"- [ ] \". If there are none, reply with one line saying so.';
+
+  @override
+  String get aiActionPoem => 'As a poem';
+
+  @override
+  String get aiActionPoemPrompt =>
+      'Turn the content below into a short modern poem of 4 to 12 lines that keeps its mood and imagery.';
+
+  @override
+  String get aiErrorNotConfigured =>
+      'No AI model is set up yet. Add a provider in Settings → AI assistant.';
+
+  @override
+  String get aiErrorNetwork =>
+      'Couldn\'t reach the AI service. Check the network, the address or the proxy.';
+
+  @override
+  String get aiErrorTimeout => 'The AI service took too long to respond.';
+
+  @override
+  String get aiErrorUnauthorized => 'The API key is invalid or missing.';
+
+  @override
+  String get aiErrorForbidden =>
+      'This key has no access to the model, or the service isn\'t available in your region.';
+
+  @override
+  String get aiErrorModelNotFound =>
+      'The model or address wasn\'t found. Check the model name and API address.';
+
+  @override
+  String get aiErrorRateLimited =>
+      'Too many requests. Please try again in a moment.';
+
+  @override
+  String get aiErrorQuota => 'The account has run out of balance or quota.';
+
+  @override
+  String get aiErrorContextTooLong =>
+      'Too much content for this model. Lower the word limit in AI privacy settings or pick a model with a longer context.';
+
+  @override
+  String get aiErrorContentFiltered =>
+      'The AI service declined this request because of its content policy.';
+
+  @override
+  String get aiErrorBadRequest =>
+      'The AI service rejected the request. Check the provider\'s advanced settings.';
+
+  @override
+  String get aiErrorServer =>
+      'The AI service is having trouble or is overloaded. Please try again later.';
+
+  @override
+  String get aiErrorBadResponse =>
+      'Couldn\'t understand the response. The address may point to a web page instead of the API.';
+
+  @override
+  String get aiErrorCancelled => 'Stopped';
+
+  @override
+  String get aiErrorDetails => 'Details';
+
+  @override
+  String get aiErrorOpenSettings => 'Open settings';
+
+  @override
+  String get aiSettingsTitle => 'AI assistant';
+
+  @override
+  String get aiSettingsEntrySubtitle =>
+      'Providers, models, personas and privacy';
+
+  @override
+  String get aiSettingsFooter =>
+      'Nothing goes through the developer: requests go straight from this device to the provider you set up. API keys stay on this device and never enter backups or sync.';
+
+  @override
+  String get aiStatusNotConfiguredTitle => 'No AI service yet';
+
+  @override
+  String get aiStatusNotConfiguredBody =>
+      'Add a provider and its API key, and AI features will appear in the editor, the reading page and the home screen. Content is only sent to the service you set up.';
+
+  @override
+  String get aiStatusAddProvider => 'Add provider';
+
+  @override
+  String get aiStatusDefaultModel => 'Default model';
+
+  @override
+  String get aiStatusTest => 'Test connection';
+
+  @override
+  String get aiStatusTesting => 'Testing…';
+
+  @override
+  String aiStatusTestOk(int ms) {
+    return 'Connected · $ms ms';
+  }
+
+  @override
+  String get aiGroupService => 'Service';
+
+  @override
+  String get aiProvidersTitle => 'Providers';
+
+  @override
+  String aiProvidersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count providers',
+      one: '1 provider',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiProvidersEmpty => 'None yet';
+
+  @override
+  String get aiRoutingTitle => 'Model assignment';
+
+  @override
+  String get aiRoutingSubtitle => 'Use different models for different features';
+
+  @override
+  String get aiGroupFeatures => 'Features';
+
+  @override
+  String get aiGroupFeaturesFooter =>
+      'Turning a feature off only hides it. Existing AI records are kept.';
+
+  @override
+  String get aiModuleWriting => 'Writing assistant';
+
+  @override
+  String get aiModuleWritingSubtitle =>
+      'Continue, polish, change tone, translate and your own commands in the editor';
+
+  @override
+  String get aiModuleSuggest => 'Smart fill';
+
+  @override
+  String get aiModuleSuggestSubtitle =>
+      'Generate titles and suggest tags and moods';
+
+  @override
+  String get aiModuleReply => 'Reflections';
+
+  @override
+  String get aiModuleReplySubtitle =>
+      'Let AI read an entry and respond to you on the reading page';
+
+  @override
+  String get aiModulePrompts => 'Writing prompts';
+
+  @override
+  String get aiModulePromptsSubtitle =>
+      'A few questions when you don\'t know what to write';
+
+  @override
+  String get aiModuleRecap => 'Recaps & insights';
+
+  @override
+  String get aiModuleRecapSubtitle =>
+      'Summaries by week, month, year or notebook';
+
+  @override
+  String get aiModuleChat => 'Chat with your diary';
+
+  @override
+  String get aiModuleChatSubtitle =>
+      'Ask your diary; answers cite the entries they use';
+
+  @override
+  String get aiModuleVision => 'Image understanding';
+
+  @override
+  String get aiModuleVisionSubtitle =>
+      'Send the photos in an entry along with the text; text only if the model can\'t take images';
+
+  @override
+  String get aiOptionTitleButton => 'Show “Generate title” next to the title';
+
+  @override
+  String get aiOptionAutoSuggest => 'Suggest on the publish page';
+
+  @override
+  String get aiOptionAutoSuggestSubtitle =>
+      'Sends the entry once to suggest a title, tags and mood; nothing is filled in until you tap it';
+
+  @override
+  String get aiOptionAutoReply => 'Respond after publishing';
+
+  @override
+  String get aiOptionAutoReplySubtitle =>
+      'Each new entry is sent once for a reflection';
+
+  @override
+  String get aiOptionPromptsStrip => 'Show prompts on new entries';
+
+  @override
+  String get aiOptionPromptsStripSubtitle => 'Nothing is sent until you tap it';
+
+  @override
+  String get aiOptionPromptsRecent => 'Use recent entries';
+
+  @override
+  String get aiOptionPromptsRecentSubtitle =>
+      'Sends excerpts of your latest entries for more personal prompts';
+
+  @override
+  String get aiOptionPromptStyle => 'Insert as';
+
+  @override
+  String get aiPromptStyleCallout => 'Callout';
+
+  @override
+  String get aiPromptStyleQuote => 'Quote';
+
+  @override
+  String get aiPromptStyleHeading => 'Heading';
+
+  @override
+  String get aiOptionRecapSections => 'Recaps include';
+
+  @override
+  String get aiRecapSectionMood => 'Mood trends';
+
+  @override
+  String get aiRecapSectionEvents => 'Key moments';
+
+  @override
+  String get aiRecapSectionPeople => 'People around me';
+
+  @override
+  String get aiRecapSectionGratitude => 'Gratitude';
+
+  @override
+  String get aiRecapSectionGrowth => 'Growth & change';
+
+  @override
+  String get aiRecapSectionQuotes => 'Memorable lines';
+
+  @override
+  String get aiRecapSectionSuggestions => 'Next steps';
+
+  @override
+  String get aiOptionRetrieval => 'Finding entries';
+
+  @override
+  String get aiOptionRetrievalSubtitle =>
+      'Smart understands the question first; keywords only match words; recent only reads the latest days';
+
+  @override
+  String get aiRetrievalSmart => 'Smart';
+
+  @override
+  String get aiRetrievalKeyword => 'Keywords';
+
+  @override
+  String get aiRetrievalRecent => 'Recent';
+
+  @override
+  String get aiOptionRecentDays => 'Recent range';
+
+  @override
+  String aiDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiOptionMaxCitations => 'Read at most';
+
+  @override
+  String aiEntries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiOptionShowReasoning => 'Show reasoning';
+
+  @override
+  String get aiOptionShowTokens => 'Show token usage';
+
+  @override
+  String get aiOptionAutoTitle => 'Name chats automatically';
+
+  @override
+  String get aiOptionVisionImages => 'Photos per request';
+
+  @override
+  String aiPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos',
+      one: '1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiOptionVisionSize => 'Photo size';
+
+  @override
+  String get aiVisionSizeSmall => 'Small';
+
+  @override
+  String get aiVisionSizeMedium => 'Medium';
+
+  @override
+  String get aiVisionSizeLarge => 'Large';
+
+  @override
+  String get aiGroupPersonal => 'Personal touch';
+
+  @override
+  String get aiPersonasTitle => 'Personas';
+
+  @override
+  String get aiPersonasSubtitle =>
+      'Whose voice reflections, chats and recaps use';
+
+  @override
+  String get aiActionsTitle => 'Writing commands';
+
+  @override
+  String get aiActionsSubtitle =>
+      'Reorder, hide, rewrite prompts or add your own';
+
+  @override
+  String get aiProfileTitle => 'About me & style';
+
+  @override
+  String get aiProfileSubtitle => 'Help AI know you better (optional)';
+
+  @override
+  String get aiOutputLanguage => 'Answer language';
+
+  @override
+  String get aiLanguageFollowDiary => 'Diary';
+
+  @override
+  String get aiLanguageFollowApp => 'App';
+
+  @override
+  String get aiLanguageCustom => 'Custom';
+
+  @override
+  String get aiLanguageCustomHint => 'e.g. 日本語, Français';
+
+  @override
+  String get aiResponseLength => 'Answer length';
+
+  @override
+  String get aiLengthShort => 'Short';
+
+  @override
+  String get aiLengthMedium => 'Medium';
+
+  @override
+  String get aiLengthLong => 'Detailed';
+
+  @override
+  String get aiCreativity => 'Creativity';
+
+  @override
+  String get aiCreativitySubtitle =>
+      'Only applies to providers that accept a temperature';
+
+  @override
+  String get aiCreativityPrecise => 'Precise';
+
+  @override
+  String get aiCreativityBalanced => 'Balanced';
+
+  @override
+  String get aiCreativityCreative => 'Creative';
+
+  @override
+  String get aiGroupPrivacy => 'Privacy & usage';
+
+  @override
+  String get aiPrivacyTitle => 'Privacy';
+
+  @override
+  String get aiPrivacySubtitle => 'What is sent and which entries are left out';
+
+  @override
+  String get aiUsageTitle => 'Usage';
+
+  @override
+  String get aiUsageSubtitle => 'Requests and tokens sent from this device';
+
+  @override
+  String get aiProvidersFooter =>
+      'Without a default model, the first usable provider is used; change it in Model assignment.';
+
+  @override
+  String aiProviderModelsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count models',
+      one: '1 model',
+      zero: 'No models',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiProviderDisabled => 'Off';
+
+  @override
+  String get aiProviderNoKey => 'No key';
+
+  @override
+  String get aiPresetSheetTitle => 'Choose a provider';
+
+  @override
+  String get aiPresetGroupChina => 'China';
+
+  @override
+  String get aiPresetGroupInternational => 'International';
+
+  @override
+  String get aiPresetGroupLocal => 'Run locally';
+
+  @override
+  String get aiPresetGroupCustom => 'Custom API';
+
+  @override
+  String get aiPresetNameDashscope => 'Qwen (Alibaba Cloud)';
+
+  @override
+  String get aiPresetNameMoonshot => 'Kimi (Moonshot)';
+
+  @override
+  String get aiPresetNameZhipu => 'Zhipu GLM';
+
+  @override
+  String get aiPresetNameVolcengine => 'Doubao (Volcengine Ark)';
+
+  @override
+  String get aiPresetNameSiliconflow => 'SiliconFlow';
+
+  @override
+  String get aiPresetNameHunyuan => 'Tencent Hunyuan';
+
+  @override
+  String get aiPresetNameCustomOpenAi => 'OpenAI-compatible API';
+
+  @override
+  String get aiPresetNameCustomAnthropic => 'Anthropic-compatible API';
+
+  @override
+  String get aiPresetNameCustomGemini => 'Gemini API';
+
+  @override
+  String get aiProtocolOpenAi => 'OpenAI compatible';
+
+  @override
+  String get aiProtocolAnthropic => 'Anthropic (Claude)';
+
+  @override
+  String get aiProtocolGemini => 'Google Gemini';
+
+  @override
+  String get aiProviderEditTitleNew => 'Add provider';
+
+  @override
+  String get aiProviderEditTitle => 'Edit provider';
+
+  @override
+  String get aiProviderName => 'Name';
+
+  @override
+  String get aiProviderProtocol => 'API format';
+
+  @override
+  String get aiProviderBaseUrl => 'API address';
+
+  @override
+  String get aiProviderBaseUrlHint => 'e.g. https://api.example.com/v1';
+
+  @override
+  String get aiProviderApiKey => 'API key';
+
+  @override
+  String get aiProviderApiKeyOptional =>
+      'API key (optional for local services)';
+
+  @override
+  String get aiProviderGetKey => 'Get a key';
+
+  @override
+  String get aiProviderLocalHint =>
+      'To reach Ollama or LM Studio on a computer from your phone, replace localhost with the computer\'s LAN address and let the server listen on 0.0.0.0.';
+
+  @override
+  String get aiProviderModels => 'Models';
+
+  @override
+  String get aiProviderFetchModels => 'Fetch model list';
+
+  @override
+  String get aiProviderAddModel => 'Add manually';
+
+  @override
+  String get aiProviderModelsEmpty =>
+      'No models yet. Fetch the list from the provider or add a model name manually.';
+
+  @override
+  String get aiProviderModelIdHint => 'Model name, e.g. deepseek-chat';
+
+  @override
+  String get aiModelVision => 'Images';
+
+  @override
+  String get aiModelReasoning => 'Reasoning';
+
+  @override
+  String get aiModelEditTitle => 'Model settings';
+
+  @override
+  String get aiModelDisplayName => 'Display name (optional)';
+
+  @override
+  String get aiModelVisionToggle => 'Accepts images';
+
+  @override
+  String get aiModelReasoningToggle => 'Request reasoning';
+
+  @override
+  String get aiModelReasoningSubtitle =>
+      'Ask the model for its thinking; retried without it if the model doesn\'t support it';
+
+  @override
+  String get aiModelMaxOutput => 'Max output tokens';
+
+  @override
+  String get aiModelContext => 'Context length (tokens)';
+
+  @override
+  String get aiModelAuto => 'Auto';
+
+  @override
+  String get aiModelRemove => 'Remove model';
+
+  @override
+  String get aiModelPickerTitle => 'Choose models';
+
+  @override
+  String get aiModelPickerSearch => 'Search models';
+
+  @override
+  String aiModelPickerAdd(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count',
+      zero: 'Add',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiModelPickerEmpty =>
+      'The provider returned no models. Add a model name manually.';
+
+  @override
+  String get aiProviderAdvanced => 'Advanced';
+
+  @override
+  String get aiProviderProxy => 'HTTP proxy';
+
+  @override
+  String get aiProviderProxyHint =>
+      'host:port, e.g. 127.0.0.1:7890; empty for direct';
+
+  @override
+  String get aiProviderHeaders => 'Custom headers';
+
+  @override
+  String get aiProviderHeadersHint => 'One per line, as Name: value';
+
+  @override
+  String get aiProviderExtraBody => 'Extra request fields (JSON)';
+
+  @override
+  String get aiProviderExtraBodyHint =>
+      'A JSON object merged into every request, for provider-specific options';
+
+  @override
+  String get aiProviderExtraBodyInvalid => 'Not a valid JSON object';
+
+  @override
+  String get aiProviderStream => 'Streaming';
+
+  @override
+  String get aiProviderStreamSubtitle =>
+      'Show answers as they are written; turn off if a relay doesn\'t support it';
+
+  @override
+  String get aiProviderIncludeUsage => 'Request usage';
+
+  @override
+  String get aiProviderIncludeUsageSubtitle =>
+      'Ask for token usage while streaming; turn off if requests fail';
+
+  @override
+  String get aiProviderSendTemperature => 'Send temperature';
+
+  @override
+  String get aiProviderSendTemperatureSubtitle =>
+      'Newer Claude models reject it, so it\'s off for Anthropic';
+
+  @override
+  String get aiProviderTimeout => 'Wait for first token';
+
+  @override
+  String aiSeconds(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count seconds',
+      one: '1 second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiProviderRetries => 'Retries';
+
+  @override
+  String aiTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count times',
+      one: 'Once',
+      zero: 'Off',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiProviderEnabled => 'Enabled';
+
+  @override
+  String get aiProviderDelete => 'Delete provider';
+
+  @override
+  String aiProviderDeleteTitle(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get aiProviderDeleteBody =>
+      'Its key and model settings are removed, and features assigned to it go back to the default model.';
+
+  @override
+  String get aiProviderNameRequired => 'Enter a name';
+
+  @override
+  String get aiProviderUrlInvalid =>
+      'Enter an address starting with http:// or https://';
+
+  @override
+  String get aiProviderNeedModel => 'Add at least one model first';
+
+  @override
+  String get aiProviderDiscardTitle => 'Discard changes?';
+
+  @override
+  String get aiProviderDiscard => 'Discard';
+
+  @override
+  String get aiRoutingDefault => 'Default model';
+
+  @override
+  String get aiRoutingDefaultSubtitle =>
+      'Used by every feature that has no model of its own';
+
+  @override
+  String get aiRoutingFast => 'Fast model';
+
+  @override
+  String get aiRoutingFastSubtitle =>
+      'Preferred for short tasks such as smart fill and prompts; pick something cheap and quick';
+
+  @override
+  String get aiRoutingTasksGroup => 'Per feature';
+
+  @override
+  String get aiRoutingFollowDefault => 'Same as default';
+
+  @override
+  String get aiRoutingFollowFast => 'Same as fast model';
+
+  @override
+  String aiRoutingFirstUsable(String name) {
+    return 'First usable ($name)';
+  }
+
+  @override
+  String get aiRoutingNone => 'Not set';
+
+  @override
+  String get aiRoutingPickTitle => 'Choose a model';
+
+  @override
+  String get aiTaskWriting => 'Writing assistant';
+
+  @override
+  String get aiTaskSuggest => 'Smart fill';
+
+  @override
+  String get aiTaskReply => 'Reflections';
+
+  @override
+  String get aiTaskPrompts => 'Writing prompts';
+
+  @override
+  String get aiTaskRecap => 'Recaps';
+
+  @override
+  String get aiTaskChat => 'Chat';
+
+  @override
+  String get aiTaskVision => 'Describe images';
+
+  @override
+  String get aiTaskUtility => 'Small background tasks';
+
+  @override
+  String get aiTaskUtilitySubtitle =>
+      'Chat titles, search plans and partial summaries of long recaps';
+
+  @override
+  String get aiPersonasDefaultsGroup => 'Defaults';
+
+  @override
+  String get aiPersonaUseReply => 'Reflections';
+
+  @override
+  String get aiPersonaUseChat => 'Chat';
+
+  @override
+  String get aiPersonaUseRecap => 'Recaps';
+
+  @override
+  String get aiPersonasBuiltInGroup => 'Built-in';
+
+  @override
+  String get aiPersonasMineGroup => 'My personas';
+
+  @override
+  String get aiPersonasMineEmpty =>
+      'No personas of your own yet. Create one, or copy a built-in persona and change it.';
+
+  @override
+  String get aiPersonaAdd => 'New persona';
+
+  @override
+  String get aiPersonaDuplicate => 'Copy as mine';
+
+  @override
+  String get aiPersonaEditTitleNew => 'New persona';
+
+  @override
+  String get aiPersonaEditTitle => 'Edit persona';
+
+  @override
+  String get aiPersonaName => 'Name';
+
+  @override
+  String get aiPersonaEmoji => 'Emoji';
+
+  @override
+  String get aiPersonaPrompt => 'Prompt';
+
+  @override
+  String get aiPersonaPromptHint =>
+      'Describe who they are, how they talk and how they respond to your diary';
+
+  @override
+  String aiPersonaLimit(int count) {
+    return 'Up to $count personas';
+  }
+
+  @override
+  String aiPersonaCopySuffix(String name) {
+    return '$name (copy)';
+  }
+
+  @override
+  String get aiCommonHidden => 'Hidden';
+
+  @override
+  String get aiCommonHide => 'Hide';
+
+  @override
+  String get aiCommonShow => 'Show';
+
+  @override
+  String get aiCommonRestoreDefault => 'Restore default';
+
+  @override
+  String aiCommonDeleted(String name) {
+    return 'Deleted “$name”';
+  }
+
+  @override
+  String get aiActionsFooter =>
+      'Drag to reorder. The order here is the order in the editor.';
+
+  @override
+  String get aiActionAdd => 'New command';
+
+  @override
+  String get aiActionCustomized => 'Edited';
+
+  @override
+  String get aiActionEditTitleNew => 'New command';
+
+  @override
+  String get aiActionEditTitle => 'Edit command';
+
+  @override
+  String get aiActionName => 'Name';
+
+  @override
+  String get aiActionEmoji => 'Icon';
+
+  @override
+  String get aiActionPrompt => 'Prompt';
+
+  @override
+  String get aiActionPromptHint => 'Tell AI what to do with the text';
+
+  @override
+  String get aiActionVariables => 'Insert a variable';
+
+  @override
+  String get aiActionVariablesHelp =>
+      'If the prompt has no “text” variable, the text is added after the prompt automatically.';
+
+  @override
+  String get aiVariableText => 'Text';
+
+  @override
+  String get aiVariableDiary => 'Whole entry';
+
+  @override
+  String get aiVariableTitle => 'Title';
+
+  @override
+  String get aiVariableDate => 'Date';
+
+  @override
+  String get aiVariableMood => 'Mood';
+
+  @override
+  String get aiActionOutput => 'Result';
+
+  @override
+  String get aiOutputReplace => 'Replace';
+
+  @override
+  String get aiOutputInsertBelow => 'Insert below';
+
+  @override
+  String get aiOutputPreview => 'Preview only';
+
+  @override
+  String aiActionLimit(int count) {
+    return 'Up to $count commands';
+  }
+
+  @override
+  String get aiActionResetPromptTitle => 'Restore the default prompt?';
+
+  @override
+  String get aiProfileAboutMe => 'About me';
+
+  @override
+  String get aiProfileAboutMeHint =>
+      'What you do, your life right now, what matters to you. AI will keep it in mind.';
+
+  @override
+  String get aiProfileStyle => 'Writing style';
+
+  @override
+  String get aiProfileStyleHint =>
+      'e.g. plain and simple, few adjectives, short sentences';
+
+  @override
+  String get aiProfileFooter =>
+      'These are sent along with every request. Leave them empty to send nothing.';
+
+  @override
+  String get aiPrivacySendGroup => 'Sent with entries';
+
+  @override
+  String get aiPrivacySendFooter =>
+      'Titles and text are always sent. Private notebooks, the recycle bin and sealed time capsules are never sent.';
+
+  @override
+  String get aiPrivacyDate => 'Date';
+
+  @override
+  String get aiPrivacyMood => 'Mood';
+
+  @override
+  String get aiPrivacyTags => 'Tags';
+
+  @override
+  String get aiPrivacyWeather => 'Weather';
+
+  @override
+  String get aiPrivacyLocation => 'Location';
+
+  @override
+  String get aiPrivacyScopeGroup => 'Chats and recaps';
+
+  @override
+  String get aiPrivacyIncludeArchived => 'Include archived entries';
+
+  @override
+  String get aiPrivacyExcludedNotebooks => 'Excluded notebooks';
+
+  @override
+  String get aiPrivacyExcludedTags => 'Excluded tags';
+
+  @override
+  String get aiPrivacyExcludedNone => 'None';
+
+  @override
+  String aiPrivacyExcludedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get aiPrivacyPickNotebooks => 'Notebooks to leave out';
+
+  @override
+  String get aiPrivacyPickTags => 'Tags to leave out';
+
+  @override
+  String get aiPrivacyPickEmpty => 'Nothing to choose from';
+
+  @override
+  String get aiPrivacyBudget => 'Send at most';
+
+  @override
+  String get aiPrivacyBudgetSubtitle =>
+      'Entries are sent in full; text is cut only when one request would go over this.';
+
+  @override
+  String aiWords(int count) {
+    final intl.NumberFormat countNumberFormat = intl.NumberFormat.compact(
+      locale: localeName,
+    );
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString words';
+  }
+
+  @override
+  String get aiPrivacyConfirmGroup => 'Confirm before sending';
+
+  @override
+  String get aiPrivacyConfirmSubtitle =>
+      'First time: once per provider. Multiple entries: chats and recaps always show what will be sent. Always: confirm every request.';
+
+  @override
+  String get aiConfirmFirstTime => 'First time';
+
+  @override
+  String get aiConfirmMultiDiary => 'Multiple entries';
+
+  @override
+  String get aiConfirmAlways => 'Always';
+
+  @override
+  String get aiPrivacyAllowPrivate => 'Allow AI on private entries';
+
+  @override
+  String get aiPrivacyAllowPrivateSubtitle =>
+      'The writing assistant and reflections become available in private notebooks. Chats and recaps still never read them.';
+
+  @override
+  String get aiPrivacyResetHosts => 'Ask again for every provider';
+
+  @override
+  String get aiPrivacyResetHostsSubtitle =>
+      'Show the first-time confirmation again';
+
+  @override
+  String get aiPrivacyResetHostsDone =>
+      'Done. You\'ll be asked again next time.';
+
+  @override
+  String get aiUsageEmpty => 'No usage recorded yet';
+
+  @override
+  String aiUsageRequests(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count requests',
+      one: '1 request',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String aiUsageFailures(int count) {
+    return '$count failed';
+  }
+
+  @override
+  String aiUsageTokens(String input, String output) {
+    return 'In $input · Out $output';
+  }
+
+  @override
+  String aiUsageMonthTotal(String tokens) {
+    return '$tokens tokens';
+  }
+
+  @override
+  String get aiUsageClear => 'Clear usage';
+
+  @override
+  String get aiUsageClearTitle => 'Clear usage records?';
+
+  @override
+  String get aiUsageClearBody =>
+      'Only this device\'s statistics are cleared; the provider\'s billing isn\'t affected.';
+
+  @override
+  String get aiUsageFooter =>
+      'Counts only requests sent from this device. Check the provider\'s billing for actual costs.';
+
+  @override
+  String get aiPrivacyRecordsGroup => 'AI records';
+
+  @override
+  String get aiPrivacyRecordsFooter =>
+      'Chats, reflections and recaps are saved on this device and in full backups. They are never synced over the local network.';
+
+  @override
+  String get aiPrivacyClearRecords => 'Clear all AI records';
+
+  @override
+  String aiPrivacyClearRecordsSubtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chats and results',
+      one: '1 chat or result',
+      zero: 'Nothing saved yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiPrivacyClearRecordsTitle => 'Clear all AI records?';
+
+  @override
+  String get aiPrivacyClearRecordsBody =>
+      'Every chat, reflection and recap is deleted from this device. This can\'t be undone. Your diary entries are not affected.';
+
+  @override
+  String get aiPrivacyClearRecordsDone => 'AI records cleared';
+
+  @override
+  String get aiPromptSystemBase =>
+      'You are the AI assistant inside Jotsy, a personal diary app. The person you talk to is the author of the diary. Be sincere and specific, and never invent facts that are not in the diary.';
+
+  @override
+  String aiPromptAboutUser(String text) {
+    return 'About the user: $text';
+  }
+
+  @override
+  String aiPromptWritingStyle(String text) {
+    return 'The user\'s preferred writing style: $text';
+  }
+
+  @override
+  String aiPromptRespondIn(String language) {
+    return 'Reply in $language.';
+  }
+
+  @override
+  String get aiPromptRespondLikeDiary =>
+      'Reply in the same language the diary is written in.';
+
+  @override
+  String get aiPromptLanguageChinese => 'Chinese';
+
+  @override
+  String get aiPromptLanguageEnglish => 'English';
+
+  @override
+  String get aiPromptLanguageJapanese => 'Japanese';
+
+  @override
+  String get aiPromptLanguageRussian => 'Russian';
+
+  @override
+  String get aiPromptLengthShort =>
+      'Keep the answer short, within a few sentences.';
+
+  @override
+  String get aiPromptLengthMedium => 'Keep the answer to a moderate length.';
+
+  @override
+  String get aiPromptLengthLong => 'Feel free to answer in detail.';
+
+  @override
+  String aiPromptPersona(String text) {
+    return 'Your role: $text';
+  }
+
+  @override
+  String get aiPromptFieldTitle => 'Title';
+
+  @override
+  String get aiPromptFieldDate => 'Date';
+
+  @override
+  String get aiPromptFieldMood => 'Mood';
+
+  @override
+  String get aiPromptFieldTags => 'Tags';
+
+  @override
+  String get aiPromptFieldWeather => 'Weather';
+
+  @override
+  String get aiPromptFieldLocation => 'Place';
+
+  @override
+  String get aiPromptFieldBody => 'Text';
+
+  @override
+  String get aiPromptTruncated => '(the rest is omitted)';
+
+  @override
+  String aiPromptImagesAttached(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos from the entry are attached.',
+      one: 'One photo from the entry is attached.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiPromptWritingSystem =>
+      'You are a writing assistant helping the user edit their own diary. Output only the resulting text: no explanations, no quotes, no preface. Keep the first-person point of view. You may use Markdown lists, bold and task lists, but no headings.';
+
+  @override
+  String get aiPromptWritingContext =>
+      'For context, this is the whole entry (do not repeat it):';
+
+  @override
+  String aiPromptCustomInstruction(String text) {
+    return 'Follow this instruction for the text below: $text';
+  }
+
+  @override
+  String get aiPromptReplyInstruction =>
+      'Here is an entry the user wrote. Read it as yourself and respond to the user directly. Do not retell the entry and do not use headings.';
+
+  @override
+  String get aiPromptSuggestInstruction =>
+      'Based on the entry below, suggest: a short fitting title of at most 20 characters without quotes; 0 to 3 of the user\'s existing tags; at most 2 new tags of at most 6 characters each, only if really useful; and the single best mood from the given options, or leave it empty if unsure. Reply with one JSON object only, exactly in this shape:';
+
+  @override
+  String aiPromptSuggestTagsList(String tags) {
+    return 'The user\'s existing tags: $tags';
+  }
+
+  @override
+  String aiPromptSuggestMoodList(String moods) {
+    return 'Mood options: $moods';
+  }
+
+  @override
+  String get aiPromptPromptsInstruction =>
+      'Write 3 concrete, gentle questions that make it easy for the user to start today\'s diary. One question per line, no numbering, nothing else.';
+
+  @override
+  String aiPromptPromptsToday(String date) {
+    return 'Today: $date';
+  }
+
+  @override
+  String get aiPromptPromptsRecent =>
+      'Excerpts of the user\'s recent entries, for a more personal touch:';
+
+  @override
+  String aiPromptRecapInstruction(String period) {
+    return 'Below are the entries the user wrote during $period. Write a recap organised with Markdown subheadings, covering:';
+  }
+
+  @override
+  String get aiPromptRecapRules =>
+      'Only use what is in the entries. Mention dates when you refer to specific days. If an entry is marked [Dn], you may cite it as [Dn].';
+
+  @override
+  String get aiPromptRecapChunk =>
+      'Below are entries from part of a period. Summarise in bullet points what happened, the feelings and the thoughts, keeping concrete dates and details, so they can be merged into a recap later.';
+
+  @override
+  String get aiPromptRecapFromSummaries =>
+      'These are summaries of consecutive parts of the period, oldest first:';
+
+  @override
+  String aiPromptRecapStats(int count, int words) {
+    return 'Statistics: $count entries, $words words.';
+  }
+
+  @override
+  String aiPromptRecapMoods(String moods) {
+    return 'Mood counts: $moods';
+  }
+
+  @override
+  String aiPromptRecapTopTags(String tags) {
+    return 'Most used tags: $tags';
+  }
+
+  @override
+  String get aiPromptChatSystem =>
+      'You can read some of the user\'s diary entries, each marked [Dn]. Answer based on these entries. When you use an entry, cite its marker at the end of the sentence, like [D3]. Do not invent anything that is not in the entries; if you can\'t find it, say so.';
+
+  @override
+  String get aiPromptChatContextHeader => 'Relevant diary entries:';
+
+  @override
+  String get aiPromptChatNoDiaries =>
+      '(No diary entries matched this question.)';
+
+  @override
+  String aiPromptChatToday(String date) {
+    return 'Today is $date.';
+  }
+
+  @override
+  String get aiPromptChatTitle =>
+      'Summarise the topic of this conversation in at most 8 words. Output only the title.';
+
+  @override
+  String aiPromptRetrievalPlan(String date) {
+    return 'Turn the user\'s question into a diary search plan. Today is $date. Give up to 8 short keywords likely to appear in the entries (include synonyms), and a date range only if the question implies one. Reply with one JSON object only, exactly in this shape:';
+  }
+
+  @override
+  String get aiPromptDescribeImage =>
+      'Describe what is in this photo and its mood in one or two sentences, as a caption for a diary. Output only the description.';
+
+  @override
+  String get aiToolbarLabel => 'AI writing';
+
+  @override
+  String get aiPanelTitle => 'AI writing';
+
+  @override
+  String get aiScopeSelection => 'Selection';
+
+  @override
+  String get aiScopeParagraph => 'This paragraph';
+
+  @override
+  String get aiScopeBeforeCaret => 'Text before the cursor';
+
+  @override
+  String get aiScopeDocument => 'Whole entry';
+
+  @override
+  String aiScopeSummary(String scope, int words) {
+    return '$scope · $words words';
+  }
+
+  @override
+  String get aiPanelInstructionHint =>
+      'Tell AI what to do, e.g. “make it more casual”';
+
+  @override
+  String get aiPanelSend => 'Send';
+
+  @override
+  String get aiPanelThinking => 'Thinking…';
+
+  @override
+  String get aiPanelReplace => 'Replace';
+
+  @override
+  String get aiPanelInsertBelow => 'Insert below';
+
+  @override
+  String get aiPanelCopy => 'Copy';
+
+  @override
+  String get aiPanelCopied => 'Copied';
+
+  @override
+  String get aiPanelStop => 'Stop';
+
+  @override
+  String get aiPanelEmptyTarget =>
+      'Nothing to work on yet. Write something or select some text first.';
+
+  @override
+  String get aiPanelReasoning => 'Reasoning';
+
+  @override
+  String get aiPanelPrivateBlocked =>
+      'This entry is in a private notebook. You can allow AI for private entries in AI privacy settings.';
+
+  @override
+  String get aiSlashGroup => 'AI';
+
+  @override
+  String get aiSlashWrite => 'AI writing…';
+
+  @override
+  String get aiSlashContinue => 'AI continue';
+
+  @override
+  String get aiSlashPrompts => 'Writing prompts';
+
+  @override
+  String get aiSelectionMenu => 'AI…';
+
+  @override
+  String get aiImageDescribe => 'Describe with AI';
+
+  @override
+  String get aiImageDescribing => 'Describing the photo…';
+
+  @override
+  String get aiImageNoVision =>
+      'The current model can\'t see images. Pick a vision model for “Describe images” in Model assignment.';
+
+  @override
+  String get aiSuggestTitle => 'Generate title with AI';
+
+  @override
+  String get aiSuggestMeta => 'Suggest tags & mood with AI';
+
+  @override
+  String get aiSuggesting => 'AI is thinking…';
+
+  @override
+  String get aiSuggestNeedContent =>
+      'Write a little first so AI has something to go on.';
+
+  @override
+  String get aiSuggestTitleApplied => 'Title filled in by AI';
+
+  @override
+  String get aiSuggestTagsHeader => 'AI suggests';
+
+  @override
+  String aiSuggestNewTag(String name) {
+    return 'New “$name”';
+  }
+
+  @override
+  String get aiSuggestMoodButton => 'AI pick';
+
+  @override
+  String get aiSuggestNothing => 'No suggestions this time';
+
+  @override
+  String get aiSuggestApplied => 'Applied AI suggestions';
+
+  @override
+  String aiConfirmSendTitle(String host) {
+    return 'Send to $host?';
+  }
+
+  @override
+  String aiConfirmSendModel(String name) {
+    return 'Handled by “$name”';
+  }
+
+  @override
+  String aiConfirmSendEntries(int count, int words) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0, about $words words';
+  }
+
+  @override
+  String aiConfirmSendText(int words) {
+    return 'About $words words of text';
+  }
+
+  @override
+  String aiConfirmSendImages(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Plus $count photos',
+      one: 'Plus 1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiConfirmSendNote =>
+      'It goes straight from this device; the developer never sees it. The provider handles it under its own privacy policy.';
+
+  @override
+  String get aiConfirmSendRemember => 'Don\'t ask again for this provider';
+
+  @override
+  String get aiConfirmSendAction => 'Send';
+
+  @override
+  String aiRepliesHeading(int count) {
+    return 'AI reflections · $count';
+  }
+
+  @override
+  String get aiReplyAsk => 'Ask AI to respond…';
+
+  @override
+  String get aiReplyMoreItem => 'AI reflection';
+
+  @override
+  String get aiReplyPickPersona => 'Who should respond?';
+
+  @override
+  String get aiReplyWriting => 'Reading your entry…';
+
+  @override
+  String get aiReplyRegenerate => 'Regenerate';
+
+  @override
+  String get aiReplySaveAsComment => 'Save as comment';
+
+  @override
+  String get aiReplyContinueChat => 'Talk more';
+
+  @override
+  String get aiReplyDeleted => 'Reflection deleted';
+
+  @override
+  String get aiReplyExpand => 'Show more';
+
+  @override
+  String get aiReplyCollapse => 'Show less';
+
+  @override
+  String get aiReplyStopped => 'Stopped. Try again?';
+
+  @override
+  String get aiReplyDismiss => 'Dismiss';
+
+  @override
+  String get aiReplyAutoSkipped =>
+      'Auto reflection skipped: confirm this provider once by asking for a reflection manually.';
+
+  @override
+  String get aiPromptsStripLabel => 'Need a writing prompt?';
+
+  @override
+  String get aiPromptsLoading => 'Thinking of questions…';
+
+  @override
+  String get aiPromptsRefresh => 'New set';
+
+  @override
+  String get aiPromptsTitle => 'Writing prompts';
+
+  @override
+  String get aiPromptsHint => 'Tap a question to add it to your entry';
+
+  @override
+  String get aiPromptsEmpty => 'No questions this time. Try again?';
+
+  @override
+  String get aiPromptsClose => 'Hide prompts';
+
+  @override
+  String get aiReplySavedAsComment => 'Saved as a comment';
+
+  @override
+  String get aiRecapTitle => 'AI recap';
+
+  @override
+  String get aiRecapRange => 'Period';
+
+  @override
+  String get aiRecapThisWeek => 'This week';
+
+  @override
+  String get aiRecapLastWeek => 'Last week';
+
+  @override
+  String get aiRecapThisMonth => 'This month';
+
+  @override
+  String get aiRecapLastMonth => 'Last month';
+
+  @override
+  String get aiRecapThisYear => 'This year';
+
+  @override
+  String get aiRecapCustom => 'Custom…';
+
+  @override
+  String get aiRecapNotebook => 'Notebook';
+
+  @override
+  String get aiRecapAllNotebooks => 'All entries';
+
+  @override
+  String get aiRecapSections => 'Include';
+
+  @override
+  String get aiRecapPersona => 'Voice';
+
+  @override
+  String get aiRecapGenerate => 'Write recap';
+
+  @override
+  String get aiRecapNoEntries => 'No entries to recap in this period.';
+
+  @override
+  String aiRecapReading(int index, int total) {
+    return 'Reading part $index of $total…';
+  }
+
+  @override
+  String get aiRecapWriting => 'Writing the recap…';
+
+  @override
+  String aiRecapStats(int count, int words) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0 · $words words';
+  }
+
+  @override
+  String get aiRecapSaved => 'Saved to your recaps';
+
+  @override
+  String get aiRecapSaveAsDiary => 'Save as entry';
+
+  @override
+  String get aiRecapShare => 'Share text';
+
+  @override
+  String get aiRecapDeleted => 'Recap deleted';
+
+  @override
+  String aiRecapPeriodRange(String start, String end) {
+    return '$start – $end';
+  }
+
+  @override
+  String aiRecapDiaryTitle(String period) {
+    return '$period recap';
+  }
+
+  @override
+  String get aiHubTitle => 'AI assistant';
+
+  @override
+  String get aiHubAskHint => 'Ask your diary…';
+
+  @override
+  String get aiHubQuickMonth => 'How has this month been for me?';
+
+  @override
+  String get aiHubQuickWorry => 'What have I been worrying about lately?';
+
+  @override
+  String get aiHubQuickLastYear => 'What was I doing this time last year?';
+
+  @override
+  String get aiHubQuickHappy => 'What small things made me happy recently?';
+
+  @override
+  String get aiHubQuickGrowth => 'How have I changed over the past half year?';
+
+  @override
+  String get aiHubRecapsGroup => 'Recaps';
+
+  @override
+  String get aiHubRecapMore => 'More options…';
+
+  @override
+  String get aiHubNoRecaps => 'No recaps yet';
+
+  @override
+  String get aiHubChatsGroup => 'Chats';
+
+  @override
+  String get aiHubNoChats => 'No chats yet. Ask a question above to start.';
+
+  @override
+  String get aiHubSearchChats => 'Search chats';
+
+  @override
+  String get aiChatUntitled => 'New chat';
+
+  @override
+  String get aiChatPin => 'Pin';
+
+  @override
+  String get aiChatUnpin => 'Unpin';
+
+  @override
+  String get aiChatRename => 'Rename';
+
+  @override
+  String get aiChatRenameTitle => 'Rename chat';
+
+  @override
+  String get aiChatDeleted => 'Chat deleted';
+
+  @override
+  String get aiChatInputHint => 'Ask something…';
+
+  @override
+  String get aiChatPlanning => 'Understanding the question…';
+
+  @override
+  String get aiChatSearching => 'Looking for related entries…';
+
+  @override
+  String aiChatCitations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used $count entries',
+      one: 'Used 1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get aiChatNoCitations => 'No related entries found';
+
+  @override
+  String get aiChatScope => 'Scope';
+
+  @override
+  String get aiChatScopeAuto => 'Auto';
+
+  @override
+  String aiChatScopeRecent(int days) {
+    return 'Last $days days';
+  }
+
+  @override
+  String get aiChatScopeAll => 'All entries';
+
+  @override
+  String get aiChatScopeRange => 'Date range…';
+
+  @override
+  String get aiChatScopeEntry => 'This entry';
+
+  @override
+  String get aiChatPersona => 'Persona';
+
+  @override
+  String get aiChatModel => 'Model';
+
+  @override
+  String aiChatModelDefault(String name) {
+    return 'Default ($name)';
+  }
+
+  @override
+  String get aiChatEditResend => 'Edit and resend';
+
+  @override
+  String get aiChatDeleteMessage => 'Delete message';
+
+  @override
+  String get aiChatCitationMissing => 'This entry no longer exists';
+
+  @override
+  String get aiChatEmptyHint =>
+      'Ask about your mood over a period, how something unfolded, or let AI help you remember.';
+
+  @override
+  String aiChatAboutEntry(String title) {
+    return 'About “$title”';
+  }
+
+  @override
+  String get aiHubTooltip => 'AI assistant';
+
+  @override
+  String get exploreModuleAi => 'AI insights';
+
+  @override
+  String get exploreModuleAiDesc => 'Your latest recap, and ask your diary';
+
+  @override
+  String get aiExploreNoRecap => 'No recap yet. How about one for this week?';
+
+  @override
+  String get aiExploreWeekly => 'This week\'s recap';
+
+  @override
+  String get aiExploreAsk => 'Ask my diary';
+
+  @override
+  String get aiExploreNotConfigured => 'Set up an AI service to use this';
+
+  @override
+  String get aiRecapStopped => 'Stopped. The partial recap isn\'t saved.';
+
+  @override
+  String get aiRecapHistory => 'Earlier recaps';
+
+  @override
+  String get aiRecapDeleteTitle => 'Delete this recap?';
+
+  @override
+  String get aiRecapNotebookPick => 'Choose a notebook';
+
+  @override
+  String get aiRecapCustomRange => 'Choose dates';
+
+  @override
+  String get aiRecapShareUnavailable =>
+      'Copied. Paste it wherever you\'d like to share.';
+
+  @override
+  String aiRecapModel(String model) {
+    return 'Written by $model';
+  }
+
+  @override
+  String get aiChatMore => 'More';
+
+  @override
+  String aiChatTokens(String input, String output) {
+    return '$input in · $output out';
+  }
+
+  @override
+  String get aiChatStoppedLabel => 'Stopped';
+
+  @override
+  String get aiChatDeleteMessageTitle => 'Delete this message?';
+
+  @override
+  String get aiChatDeleteTitle => 'Delete this chat?';
+
+  @override
+  String get aiChatDeleteBody =>
+      'Its messages are deleted too. Your entries aren\'t affected.';
+
+  @override
+  String get aiChatRangeTitle => 'Choose dates';
+
+  @override
+  String get aiChatScopeTitle => 'Search in';
+
+  @override
+  String get aiChatScopeAutoSubtitle =>
+      'Follows the search method in AI settings';
+
+  @override
+  String get aiHubOpenSettings => 'AI settings';
+
+  @override
+  String get aiHubSend => 'Ask';
+
+  @override
+  String get aiSettingsOpenHub => 'Open AI assistant';
+
+  @override
+  String get aiSettingsOpenHubSubtitle => 'Ask your diary and write recaps';
+
+  @override
+  String get aiProtocolOpenAiResponses => 'OpenAI Responses';
+
+  @override
+  String get aiPresetNameCustomOpenAiResponses => 'OpenAI Responses API';
+
+  @override
+  String get cloudBackupBackupNow => 'Back up';
+
+  @override
+  String get cloudIncrementalBusyScan => 'Checking for changes…';
+
+  @override
+  String get cloudIncrementalBusyCheck => 'Reading backups on the drive…';
+
+  @override
+  String get cloudIncrementalBusyPrune => 'Cleaning up old backups…';
+
+  @override
+  String cloudIncrementalUploaded(String size) {
+    return 'Backed up. Uploaded $size this time';
+  }
+
+  @override
+  String get cloudIncrementalUnchanged =>
+      'Nothing changed. The backup on the drive is up to date';
+
+  @override
+  String get cloudIncrementalNewPasswordMessage =>
+      'This password is remembered on this device and used for later and automatic backups. You will need it to restore on another device. Leave empty for no encryption.';
+
+  @override
+  String get cloudIncrementalExistingEncryptedMessage =>
+      'There are encrypted incremental backups on this drive. Enter their password to continue them without re-uploading photos and media.';
+
+  @override
+  String get cloudIncrementalContinue => 'Continue';
+
+  @override
+  String get cloudIncrementalWrongPasswordTitle => 'Wrong password';
+
+  @override
+  String get cloudIncrementalWrongPasswordContent =>
+      'This password does not open the incremental backups on the drive. Try again, or start a new series of incremental backups (all photos and media will be uploaded again).';
+
+  @override
+  String get cloudIncrementalRetry => 'Try again';
+
+  @override
+  String get cloudIncrementalStartNew => 'Start a new series';
+
+  @override
+  String get cloudIncrementalExistingPlainTitle =>
+      'Continue the existing backups?';
+
+  @override
+  String get cloudIncrementalExistingPlainContent =>
+      'There are unencrypted incremental backups on this drive. Continuing uploads only what is new. To encrypt, start a new series instead (all photos and media will be uploaded again).';
+
+  @override
+  String get cloudIncrementalContinueExisting => 'Continue';
+
+  @override
+  String get cloudIncrementalRememberedMismatchContent =>
+      'The password remembered on this device no longer opens the incremental backups on the drive; it may have been changed on another device. Reset it to enter the original password or start a new series.';
+
+  @override
+  String get cloudIncrementalRestorePasswordMessage =>
+      'This incremental backup is encrypted. Enter the password set when it was made.';
+
+  @override
+  String get cloudIncrementalEntryTitle => 'Incremental backup';
+
+  @override
+  String get cloudIncrementalEntryMissing =>
+      'Snapshot file missing; cannot be restored';
+
+  @override
+  String get cloudIncrementalDeleteTitle => 'Delete this incremental backup?';
+
+  @override
+  String cloudIncrementalDeleteContent(String time) {
+    return 'The incremental backup from $time will be deleted. Photos and media used only by it are removed from the drive too; other backups are not affected. This cannot be undone.';
+  }
+
+  @override
+  String get cloudIncrementalSectionTitle => 'Incremental backup';
+
+  @override
+  String get cloudIncrementalSectionHint =>
+      '“Back up” uploads only new photos and changed data; anything already on the drive is never uploaded again. Restoring on this device downloads only what is missing, saving your drive’s traffic quota.';
+
+  @override
+  String get cloudIncrementalKeepTitle => 'Keep';
+
+  @override
+  String get cloudIncrementalKeepSubtitle =>
+      'Older incremental backups are deleted automatically, along with photos and media used only by them';
+
+  @override
+  String get cloudIncrementalKeepAll => 'All';
+
+  @override
+  String cloudIncrementalKeepCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String get cloudAutoBackupTitle => 'Automatic backup';
+
+  @override
+  String get cloudAutoBackupSubtitle =>
+      'Backs up quietly when you open or leave the app once it is due. If more than 50 MB is new, it waits for you to back up manually';
+
+  @override
+  String get cloudAutoBackupNeedsChain =>
+      'Back up manually once before turning this on';
+
+  @override
+  String get cloudAutoBackupIntervalTitle => 'Frequency';
+
+  @override
+  String get cloudAutoBackupDaily => 'Daily';
+
+  @override
+  String get cloudAutoBackupWeekly => 'Weekly';
+
+  @override
+  String cloudAutoBackupLastUploaded(String time, String size) {
+    return 'Last automatic backup: $time, uploaded $size';
+  }
+
+  @override
+  String cloudAutoBackupLastUnchanged(String time) {
+    return 'Last automatic backup: $time, nothing changed';
+  }
+
+  @override
+  String cloudAutoBackupLastNeedsManual(String time, String size) {
+    return '$time: $size is new. Please back up manually';
+  }
+
+  @override
+  String cloudAutoBackupLastFailed(String time, String reason) {
+    return 'Automatic backup failed at $time: $reason';
+  }
+
+  @override
+  String cloudAutoBackupTileOk(String time) {
+    return 'Auto backup · $time';
+  }
+
+  @override
+  String get cloudAutoBackupTileNeedsManual => 'Back up manually';
+
+  @override
+  String get cloudAutoBackupTileFailed => 'Auto backup failed';
+
+  @override
+  String get cloudIncrementalForgetChain => 'Reset password';
+
+  @override
+  String get cloudIncrementalForgetTitle =>
+      'Reset the incremental backup password?';
+
+  @override
+  String get cloudIncrementalForgetContent =>
+      'This device forgets the current incremental backup password and automatic backup pauses. Next time you back up, enter the original password to continue, or set a new one to start over (all photos and media will be uploaded again).';
+
+  @override
+  String get cloudIncrementalForgotten =>
+      'Incremental backup password forgotten';
+
+  @override
+  String get cloudIncrementalErrorPassword =>
+      'The password does not open this incremental backup';
+
+  @override
+  String get cloudIncrementalErrorMediaChanged =>
+      'A photo or attachment changed during the backup. Please try again';
+
+  @override
+  String get textSelectionMenuMore => 'More';
+
+  @override
+  String get textSelectionMenuLess => 'Less';
+
+  @override
+  String passcodeDotsSemantics(int filled, int total) {
+    return '$filled of $total digits entered';
+  }
+
+  @override
+  String get passcodeDelete => 'Delete';
+
+  @override
+  String get passcodePatternSemantics =>
+      'Pattern pad: draw a line through the dots';
+
+  @override
+  String get passcodeUseBiometric => 'Use fingerprint or face';
+
+  @override
+  String passcodeWrongAttemptsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wrong. $count more mistakes and you\'ll have to wait',
+      one: 'Wrong. One more mistake and you\'ll have to wait',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passcodeWrongPin => 'Wrong passcode, try again';
+
+  @override
+  String get passcodeWrongPattern => 'Wrong pattern, try again';
+
+  @override
+  String passcodePatternTooShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Too short. Connect at least $count dots',
+      one: 'Too short. Connect at least $count dot',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passcodeLockedOutSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: 'Try again in $seconds seconds',
+      one: 'Try again in $seconds second',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String passcodeLockedOutMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Try again in $minutes minutes',
+      one: 'Try again in $minutes minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passcodeUnavailable =>
+      'Couldn\'t read the app passcode. Restart the app and try again.';
+
+  @override
+  String get passcodeEnterPinTitle => 'Enter app passcode';
+
+  @override
+  String get passcodeDrawPatternTitle => 'Draw your pattern';
+
+  @override
+  String get passcodeForgot => 'Forgot passcode?';
+
+  @override
+  String get passcodeForgotMessage =>
+      'The app passcode is kept only on this device and can\'t be recovered. The only way back in is to clear the app\'s data or reinstall it, then restore your diaries from a backup.';
+
+  @override
+  String get appLockPasscodeSubtitle =>
+      'Verify with your app passcode to continue';
+
+  @override
+  String get passcodeVerifyTitle => 'Verify identity';
+
+  @override
+  String passcodeFormPin(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count digits',
+      one: '$count digit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passcodeFormPattern => 'Pattern';
+
+  @override
+  String get passcodeConfirmPinTitle => 'Enter it again';
+
+  @override
+  String get passcodeConfirmPatternTitle => 'Draw it again';
+
+  @override
+  String get passcodeConfirmMessage => 'Same as the first time, to confirm';
+
+  @override
+  String get passcodeSetupPinTitle => 'Set a PIN';
+
+  @override
+  String passcodeSetupPinMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Enter $count digits',
+      one: 'Enter $count digit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passcodeSetupPatternTitle => 'Set an unlock pattern';
+
+  @override
+  String passcodeSetupPatternMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Connect at least $count dots in one stroke',
+      one: 'Connect at least $count dot in one stroke',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passcodeMismatch => 'They didn\'t match. Start over.';
+
+  @override
+  String get passcodeSaveFailed => 'Couldn\'t save. Try again.';
+
+  @override
+  String get passcodeChangeTitle => 'Change app passcode';
+
+  @override
+  String get passcodeSetupTitle => 'Set app passcode';
+
+  @override
+  String get passcodeNoRecoveryNote =>
+      'The app passcode is stored only on this device. It isn\'t included in backups or sync, and it can\'t be recovered if you forget it.';
+
+  @override
+  String get appLockSwitchToPasscodeReason =>
+      'Verify to switch to an app passcode';
+
+  @override
+  String get appLockSwitchVerifyFailed =>
+      'Verification failed. The method wasn\'t changed.';
+
+  @override
+  String get passcodeSetDone => 'App passcode set';
+
+  @override
+  String get appLockSystemUnsupported =>
+      'System verification isn\'t available on this device (no screen lock is set)';
+
+  @override
+  String get appLockSwitchToSystemReason =>
+      'Enter your app passcode to switch to system verification';
+
+  @override
+  String get appLockSwitchedToSystem =>
+      'Switched to system verification. The app passcode was removed.';
+
+  @override
+  String get passcodeChangeReason => 'Enter your current passcode to change it';
+
+  @override
+  String get passcodeChangedDone => 'App passcode changed';
+
+  @override
+  String get passcodeBiometricEnableReason =>
+      'Verify your fingerprint or face to turn on quick unlock';
+
+  @override
+  String get passcodeBiometricFailed =>
+      'Fingerprint or face verification failed';
+
+  @override
+  String get settingsAppLockAndPasscode => 'App lock & passcode';
+
+  @override
+  String get appLockMethodTitle => 'Verification method';
+
+  @override
+  String get appLockMethodFooter =>
+      'App lock, locked notebooks and LAN pairing confirmation all use this method.';
+
+  @override
+  String get appLockNeedsPasscode =>
+      'This device has no system verification. Set an app passcode below first.';
+
+  @override
+  String get appLockMethodSystem => 'System verification';
+
+  @override
+  String get appLockMethodSystemDescription =>
+      'Fingerprint, face or your phone\'s screen lock';
+
+  @override
+  String get appLockMethodSystemUnavailable => 'Not available on this device';
+
+  @override
+  String get appLockMethodPasscode => 'App passcode';
+
+  @override
+  String get appLockMethodPasscodeDescription =>
+      'A PIN or pattern of its own, separate from your screen lock';
+
+  @override
+  String passcodeCurrentForm(String form) {
+    return 'Current: $form';
+  }
+
+  @override
+  String get passcodeBiometric => 'Fingerprint / face quick unlock';
+
+  @override
+  String get passcodeBiometricSubtitle =>
+      'Unlock with your fingerprint or face instead of the passcode. Turning off app lock or changing the passcode still needs the passcode.';
+
+  @override
+  String get appLockStatusPasscode => 'On · App passcode';
+
+  @override
+  String get appLockStatusSystem => 'On · System verification';
+
+  @override
+  String get appLockStatusOffPasscode =>
+      'Off · Locked notebooks use the app passcode';
+
+  @override
+  String get appLockStatusOff => 'Off';
+
+  @override
+  String get settingsGroupGeneral => 'General';
+
+  @override
+  String get settingsGroupWriting => 'Writing';
+
+  @override
+  String get settingsGroupOrganize => 'Organize';
+
+  @override
+  String get settingsGroupDataSecurity => 'Data & security';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsAppearanceSubtitle => 'Theme, background and page styles';
+
+  @override
+  String get settingsEditor => 'Editor';
+
+  @override
+  String get settingsThemeGroup => 'Theme';
+
+  @override
+  String get settingsInterfaceGroup => 'Interface';
+
+  @override
+  String get settingsPageStylesGroup => 'Page styles';
+
+  @override
+  String get settingsEditorBodyGroup => 'Body text';
+
+  @override
+  String get settingsEditorToolbarGroup => 'Toolbar';
+
+  @override
+  String get settingsEditorBehaviorGroup => 'Behavior';
+
+  @override
+  String get dataMgmtBackupGroup => 'Backup & restore';
+
+  @override
+  String get dataMgmtFilesGroup => 'Import & export';
+
+  @override
+  String get placeHistoryTitle => 'Recent places';
+
+  @override
+  String get placeHistorySearchHint => 'Search places';
+
+  @override
+  String placeHistorySearchEmpty(String query) {
+    return 'No places match “$query”';
+  }
+
+  @override
+  String get placeHistoryEmptyTitle => 'No places yet';
+
+  @override
+  String get placeHistoryEmptyBody =>
+      'Places from your diaries show up here, ready to reuse with one tap.';
+
+  @override
+  String placeHistoryUseCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String placeHistoryShowAll(int count) {
+    return 'All $count';
+  }
+
+  @override
+  String get appLockAfterLeaving => 'Lock after leaving';
+
+  @override
+  String get appLockAfterLeavingHint =>
+      'Switching to another app, going to the home screen or minimizing the window counts as leaving; picking photos, taking pictures, choosing files or sharing from the app doesn\'t. Opening the app always needs verification.';
+
+  @override
+  String get appLockDelayImmediately => 'Immediately';
+
+  @override
+  String appLockDelayMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'After $count minutes',
+      one: 'After 1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String appLockDelayHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'After $count hours',
+      one: 'After 1 hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get appLockAfterLeavingNever => 'Never (only when the app opens)';
+
+  @override
+  String get appLockOnScreenOff => 'Lock when the screen locks';
+
+  @override
+  String get appLockOnScreenOffSubtitle =>
+      'After the phone locks or the screen turns off, coming back needs verification';
+
+  @override
+  String get appLockWhenIdle => 'Lock when idle';
+
+  @override
+  String get appLockWhenIdleHint =>
+      'Locks when the window stays open but the mouse, touchpad and keyboard go unused for a while.';
+
+  @override
+  String get appLockWhenIdleOff => 'Off';
+
+  @override
+  String get appLockAutoPrompt => 'Ask right away';
+
+  @override
+  String get appLockAutoPromptSubtitle =>
+      'Show fingerprint, face or system verification as soon as the lock screen appears. When off, tap to verify.';
+
+  @override
+  String get appLockPrivacyTitle => 'Privacy';
+
+  @override
+  String get appLockSecureScreen => 'Block screenshots';
+
+  @override
+  String get appLockSecureScreenSubtitle =>
+      'Screenshots and screen recordings show nothing, and recent apps hide the app\'s content';
+
+  @override
+  String get appLockLoosenReason => 'Verify your identity to relax app lock';
+
+  @override
+  String get appLockLoosenVerifyFailed =>
+      'Verification failed. The setting wasn\'t changed.';
+
+  @override
+  String get diarySearchRecentTitle => 'Recent searches';
+
+  @override
+  String get diarySearchClearRecent => 'Clear recent searches';
+
+  @override
+  String diarySearchRecentRemove(String query) {
+    return 'Remove “$query” from recent searches';
+  }
+
+  @override
+  String get diarySearchSuggestedTags => 'Frequent tags';
+
+  @override
+  String get diarySearchEmptyTip =>
+      'Separate words with spaces to find entries containing all of them';
+
+  @override
+  String diarySearchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diarySearchClearFilters => 'Clear filters';
+
+  @override
+  String get diarySearchIncludeArchived => 'Include archived';
+
+  @override
+  String diarySearchRemoveFilter(String label) {
+    return 'Remove filter $label';
+  }
+
+  @override
+  String get diarySearchSortTooltip => 'Sort results';
+
+  @override
+  String get diarySearchSortUpdated => 'Recently updated';
+
+  @override
+  String get diarySearchSortNewest => 'Newest';
+
+  @override
+  String get diarySearchSortOldest => 'Oldest';
+
+  @override
+  String get diarySearchTagSheetTitle => 'Search by tags';
+
+  @override
+  String get diarySearchTagSheetHint =>
+      'Shows entries that have all selected tags';
+
+  @override
+  String settingsStorageSubtitle(String size) {
+    return '$size used';
+  }
+
+  @override
+  String get storageMgmtTitle => 'Storage';
+
+  @override
+  String get storageMgmtTotalLabel => 'Total used';
+
+  @override
+  String storageMgmtCleanUpAll(String size) {
+    return 'Clean up · free $size';
+  }
+
+  @override
+  String get storageMgmtRescan => 'Rescan';
+
+  @override
+  String get storageMgmtScanFailed =>
+      'Couldn\'t measure storage. Try again later.';
+
+  @override
+  String get storageMgmtCategoryImages => 'Images';
+
+  @override
+  String get storageMgmtCategoryVideos => 'Videos';
+
+  @override
+  String get storageMgmtCategoryAudio => 'Recordings';
+
+  @override
+  String get storageMgmtCategoryAttachments => 'Attachments';
+
+  @override
+  String get storageMgmtCategoryCovers => 'Covers';
+
+  @override
+  String get storageMgmtCategoryBackgrounds => 'Backgrounds';
+
+  @override
+  String get storageMgmtCategoryFonts => 'Fonts';
+
+  @override
+  String get storageMgmtCategoryDatabase => 'Diary data';
+
+  @override
+  String get storageMgmtCategoryCache => 'Cache';
+
+  @override
+  String get storageMgmtCategoryUnused => 'Unused files';
+
+  @override
+  String get storageMgmtCategoryOther => 'Other';
+
+  @override
+  String get storageMgmtSuggestionsTitle => 'Free up space';
+
+  @override
+  String get storageMgmtSuggestCache => 'Cache';
+
+  @override
+  String storageMgmtSuggestCacheSubtitle(String size) {
+    return '$size can be cleared. Cache used in the last hour is kept.';
+  }
+
+  @override
+  String get storageMgmtSuggestUnused => 'Unused files';
+
+  @override
+  String storageMgmtSuggestUnusedSubtitle(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files no entry uses, $size',
+      one: '1 file no entry uses, $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtSuggestTrash => 'Entries in the trash';
+
+  @override
+  String storageMgmtSuggestTrashSubtitle(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files are used only by entries in the trash, $size',
+      one: '1 file is used only by entries in the trash, $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtSuggestCompress => 'Photos & videos to compress';
+
+  @override
+  String storageMgmtSuggestCompressSubtitle(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items, saves about $size',
+      one: '1 item, saves about $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtSuggestDatabase => 'Tidy up diary data';
+
+  @override
+  String storageMgmtSuggestDatabaseSubtitle(String size) {
+    return 'Frees $size left behind by deleted content';
+  }
+
+  @override
+  String get storageMgmtClear => 'Clear';
+
+  @override
+  String get storageMgmtCompact => 'Tidy up';
+
+  @override
+  String get storageMgmtAllClean => 'All tidy';
+
+  @override
+  String get storageMgmtAllCleanSubtitle =>
+      'No cache or unused files to clear right now';
+
+  @override
+  String get storageMgmtMediaTitle => 'Media';
+
+  @override
+  String get storageMgmtAllMedia => 'All media';
+
+  @override
+  String storageMgmtFileCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtLargeFiles => 'Large files';
+
+  @override
+  String get storageMgmtOtherTitle => 'Other data';
+
+  @override
+  String get storageMgmtFooter =>
+      'Deleting and compressing reach your other devices with the next LAN sync. Older cloud backups keep the original files until they are pruned.';
+
+  @override
+  String get storageMgmtCleaning => 'Cleaning up…';
+
+  @override
+  String get storageMgmtDeleting => 'Deleting…';
+
+  @override
+  String storageMgmtFreed(String size) {
+    return 'Freed $size';
+  }
+
+  @override
+  String get storageMgmtNothingFreed => 'Nothing to clear right now';
+
+  @override
+  String get storageMgmtBusyEditing =>
+      'An entry is open for editing. Close it and try again.';
+
+  @override
+  String get storageMgmtBusyUndo =>
+      'Wait for the undo prompt to disappear, then try again.';
+
+  @override
+  String get storageMgmtCannotDelete =>
+      'Other data refers to this file, so it can\'t be deleted here.';
+
+  @override
+  String storageMgmtDeleteTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete $count files?',
+      one: 'Delete 1 file?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtDeleteBody(String size) {
+    return 'Frees $size. They will be removed from:';
+  }
+
+  @override
+  String storageMgmtDeleteFromDiaries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtDeleteFromNotebooks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notebook covers',
+      one: '1 notebook cover',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtDeleteFromComments(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count comments',
+      one: '1 comment',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtDeleteFromDrafts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count drafts',
+      one: '1 draft',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtDeleteCommentNote =>
+      'Comments left with no text or images are deleted too.';
+
+  @override
+  String get storageMgmtDeleteCapsuleNote =>
+      'Includes content from sealed time capsules.';
+
+  @override
+  String get storageMgmtDeleteIrreversible => 'This can\'t be undone.';
+
+  @override
+  String storageMgmtDeleted(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted $count files, freed $size',
+      one: 'Deleted 1 file, freed $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtSkippedRows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count places changed in the meantime and were left as they are.',
+      one: '1 place changed in the meantime and was left as it is.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtCompress => 'Compress';
+
+  @override
+  String storageMgmtCompressTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Compress $count files',
+      one: 'Compress 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtCompressImages => 'Photos';
+
+  @override
+  String get storageMgmtCompressVideos => 'Videos';
+
+  @override
+  String get storageMgmtPresetHigh => 'High quality';
+
+  @override
+  String get storageMgmtPresetBalanced => 'Balanced';
+
+  @override
+  String get storageMgmtPresetCompact => 'Save space';
+
+  @override
+  String storageMgmtImagePresetDetail(
+    int maxSide,
+    int quality,
+    String estimate,
+  ) {
+    return 'Longest side $maxSide px · quality $quality · $estimate';
+  }
+
+  @override
+  String storageMgmtPresetEstimate(String before, String after) {
+    return '$before → about $after';
+  }
+
+  @override
+  String get storageMgmtPresetNoGain => 'Already small enough';
+
+  @override
+  String storageMgmtCompressSummary(String before, String after, String saved) {
+    return '$before → about $after, saves about $saved';
+  }
+
+  @override
+  String get storageMgmtCompressNothing =>
+      'None of these files need compressing';
+
+  @override
+  String storageMgmtCompressSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count files are already small or in a format that can\'t be compressed and will be skipped.',
+      one:
+          '1 file is already small or in a format that can\'t be compressed and will be skipped.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtCompressNote =>
+      'Compressed files replace the originals and can\'t be restored. Photos keep their capture time and location.';
+
+  @override
+  String get storageMgmtCompressStart => 'Compress';
+
+  @override
+  String get storageMgmtCompressing => 'Compressing';
+
+  @override
+  String get storageMgmtCompressPreparing => 'Getting ready…';
+
+  @override
+  String storageMgmtCompressStep(int index, int total, String name) {
+    return '$index of $total · $name';
+  }
+
+  @override
+  String get storageMgmtCancelling => 'Stopping…';
+
+  @override
+  String get storageMgmtCompressFinished => 'Compression finished';
+
+  @override
+  String get storageMgmtCompressCancelled => 'Compression stopped';
+
+  @override
+  String storageMgmtCompressDone(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Compressed $count files, saved $size',
+      one: 'Compressed 1 file, saved $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtCompressUnchanged(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files didn\'t get smaller; the originals were kept.',
+      one: '1 file didn\'t get smaller; the original was kept.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtCompressFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files couldn\'t be compressed.',
+      one: '1 file couldn\'t be compressed.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtCompressNoneDone => 'Nothing was compressed.';
+
+  @override
+  String get storageMgmtDone => 'Done';
+
+  @override
+  String storageMgmtCompressSaving(String size) {
+    return 'Compress · saves $size';
+  }
+
+  @override
+  String storageMgmtSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtSelectionSummary(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected · $size',
+      one: '1 selected · $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageMgmtListSummary(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items · $size',
+      one: '1 item · $size',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtFilterAll => 'All';
+
+  @override
+  String get storageMgmtFilterLarge => 'Large files';
+
+  @override
+  String get storageMgmtFilterCompressible => 'Compressible';
+
+  @override
+  String get storageMgmtFilterTrash => 'Trash only';
+
+  @override
+  String get storageMgmtSort => 'Sort';
+
+  @override
+  String get storageMgmtSortLargest => 'Largest first';
+
+  @override
+  String get storageMgmtSortNewest => 'Newest first';
+
+  @override
+  String get storageMgmtSortOldest => 'Oldest first';
+
+  @override
+  String get storageMgmtViewGrid => 'Show as grid';
+
+  @override
+  String get storageMgmtViewList => 'Show as list';
+
+  @override
+  String get storageMgmtEmpty => 'No files here';
+
+  @override
+  String storageMgmtPrivateHidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items from private entries are hidden',
+      one: '1 item from private entries is hidden',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtReveal => 'Show';
+
+  @override
+  String get storageMgmtRevealReason =>
+      'Verify to show media from private entries';
+
+  @override
+  String get storageMgmtRevealUnavailable =>
+      'Can\'t verify on this device. Set an app passcode first.';
+
+  @override
+  String get storageMgmtBadgeTrash => 'In trash';
+
+  @override
+  String storageMgmtBadgeCompressible(String size) {
+    return 'Can save $size';
+  }
+
+  @override
+  String get storageMgmtBadgeCompressShort => 'Compress';
+
+  @override
+  String storageMgmtBadgeUsedIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used in $count places',
+      one: 'Used once',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageMgmtBadgeLocked => 'Can\'t delete';
+
+  @override
+  String get storageMgmtUntitledDiary => 'Untitled entry';
+
+  @override
+  String get storageMgmtUntitledDraft => 'Untitled draft';
+
+  @override
+  String storageMgmtRefComment(String title) {
+    return 'Comment · $title';
+  }
+
+  @override
+  String storageMgmtRefDiaryCover(String title) {
+    return 'Cover · $title';
+  }
+
+  @override
+  String storageMgmtRefNotebookCover(String name) {
+    return 'Notebook cover · $name';
+  }
+
+  @override
+  String storageMgmtRefDraft(String title) {
+    return 'Draft · $title';
+  }
+
+  @override
+  String get storageMgmtRefOther => 'Referenced by other data';
+
+  @override
+  String get storageMgmtMaskedPrivate => 'Content from a private entry';
+
+  @override
+  String get storageMgmtMaskedCapsule => 'Content from a sealed time capsule';
+
+  @override
+  String storageMgmtUsedIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used in $count places',
+      one: 'Used in 1 place',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diaryTagFilterMultiSelectSemanticHint =>
+      'select more than one tag';
+
+  @override
+  String get diaryTagFilterMultiSelectTip =>
+      'Long-press a tag to select more than one';
+
+  @override
+  String diaryTagFilterMultiSelectTipDesktop(String key) {
+    return 'Hold $key and click tags to select more than one';
+  }
+
+  @override
+  String get settingsPublishOnLeave => 'Publish new diaries when going back';
+
+  @override
+  String get settingsPublishOnLeaveSubtitle =>
+      'Going back from a new diary saves it as a diary, not a draft';
+
+  @override
+  String get publishOnLeaveFailedKeptDraft =>
+      'Couldn\'t publish the diary. It\'s kept in Drafts.';
+
+  @override
+  String get storageMgmtAppTitle => 'Used by Jotsy';
+
+  @override
+  String get storageMgmtCategoryApp => 'App';
+
+  @override
+  String get storageMgmtDeviceTitle => 'Device storage';
+
+  @override
+  String storageMgmtDeviceTotal(String size) {
+    return '$size total';
+  }
+
+  @override
+  String get storageMgmtDeviceUsedLabel => 'used';
+
+  @override
+  String get storageMgmtDeviceApp => 'Jotsy';
+
+  @override
+  String get storageMgmtDeviceOther => 'Other apps & system';
+
+  @override
+  String get storageMgmtDeviceFree => 'Available';
+
+  @override
+  String storageMgmtShareOfDevice(String percent) {
+    return '$percent of the device';
+  }
+
+  @override
+  String get storageMgmtDeviceShareLabel => 'Share of device';
+
+  @override
+  String get storageMgmtReclaimable => 'Can be freed';
+
+  @override
+  String get storageMgmtTopTitle => 'Largest files';
+
+  @override
+  String get storageMgmtSeeAll => 'See all';
+
+  @override
+  String get storageMgmtGrowthTitle => 'Media over time';
+
+  @override
+  String get storageMgmtGrowthByYear => 'Added each year, by entry date';
+
+  @override
+  String get storageMgmtGrowthByMonth =>
+      'Added each month over the last 12 months, by entry date';
+
+  @override
+  String storageMgmtGrowthPeak(String period, String size) {
+    return 'Most added in $period: $size';
+  }
+
+  @override
+  String get storageMgmtOpenExternally => 'Open in another app';
+
+  @override
+  String backupImportTodoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count to-dos',
+      one: '1 to-do',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupImportExistingTodoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count to-dos are already on this device',
+      one: '1 to-do is already on this device',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupImportModeOverwriteTodosOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Adds new items and replaces the $count to-dos already on this device with the versions in the file',
+      one:
+          'Adds new items and replaces the 1 to-do already on this device with the version in the file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupImportModeOverwriteTodosExtra(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Also replaces $count to-dos already on this device',
+      one: 'Also replaces 1 to-do already on this device',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupOverwriteAllTodos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count to-dos',
+      one: '1 to-do',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupOverwriteExistingTodosBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'The $count to-dos already on this device will be replaced by the versions in the file.',
+      one:
+          'The 1 to-do already on this device will be replaced by the version in the file.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupImportTodoMergeResult(int added) {
+    String _temp0 = intl.Intl.pluralLogic(
+      added,
+      locale: localeName,
+      other: 'To-dos: $added added',
+      one: 'To-dos: 1 added',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String backupImportTodoOverwriteResult(int added, int replaced) {
+    return 'To-dos: $added added, $replaced overwritten';
+  }
+
+  @override
+  String get navTodos => 'To-dos';
+
+  @override
+  String get appSurfaceAreaTodos => 'To-dos';
+
+  @override
+  String get settingsFeaturesTodosSubtitle =>
+      'To-dos, lists and reminders separate from your diary';
+
+  @override
+  String get todoViewToday => 'Today';
+
+  @override
+  String get todoViewPlanned => 'Planned';
+
+  @override
+  String get todoViewImportant => 'Important';
+
+  @override
+  String get todoViewAll => 'All';
+
+  @override
+  String get todoViewCompleted => 'Completed';
+
+  @override
+  String get todoViewInbox => 'Inbox';
+
+  @override
+  String get todoGroupOverdue => 'Overdue';
+
+  @override
+  String get todoGroupToday => 'Today';
+
+  @override
+  String get todoGroupTomorrow => 'Tomorrow';
+
+  @override
+  String get todoGroupNextDays => 'Next 7 days';
+
+  @override
+  String get todoGroupLater => 'Later';
+
+  @override
+  String get todoGroupNoDate => 'No date';
+
+  @override
+  String todoGroupCompleted(int count) {
+    return 'Completed $count';
+  }
+
+  @override
+  String get todoNew => 'New to-do';
+
+  @override
+  String get todoQuickAddHint => 'What needs doing?';
+
+  @override
+  String get todoQuickAddSubmit => 'Add';
+
+  @override
+  String get todoSearchHint => 'Search to-dos';
+
+  @override
+  String get todoEmptyToday => 'Nothing to do today';
+
+  @override
+  String get todoEmptyList => 'No to-dos here yet';
+
+  @override
+  String get todoEmptyCompleted => 'No completed to-dos yet';
+
+  @override
+  String get todoEmptySearch => 'No matching to-dos';
+
+  @override
+  String todoSortLabel(String mode) {
+    return 'Sort: $mode';
+  }
+
+  @override
+  String get todoSortManual => 'Manual';
+
+  @override
+  String get todoSortDue => 'Due date';
+
+  @override
+  String get todoSortPriority => 'Priority';
+
+  @override
+  String get todoSortCreated => 'Date created';
+
+  @override
+  String get todoSortTitle => 'Sort by';
+
+  @override
+  String get todoShowCompleted => 'Show completed';
+
+  @override
+  String get todoHideCompleted => 'Hide completed';
+
+  @override
+  String get todoClearCompleted => 'Clear completed';
+
+  @override
+  String get todoClearCompletedTitle => 'Clear completed to-dos?';
+
+  @override
+  String todoClearCompletedBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count completed to-dos will be deleted. You can undo from the notice.',
+      one: '1 completed to-do will be deleted. You can undo from the notice.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoClearedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cleared $count to-dos',
+      one: 'Cleared 1 to-do',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get todoCompletedNotice => 'Completed';
+
+  @override
+  String todoCompletedNextNotice(String date) {
+    return 'Completed. Next: $date';
+  }
+
+  @override
+  String get todoDeletedNotice => 'To-do deleted';
+
+  @override
+  String get todoDelete => 'Delete to-do';
+
+  @override
+  String get todoMarkDone => 'Mark as done';
+
+  @override
+  String get todoMarkUndone => 'Mark as not done';
+
+  @override
+  String get todoMore => 'More';
+
+  @override
+  String get todoListsSection => 'Lists';
+
+  @override
+  String get todoListNew => 'New list';
+
+  @override
+  String get todoListEdit => 'Edit list';
+
+  @override
+  String get todoListNameHint => 'List name';
+
+  @override
+  String get todoListManage => 'Manage lists';
+
+  @override
+  String get todoListDelete => 'Delete list';
+
+  @override
+  String todoListDeleteTitle(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String todoListDeleteBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Its $count to-dos will be deleted too. You can undo from the notice.',
+      one: 'Its 1 to-do will be deleted too. You can undo from the notice.',
+      zero: 'The list is empty. You can undo from the notice.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get todoListDeletedNotice => 'List deleted';
+
+  @override
+  String get todoListColor => 'Color';
+
+  @override
+  String get todoListIcon => 'Icon';
+
+  @override
+  String get todoListEmptyManage =>
+      'No lists yet. Group to-dos by work, home and so on to find them faster.';
+
+  @override
+  String get todoDetailTitle => 'To-do';
+
+  @override
+  String get todoNoteHint => 'Add a note';
+
+  @override
+  String get todoStepAdd => 'Add a step';
+
+  @override
+  String get todoStepDelete => 'Delete step';
+
+  @override
+  String todoStepsProgress(int done, int total) {
+    return '$done/$total';
+  }
+
+  @override
+  String get todoFieldDue => 'Date';
+
+  @override
+  String get todoFieldDueEmpty => 'Add date';
+
+  @override
+  String get todoFieldReminders => 'Reminders';
+
+  @override
+  String get todoFieldRemindersEmpty => 'Add reminder';
+
+  @override
+  String get todoFieldRepeat => 'Repeat';
+
+  @override
+  String get todoFieldPriority => 'Priority';
+
+  @override
+  String get todoFieldList => 'List';
+
+  @override
+  String get todoFieldDiary => 'Linked diary';
+
+  @override
+  String get todoFieldDiaryEmpty => 'Link a diary';
+
+  @override
+  String get todoFieldDiaryMissing => 'The diary no longer exists';
+
+  @override
+  String get todoRemoveField => 'Clear';
+
+  @override
+  String todoCreatedAt(String time) {
+    return 'Created $time';
+  }
+
+  @override
+  String todoCompletedAt(String time) {
+    return 'Completed $time';
+  }
+
+  @override
+  String get todoNotFound => 'This to-do was deleted';
+
+  @override
+  String get todoPriorityNone => 'None';
+
+  @override
+  String get todoPriorityLow => 'Low';
+
+  @override
+  String get todoPriorityMedium => 'Medium';
+
+  @override
+  String get todoPriorityHigh => 'High';
+
+  @override
+  String get todoDueToday => 'Today';
+
+  @override
+  String get todoDueTomorrow => 'Tomorrow';
+
+  @override
+  String get todoDueYesterday => 'Yesterday';
+
+  @override
+  String get todoDueNextWeek => 'Next Monday';
+
+  @override
+  String get todoDuePickDate => 'Pick a date…';
+
+  @override
+  String get todoDueAllDay => 'All day';
+
+  @override
+  String get todoDueSetTime => 'Set time';
+
+  @override
+  String get todoDueRemove => 'Remove date';
+
+  @override
+  String todoDueWithTime(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String get todoReminderAtDue => 'At due time';
+
+  @override
+  String todoReminderMinutesBefore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes before',
+      one: '1 minute before',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoReminderHoursBefore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours before',
+      one: '1 hour before',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoReminderDaysBefore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days before',
+      one: '1 day before',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoReminderOnDayAt(String time) {
+    return 'On the day at $time';
+  }
+
+  @override
+  String todoReminderDaysBeforeAt(int count, String time) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days before at $time',
+      one: '1 day before at $time',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get todoReminderCustom => 'Custom time…';
+
+  @override
+  String todoReminderLimit(int count) {
+    return 'Up to $count reminders';
+  }
+
+  @override
+  String get todoReminderRemove => 'Remove reminder';
+
+  @override
+  String get todoRepeatNone => 'Never';
+
+  @override
+  String get todoRepeatDaily => 'Daily';
+
+  @override
+  String get todoRepeatLegalWorkdays => 'Workdays (China public holidays)';
+
+  @override
+  String todoRepeatWeeklyOn(String days) {
+    return 'Weekly on $days';
+  }
+
+  @override
+  String todoRepeatMonthlyOnDay(int day) {
+    return 'Monthly on day $day';
+  }
+
+  @override
+  String todoRepeatMonthlyOrdinal(String ordinal, String weekday) {
+    String _temp0 = intl.Intl.selectLogic(ordinal, {
+      '1': 'first',
+      '2': 'second',
+      '3': 'third',
+      '4': 'fourth',
+      'other': 'fifth',
+    });
+    return 'Monthly on the $_temp0 $weekday';
+  }
+
+  @override
+  String get todoRepeatMonthlyLastDay => 'Monthly on the last day';
+
+  @override
+  String todoRepeatYearlyOn(String date) {
+    return 'Yearly on $date';
+  }
+
+  @override
+  String todoRepeatEveryDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Every $count days',
+      one: 'Every day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoRepeatEveryWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Every $count weeks',
+      one: 'Every week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoRepeatEveryMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Every $count months',
+      one: 'Every month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoRepeatEveryYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Every $count years',
+      one: 'Every year',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoRepeatSummaryJoin(String a, String b) {
+    return '$a · $b';
+  }
+
+  @override
+  String get todoRepeatCustom => 'Custom…';
+
+  @override
+  String get todoRepeatCustomTitle => 'Custom repeat';
+
+  @override
+  String get todoRepeatUnitDay => 'Day';
+
+  @override
+  String get todoRepeatUnitWeek => 'Week';
+
+  @override
+  String get todoRepeatUnitMonth => 'Month';
+
+  @override
+  String get todoRepeatUnitYear => 'Year';
+
+  @override
+  String get todoRepeatInterval => 'Every';
+
+  @override
+  String get todoRepeatOnDays => 'On';
+
+  @override
+  String get todoRepeatFromCompletion => 'Count from completion';
+
+  @override
+  String get todoRepeatFromCompletionSubtitle =>
+      'For things like watering plants: again a while after you do it';
+
+  @override
+  String get todoRepeatEnds => 'Ends';
+
+  @override
+  String get todoRepeatEndsNever => 'Never';
+
+  @override
+  String todoRepeatEndsOn(String date) {
+    return 'Until $date';
+  }
+
+  @override
+  String todoRepeatEndsAfter(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count times',
+      one: '1 time',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get todoRepeatEndsOnPick => 'On a date';
+
+  @override
+  String get todoRepeatEndsAfterPick => 'After a number of times';
+
+  @override
+  String get todoRepeatNeedsDate => 'Repeating starts today';
+
+  @override
+  String get todoSettingsTitle => 'To-dos';
+
+  @override
+  String get todoSettingsSubtitle => 'Lists, display and reminders';
+
+  @override
+  String get todoSettingsDisplayGroup => 'Display';
+
+  @override
+  String get todoSettingsShowCompletedSubtitle =>
+      'Show completed to-dos at the bottom of lists and the inbox';
+
+  @override
+  String get todoSettingsDefaultList => 'New to-dos go to';
+
+  @override
+  String get todoSettingsDefaultView => 'Open to';
+
+  @override
+  String get todoNotificationChannel => 'To-do reminders';
+
+  @override
+  String get todoNotificationChannelDescription =>
+      'Notifies you at the reminder times you set on to-dos';
+
+  @override
+  String get todoNotificationComplete => 'Done';
+
+  @override
+  String get todoNotificationSnooze => 'Snooze';
+
+  @override
+  String get todoNotificationOpen => 'Open';
+
+  @override
+  String get todoNotificationSnoozedBody => 'Snoozed reminder';
+
+  @override
+  String get todoSettingsRemindersGroup => 'Reminders';
+
+  @override
+  String get todoSettingsPermission => 'Notification permission';
+
+  @override
+  String get todoSettingsPermissionOn => 'Allowed';
+
+  @override
+  String get todoSettingsPermissionOff => 'Not allowed. Tap to turn on';
+
+  @override
+  String get todoSettingsExactOff =>
+      'Exact alarms are restricted by the system, so reminders may be a few minutes late';
+
+  @override
+  String get todoSettingsAllDayTime => 'All-day reminder time';
+
+  @override
+  String get todoSettingsSnooze => 'Snooze for';
+
+  @override
+  String todoSettingsSnoozeMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get todoSettingsHideContent => 'Hide content on the lock screen';
+
+  @override
+  String get todoSettingsHideContentSubtitle =>
+      'The lock screen only shows that there\'s a reminder; unlock to see what it is';
+
+  @override
+  String get todoSettingsDesktopNote =>
+      'On computers, reminders only appear while Jotsy is open. Reminders that come due while it\'s closed won\'t pop up.';
+
+  @override
+  String get todoSettingsReliability => 'Reminders late or missing?';
+
+  @override
+  String get todoSettingsReliabilityBody =>
+      'Some phone systems restrict apps in the background. If reminders often don\'t ring or arrive late, allow Jotsy to auto-start, turn off battery optimization for Jotsy, and make sure the Notifications and Alarms & reminders permissions are on in system settings.';
+
+  @override
+  String get todoReminderPermissionDenied =>
+      'Notifications are off, so reminders won\'t appear';
+
+  @override
+  String get todoReminderPermissionAction => 'Turn on';
+
+  @override
+  String get calendarShowTodos => 'Show to-dos';
+
+  @override
+  String get calendarShowTodosDescription =>
+      'Mark days with to-dos and list them when a day is selected';
+
+  @override
+  String get calendarAddTodo => 'Add a to-do';
+
+  @override
+  String get calendarTodoSectionTitle => 'To-dos for this day';
+
+  @override
+  String get calendarTodoRepeatHint =>
+      'An upcoming repeat of this to-do; tick it when it comes';
+
+  @override
+  String get diaryPreviewAddTodo => 'Add a to-do';
+
+  @override
+  String get diaryPreviewConvertTodos => 'Copy checklist to to-dos';
+
+  @override
+  String get todoConvertTitle => 'Copy to to-dos';
+
+  @override
+  String get todoConvertHint =>
+      'The selected items are added as to-dos linked to this diary. The diary itself is unchanged.';
+
+  @override
+  String todoConvertSubmit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count',
+      one: 'Add 1',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String todoConvertDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Added $count to-dos',
+      one: 'Added 1 to-do',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get diaryLinkedTodosTitle => 'Related to-dos';
+
+  // Added customizations
+  @override
+  String get settingsThemeMode => 'Theme';
+  @override
+  String get settingsThemeColor => 'Theme';
+  @override
+  String get settingsLanguageSubtitle => 'Switch app language';
+  @override
+  String get settingsAppearanceLanguage => 'Appearance & Language';
+  @override
+  String get settingsEditorGroup => 'Editor';
+  @override
+  String get settingsEditorToolsGroup => 'Toolbar & mood';
+  @override
+  String get settingsMoodOptionsSubtitle => 'Customize the emoji and color of 10 moods';
+  @override
+  String get settingsDataPrivacy => 'Data & Privacy';
+  @override
+  String get settingsDataPrivacySubtitle => 'Manage backups, app lock, and recycle bin';
+  @override
+  String get settingsDataPrivacyTitle => 'Data & Privacy';
+  @override
+  String get settingsTagManagementSubtitle => 'Deleting a tag only unlinks it from diaries';
+  @override
+  String get settingsRecycleBinSubtitle => 'Restore or permanently remove deleted diaries';
+  @override
+  String get settingsAboutSubtitle => 'App info, repo, and version';
+  @override
+  String get diaryDraftsSettingsSubtitle => 'Unpublished entries you can keep writing or delete';
+  @override
+  String get diaryTemplatesDragHandle => 'Drag to reorder';
+  @override
+  String get notebookSettingsSubtitle => 'Organize, reorder and merge your notebooks';
+  @override
+  String get notebookDragHandle => 'Drag to reorder';
+  @override
+  String get notebookContentsDragHandle => 'Drag to reorder';
 }

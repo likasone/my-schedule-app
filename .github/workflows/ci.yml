@@ -64,8 +64,10 @@ jobs:
             while IFS= read -r line; do
               echo "::error::$line"
             done < analyze_err.txt
+            rm -f analyze_err.txt
             exit 1
           }
+          rm -f analyze_err.txt
 
       - name: Check ARB metadata
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
@@ -76,6 +78,7 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           git checkout -- .
+          git clean -fd
           flutter gen-l10n
           dart run build_runner build --delete-conflicting-outputs
           changes="$(git status --porcelain --untracked-files=all)"

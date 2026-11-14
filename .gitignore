@@ -49,5 +49,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Build error logs
+*_err.txt
+
 # 网盘备份的应用密钥（--dart-define-from-file），不入库
 cloud_backup_keys.json
