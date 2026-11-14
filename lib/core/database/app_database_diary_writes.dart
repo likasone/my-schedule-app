@@ -213,9 +213,9 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
             errorStr.contains('code 8') ||
             errorStr.contains('code 5') ||
             errorStr.contains('database is locked');
-        if (isLockOrReadonly && attempts < 4) {
-          // 遇到并发读锁或杀毒软件锁冲突时，退避重试 (100ms, 200ms, 300ms)
-          await Future<void>.delayed(Duration(milliseconds: 100 * attempts));
+        if (isLockOrReadonly && attempts < 5) {
+          // 遇到并发读锁或杀毒软件锁冲突时，退避重试 (150ms, 300ms, 450ms, 600ms)
+          await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;
         }
         rethrow;
@@ -254,8 +254,8 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
             errorStr.contains('code 8') ||
             errorStr.contains('code 5') ||
             errorStr.contains('database is locked');
-        if (isLockOrReadonly && attempts < 4) {
-          await Future<void>.delayed(Duration(milliseconds: 100 * attempts));
+        if (isLockOrReadonly && attempts < 5) {
+          await Future<void>.delayed(Duration(milliseconds: 150 * attempts));
           continue;
         }
         rethrow;

@@ -180,6 +180,16 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final root = await appDataRootDirectory();
     final file = File(p.join(root.path, 'node_diary.sqlite'));
-    return NativeDatabase.createInBackground(file);
+    return NativeDatabase.createInBackground(
+      file,
+      setup: (database) {
+        // 在底层 C 句柄刚建立时开启 WAL 模式与繁忙等待超时：
+        // 1. WAL 模式让读写在文件层完全解耦，读不阻塞写，写不阻塞读；
+        // 2. 5000ms busy_timeout 让 Windows 文件锁冲突时自旋等待最多 5 秒；
+        // 3. 不执行 PRAGMA foreign_keys=ON，避免历史非级联数据校验崩溃。
+        database.execute('PRAGMA journal_mode = WAL;');
+        database.execute('PRAGMA busy_timeout = 5000;');
+      },
+    );
   });
 }
