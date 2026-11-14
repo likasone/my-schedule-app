@@ -129,42 +129,48 @@ class _DiaryTagText extends StatelessWidget {
       fontSize: 11 * scale,
     );
     if (style == DiaryCardTagStyle.dot) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            width: 6 * scale,
-            height: 6 * scale,
-            decoration: BoxDecoration(color: hashColor, shape: BoxShape.circle),
-          ),
-          SizedBox(width: 4 * scale),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: labelStyle,
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 200 * scale),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 6 * scale,
+              height: 6 * scale,
+              decoration: BoxDecoration(color: hashColor, shape: BoxShape.circle),
             ),
-          ),
-        ],
+            SizedBox(width: 4 * scale),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: labelStyle,
+              ),
+            ),
+          ],
+        ),
       );
     }
-    final text = Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: '# ',
-            style: textTheme.labelSmall?.copyWith(
-              color: hashColor,
-              fontWeight: FontWeight.w800,
-              fontSize: 10.5 * scale,
+    final text = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 180 * scale),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '# ',
+              style: textTheme.labelSmall?.copyWith(
+                color: hashColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 10.5 * scale,
+              ),
             ),
-          ),
-          TextSpan(text: label, style: labelStyle),
-        ],
+            TextSpan(text: label, style: labelStyle),
+          ],
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
     );
     if (style == DiaryCardTagStyle.plain) {
       return text;

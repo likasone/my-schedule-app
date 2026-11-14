@@ -377,26 +377,17 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
       diaryTags,
     )..where((DiaryTags t) => t.diaryId.equals(diaryId))).go();
 
-    // 标签列表去重
-    final normalizedTagIds = tagIds.toSet().toList();
+    // 标签列表去重并过滤非正数 ID
+    final normalizedTagIds = tagIds.where((int id) => id > 0).toSet().toList();
     if (normalizedTagIds.isEmpty) {
       return;
     }
 
-    // 验证待关联的标签 ID 是否真实存在于 tags 表中，过滤已废弃或无效外键，规避外键冲突与批量写入异常
-    final existingTags = await (select(tags)
-          ..where((Tags t) => t.id.isIn(normalizedTagIds)))
-        .get();
-    final validTagIds = existingTags.map((Tag t) => t.id).toSet();
-    final safeTagIds = normalizedTagIds.where(validTagIds.contains).toList();
-    if (safeTagIds.isEmpty) {
-      return;
-    }
-
+    // 对齐原版实现，在事务内直接批量写入关联记录，杜绝事务内嵌套查询导致的锁冲突或标签被误判过滤
     await batch((Batch batch) {
       batch.insertAll(
         diaryTags,
-        safeTagIds.map(
+        normalizedTagIds.map(
           (int tagId) =>
               DiaryTagsCompanion.insert(diaryId: diaryId, tagId: tagId),
         ),

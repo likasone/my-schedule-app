@@ -599,21 +599,30 @@ ORDER BY updated_at DESC
   /// 解析 SQL 聚合得到的标签 JSON 字符串。
   List<Tag> _parseTagsJson(String rawJson) {
     try {
-      final decoded = jsonDecode(rawJson);
-      if (decoded is! List<dynamic>) {
+      final dynamic decoded = jsonDecode(rawJson);
+      if (decoded is! List) {
         return const <Tag>[];
       }
 
-      return decoded
-          .whereType<Map<String, dynamic>>()
-          .map((entry) {
-            return Tag(
-              id: (entry['id'] as num).toInt(),
-              name: entry['name'] as String,
-              color: (entry['color'] as num).toInt(),
+      final tags = <Tag>[];
+      for (final dynamic item in decoded) {
+        // 宽松校验 Map 类型（兼容 Map<dynamic, dynamic> 与各类 Dart AOT 运行时 Map 子类型）
+        if (item is Map) {
+          final idRaw = item['id'];
+          final nameRaw = item['name'];
+          final colorRaw = item['color'];
+          if (idRaw is num && nameRaw != null && colorRaw is num) {
+            tags.add(
+              Tag(
+                id: idRaw.toInt(),
+                name: nameRaw.toString(),
+                color: colorRaw.toInt(),
+              ),
             );
-          })
-          .toList(growable: false);
+          }
+        }
+      }
+      return List<Tag>.unmodifiable(tags);
     } catch (_) {
       return const <Tag>[];
     }

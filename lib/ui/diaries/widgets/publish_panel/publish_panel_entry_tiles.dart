@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:node_diary/core/database/app_database.dart';
+import 'package:node_diary/core/services/app_service.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
 import 'package:node_diary/ui/diaries/models/diary_meta_draft.dart';
 import 'package:node_diary/ui/diaries/models/time_capsule.dart';
@@ -13,7 +15,7 @@ import 'package:node_diary/ui/widgets/value_listenable_selector.dart';
 import 'publish_panel_tile.dart';
 
 /// 标签行：只展示已选标签摘要，点按进入标签子页。
-class PublishTagTile extends StatelessWidget {
+class PublishTagTile extends ConsumerWidget {
   const PublishTagTile({
     super.key,
     required this.draft,
@@ -26,13 +28,15 @@ class PublishTagTile extends StatelessWidget {
   final VoidCallback onOpen;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    // 优先实时 watch 全局 tagListProvider，保证新建标签后即使父级传入参数尚未刷新也能即时获得全量标签定义
+    final liveTags = ref.watch(tagListProvider).asData?.value ?? tags;
     return ValueListenableSelector<DiaryMetaDraft, Set<int>>(
       valueListenable: draft,
       selector: (value) => value.tagIds,
       builder: (context, tagIds, _) {
-        final selectedTags = tags
+        final selectedTags = liveTags
             .where((tag) => tagIds.contains(tag.id))
             .toList(growable: false);
         return PublishPanelTile(
@@ -42,16 +46,23 @@ class PublishTagTile extends StatelessWidget {
               Text(l10n.autoT0109, style: PublishPanelTile.titleStyle(context)),
               const SizedBox(width: 12),
               Expanded(
-                child: selectedTags.isEmpty
+                child: tagIds.isEmpty
                     ? Text(
                         l10n.autoT0164,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
                       )
-                    // 与日记卡片同一套标签微胶囊（DESIGN.md §5.2），最多三个，
-                    // 其余以 +N 汇总，窄屏时换行而不是横向滚动。
-                    : DiaryItemTagRow(tags: selectedTags, maxVisibleTags: 3),
+                    : selectedTags.isNotEmpty
+                        // 与日记卡片同一套标签微胶囊（DESIGN.md §5.2），最多三个，
+                        // 其余以 +N 汇总，窄屏时换行而不是横向滚动。
+                        ? DiaryItemTagRow(tags: selectedTags, maxVisibleTags: 3)
+                        : Text(
+                            '已选择 ${tagIds.length} 个标签',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
               ),
               const SizedBox(width: 8),
               const FaIcon(FontAwesomeIcons.angleRight, size: 14),

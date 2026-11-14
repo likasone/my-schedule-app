@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:node_diary/core/database/app_database.dart';
+import 'package:node_diary/core/services/app_service.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
 import 'package:node_diary/ui/diaries/models/diary_meta_draft.dart';
 import 'package:node_diary/ui/diaries/viewmodels/diary_meta_draft_controller.dart';
@@ -13,7 +15,7 @@ import 'package:node_diary/ui/widgets/qweather_icon.dart';
 /// 收起态不再只是一句“上划展开”：用户不展开也能看到这篇日记带着哪些
 /// 标签、心情、地点。摘要排成一行富文本，空间不足时末尾省略；点按摘要
 /// 展开面板由外层表头负责。
-class PublishPanelSummaryBar extends StatelessWidget {
+class PublishPanelSummaryBar extends ConsumerWidget {
   const PublishPanelSummaryBar({
     super.key,
     required this.draft,
@@ -35,7 +37,8 @@ class PublishPanelSummaryBar extends StatelessWidget {
   final bool showCapsule;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveTags = ref.watch(tagListProvider).asData?.value ?? tags;
     return ValueListenableBuilder<DiaryMetaDraft>(
       valueListenable: draft,
       builder: (context, value, _) => KeyedSubtree(
@@ -43,7 +46,7 @@ class PublishPanelSummaryBar extends StatelessWidget {
         child: _SummaryLine(
           items: publishPanelSummary(
             value,
-            tags,
+            liveTags,
             notebooks: notebooks,
             includeCapsule: showCapsule,
           ),
