@@ -84,12 +84,13 @@ class TagFilterChip extends StatelessWidget {
           child: AnimatedContainer(
             duration: ExpressiveMotion.duration(context, ExpressiveMotion.fast),
             curve: ExpressiveMotion.effects,
+            alignment: Alignment.center,
             padding: padding,
             decoration: BoxDecoration(
               color: backgroundColor,
               borderRadius: BorderRadius.circular(effectiveRadius),
               border: animateBorder
-                  ? Border.all(color: borderColor, width: selected ? 2.0 : 1.2)
+                  ? Border.all(color: borderColor, width: selected ? 1.5 : 1.0)
                   : null,
               boxShadow: selected && showSelectedShadow
                   ? <BoxShadow>[
@@ -105,9 +106,12 @@ class TagFilterChip extends StatelessWidget {
               style: Theme.of(context).textTheme.labelMedium!.copyWith(
                 color: foregroundColor,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                height: 1.2,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
                   if (leading != null) ...[
                     IconTheme(
@@ -125,12 +129,18 @@ class TagFilterChip extends StatelessWidget {
                           style: TextStyle(
                             color: colorDot,
                             fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
+                            fontSize: 12.0,
+                            height: 1.2,
+                          ),
+                          strutStyle: const StrutStyle(
+                            fontSize: 12.0,
+                            height: 1.2,
+                            forceStrutHeight: true,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                   ],
                   Flexible(
                     fit: FlexFit.loose,
@@ -138,6 +148,11 @@ class TagFilterChip extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      strutStyle: const StrutStyle(
+                        fontSize: 12.0,
+                        height: 1.2,
+                        forceStrutHeight: true,
+                      ),
                     ),
                   ),
                 ],

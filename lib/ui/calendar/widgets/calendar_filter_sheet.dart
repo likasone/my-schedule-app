@@ -243,12 +243,9 @@ class _CalendarFilterSheetState extends ConsumerState<CalendarFilterSheet> {
       label: tag.name,
       colorDot: tagColor,
       selected: selected,
-      selectedColor: tagColor.withValues(alpha: isLight ? 0.22 : 0.36),
-      selectedForegroundColor:
-          isLight &&
-              ThemeData.estimateBrightnessForColor(tagColor) == Brightness.dark
-          ? tagColor
-          : colorScheme.onSurface,
+      selectedColor: tagColor.withValues(alpha: isLight ? 0.16 : 0.26),
+      // 选中的文本使用高对比度正文色，避免与浅色标签背景混色导致文字被覆盖
+      selectedForegroundColor: colorScheme.onSurface,
       selectedBorderColor: tagColor,
       unselectedColor: tagColor.withValues(alpha: isLight ? 0.08 : 0.16),
       unselectedForegroundColor: colorScheme.onSurface,

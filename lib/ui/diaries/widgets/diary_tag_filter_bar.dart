@@ -323,16 +323,14 @@ class _DiaryTagFilterBarState extends State<DiaryTagFilterBar> {
     final unselectedBorder = tagColor.withValues(alpha: isLight ? 0.22 : 0.32);
     final unselectedText = colorScheme.onSurface;
 
-    final tagTint = tagColor.withValues(alpha: isLight ? 0.22 : 0.36);
+    // 选中底色：柔和的标签强调色微底，在玻璃模式下与玻璃底色优雅混色
+    final tagTint = tagColor.withValues(alpha: isLight ? 0.16 : 0.26);
     final selectedBg = glass == null
         ? tagTint
         : Color.alphaBlend(tagTint, glass.fill);
     final selectedBorder = tagColor;
-    final selectedText = isLight
-        ? (ThemeData.estimateBrightnessForColor(tagColor) == Brightness.dark
-              ? tagColor
-              : colorScheme.onSurface)
-        : colorScheme.onSurface;
+    // 选中的文本必须始终保持高对比度清晰文本色（onSurface），杜绝用标签同色造成字体被背景颜色覆盖
+    final selectedText = colorScheme.onSurface;
 
     // A horizontal ListView supplies a tight chip-extent cross-axis constraint, but a
     // Multi-row layout otherwise uses the chip's smaller intrinsic height. Retain that same

@@ -104,6 +104,14 @@ class AppDatabase extends _$AppDatabase
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    beforeOpen: (OpeningDetails details) async {
+      // 启用 Write-Ahead Logging (WAL) 模式：读写彻底分离并发，消灭多连接/流监听下的锁争用与只读锁定 (SqliteException 8)
+      await customStatement('PRAGMA journal_mode=WAL;');
+      // 开启 5000ms 繁忙等待重试超时，避免瞬时并发写锁导致 SQLITE_BUSY / SQLITE_READONLY
+      await customStatement('PRAGMA busy_timeout=5000;');
+      // 启用外键级联完整性检查
+      await customStatement('PRAGMA foreign_keys=ON;');
+    },
     onCreate: (Migrator m) async {
       await m.createAll();
     },
