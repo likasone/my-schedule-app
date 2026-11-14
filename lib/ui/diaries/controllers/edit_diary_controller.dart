@@ -15,6 +15,7 @@ class EditDiaryController {
       readSnapshot: _captureEditSnapshot,
       writeSnapshot: _persistEditSnapshot,
       onError: (error) {
+        debugPrint('Diary autosave error: $error');
         if (_state.mounted) {
           _showHint(_state.context.l10n.autoT0087(error.toString()));
         }
@@ -360,8 +361,9 @@ class EditDiaryController {
 
   Map<String, Object?>? _decodeMetadataObject(String raw) {
     try {
-      final decoded = jsonDecode(raw);
-      return decoded is Map<String, Object?> ? decoded : null;
+      final dynamic decoded = jsonDecode(raw);
+      // 宽松校验 Map 类型并转换，兼容跨平台运行时返回的 _Map<dynamic, dynamic> 结构
+      return decoded is Map ? decoded.cast<String, Object?>() : null;
     } catch (_) {
       return null;
     }

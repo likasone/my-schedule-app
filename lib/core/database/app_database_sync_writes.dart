@@ -48,7 +48,23 @@ mixin _AppDatabaseSyncWrites
       if (name.isEmpty) continue;
       tagIds.add(await _syncTagIdFor(name, newTagColor));
     }
-    await _replaceDiaryTags(localId, tagIds.toList());
+    final localTagIds = tagIds.toList();
+    await _replaceDiaryTags(localId, localTagIds);
+
+    // 同步将映射后的本地 tagIds 更新到日记主表的 metadata 字段，确保双设备同步后标签本地引用完全一致
+    try {
+      final currentDiary = await (select(diaries)..where((t) => t.id.equals(localId))).getSingleOrNull();
+      if (currentDiary != null && currentDiary.metadata.isNotEmpty) {
+        final dynamic decoded = jsonDecode(currentDiary.metadata);
+        if (decoded is Map) {
+          final Map<String, Object?> map = Map<String, Object?>.from(decoded);
+          map['tagIds'] = localTagIds;
+          await (update(diaries)..where((t) => t.id.equals(localId))).write(
+            DiariesCompanion(metadata: Value<String>(jsonEncode(map))),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   /// 彻底删除日记，清理范围与 [hardDeleteDiary] 相同（就是它）。

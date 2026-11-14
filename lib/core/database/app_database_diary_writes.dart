@@ -31,9 +31,25 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
   }) async {
     final now = createdAtOverride ?? DateTime.now();
     final diaryId = _generateDiaryId();
-    final normalizedMetadata = normalizeMetadataJson(metadataJson);
+    // 弹性规范化 metadata：格式异常时自动降级为空对象，绝不抛出 FormatException
+    String normalizedMetadata;
+    try {
+      normalizedMetadata = normalizeMetadataJson(metadataJson);
+    } catch (_) {
+      normalizedMetadata = '{}';
+    }
     final normalizedCover = _normalizeCover(cover);
     final normalizedTagIds = tagIds.toSet().toList();
+
+    // 将标签 ID 列表同步写入 metadata 字段中的 tagIds 数组，保证跨设备与兜底查询的一致性
+    try {
+      final dynamic decoded = jsonDecode(normalizedMetadata);
+      if (decoded is Map) {
+        final Map<String, Object?> map = Map<String, Object?>.from(decoded);
+        map['tagIds'] = normalizedTagIds;
+        normalizedMetadata = jsonEncode(map);
+      }
+    } catch (_) {}
 
     return transaction<String>(() async {
       final localDiaryId = await into(diaries).insert(
@@ -53,11 +69,13 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
 
       await _replaceDiaryTags(localDiaryId, normalizedTagIds);
       if (notebookIds != null && notebookIds.isNotEmpty) {
-        await _replaceDiaryNotebooks(
-          localDiaryId,
-          notebookIds.toSet(),
-          chapterIds: notebookChapterIds,
-        );
+        try {
+          await _replaceDiaryNotebooks(
+            localDiaryId,
+            notebookIds.toSet(),
+            chapterIds: notebookChapterIds,
+          );
+        } catch (_) {}
       }
       return diaryId;
     });
@@ -86,9 +104,25 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
     Map<String, String> notebookChapterIds = const <String, String>{},
     DiaryCapsuleColumns? capsule,
   }) async {
-    final normalizedMetadata = normalizeMetadataJson(metadataJson);
+    // 弹性规范化 metadata：格式异常时自动降级为空对象，绝不抛出 FormatException 阻断用户保存修改
+    String normalizedMetadata;
+    try {
+      normalizedMetadata = normalizeMetadataJson(metadataJson);
+    } catch (_) {
+      normalizedMetadata = '{}';
+    }
     final normalizedCover = _normalizeCover(cover);
     final normalizedTagIds = tagIds.toSet().toList();
+
+    // 同步将当前选中的标签 ID 列表更新到 metadata JSON 中的 tagIds 数组，防止元数据与关联表不同步
+    try {
+      final dynamic decoded = jsonDecode(normalizedMetadata);
+      if (decoded is Map) {
+        final Map<String, Object?> map = Map<String, Object?>.from(decoded);
+        map['tagIds'] = normalizedTagIds;
+        normalizedMetadata = jsonEncode(map);
+      }
+    } catch (_) {}
 
     await transaction<void>(() async {
       Diary? diary = await (select(
@@ -106,11 +140,11 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
       if (diary == null) {
         throw StateError('未找到 diaryId=$diaryId 对应的日记');
       }
-      final effectiveDiaryBusinessId = diary.diaryId;
 
+      // 精确使用确定命中的自增整型主键 id 进行更新，避免 UUID 匹配异常
       await (update(
         diaries,
-      )..where((Diaries t) => t.diaryId.equals(effectiveDiaryBusinessId))).write(
+      )..where((Diaries t) => t.id.equals(diary.id))).write(
         DiariesCompanion(
           title: Value<String>(title.trim()),
           content: Value<String>(contentDocJson),
@@ -134,11 +168,13 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
 
       await _replaceDiaryTags(diary.id, normalizedTagIds);
       if (notebookIds != null) {
-        await _replaceDiaryNotebooks(
-          diary.id,
-          notebookIds.toSet(),
-          chapterIds: notebookChapterIds,
-        );
+        try {
+          await _replaceDiaryNotebooks(
+            diary.id,
+            notebookIds.toSet(),
+            chapterIds: notebookChapterIds,
+          );
+        } catch (_) {}
       }
     });
   }

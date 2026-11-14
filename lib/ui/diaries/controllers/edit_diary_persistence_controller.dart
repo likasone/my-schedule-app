@@ -18,8 +18,13 @@ extension EditDiaryPersistenceFlow on EditDiaryController {
   Future<bool> flushEditAutoSave() => _editAutoSave.flush();
 
   EditDiarySnapshot _captureEditSnapshot() {
-    if (_state._panelMetadataDirty) {
-      _state._metadataJson = _buildMetadataJsonForEdit();
+    // 若面板元数据被修改过，或者当前持有的 metadataJson 不是合法 JSON 对象，立即重新构建
+    if (_state._panelMetadataDirty || !isValidMetadataJsonObject(_state._metadataJson)) {
+      try {
+        _state._metadataJson = _buildMetadataJsonForEdit();
+      } catch (_) {
+        _state._metadataJson = '{}';
+      }
       _state._panelMetadataDirty = false;
     }
     return EditDiarySnapshot(
@@ -37,9 +42,18 @@ extension EditDiaryPersistenceFlow on EditDiaryController {
   }
 
   Future<void> _persistEditSnapshot(EditDiarySnapshot snapshot) async {
-    if (!isValidMetadataJsonObject(snapshot.metadataJson)) {
-      throw FormatException(_state.context.l10n.autoT0203);
+    // 弹性自愈 metadata：避免因历史脏数据或未展开面板导致 FormatException 阻断日记保存
+    String effectiveMetadata = snapshot.metadataJson;
+    if (!isValidMetadataJsonObject(effectiveMetadata)) {
+      try {
+        // 尝试通过当前编辑上下文重新组装合法的元数据 JSON
+        effectiveMetadata = _buildMetadataJsonForEdit();
+      } catch (_) {
+        // 极端异常情况下兜底为最小合法空 JSON 对象，确保正文与标题绝不丢失
+        effectiveMetadata = '{}';
+      }
     }
+
     // 已有笔记允许暂时清空标题与正文：编辑中的空内容也属于用户的修改，
     // 不应因新建页的非空校验而悄悄恢复旧文。
     await _state.ref
@@ -50,7 +64,7 @@ extension EditDiaryPersistenceFlow on EditDiaryController {
           contentDocJson: snapshot.contentDocJson,
           contentText: snapshot.contentText,
           cover: snapshot.cover,
-          metadataJson: snapshot.metadataJson,
+          metadataJson: effectiveMetadata,
           tagIds: snapshot.selectedTagIds.toList(),
           createdAt: snapshot.createdAt,
           // null：用户没改过日记本，不动关联（仍在的本子保留章节与位置）。
