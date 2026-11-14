@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
 
+import '../../../core/services/app_platform.dart';
 import '../../../core/services/settings_service.dart';
 import '../../home/widgets/home_hint_visibility_scope.dart';
 import '../models/app_lock_options.dart';
@@ -92,7 +93,11 @@ class AppLockSettingsFlow {
   /// 系统验证 → 应用密码。
   Future<void> switchToPasscode(BuildContext context) async {
     final l10n = context.l10n;
-    if (await _verifier.systemSupported()) {
+    final settings = _ref.read(settingsServiceProvider).asData?.value;
+    final lockEnabled = settings?.isAppLockEnabled ?? false;
+    // 只有在已开启应用锁、且为移动端手机（保护已有锁不被他人修改）时，才需要系统验证；
+    // 桌面端或应用锁未开启时，直接允许用户设置应用独立密码，避免普通电脑因缺乏 Windows Hello 陷入死锁。
+    if (lockEnabled && AppPlatform.isMobile && await _verifier.systemSupported()) {
       final verified = await _verifier.verifySystem(
         reason: l10n.appLockSwitchToPasscodeReason,
       );

@@ -71,6 +71,10 @@ class IdentityVerifier {
     if ((await store())?.config.hasPasscode ?? false) {
       return true;
     }
+    // 桌面端（Windows/Linux）必须以应用独立密码为准，普通电脑缺乏 Windows Hello 支持时避免误判并自动解除死锁
+    if (AppPlatform.isDesktop) {
+      return false;
+    }
     return _deviceAuth.isSupported();
   }
 
@@ -157,11 +161,10 @@ final identityVerifierProvider = Provider<IdentityVerifier>(
   IdentityVerifier.new,
 );
 
-/// 这台设备上能不能上锁（同步，给界面门控用）：设了应用密码，或平台有系统
-/// 验证。平台有、但设备没设锁屏密码的情况要到验证时才知道（见
-/// [IdentityVerifier.isAvailable]）。
+/// 这台设备上能不能上锁（同步，给界面门控用）：设了应用密码，或移动端有系统
+/// 验证。桌面端必须先设置应用密码后方可开启应用锁。
 bool identityVerificationPossible(AppPasscodeConfig config) =>
-    config.hasPasscode || AppPlatform.supportsDeviceAuth;
+    config.hasPasscode || (AppPlatform.isMobile && AppPlatform.supportsDeviceAuth);
 
 /// [identityVerificationPossible] 的 provider，随密码设置变化。
 final identityVerificationPossibleProvider = Provider<bool>(

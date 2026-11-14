@@ -143,7 +143,18 @@ class AppLockController extends ChangeNotifier {
   }
 
   /// 系统验证方式的遮罩上点“立即解锁”。
-  Future<void> manualUnlock() => _lockAndAuthenticate(prompt: true);
+  Future<void> manualUnlock() async {
+    await _lockAndAuthenticate(prompt: true);
+    // 桌面端逃生安全兜底：如果点击立即解锁后依然锁定，且电脑未设置应用独立密码，
+    // 说明系统无可用 Windows Hello，自动解除应用锁，避免用户在Windows端陷入永久死锁。
+    if (_locked && AppPlatform.isDesktop) {
+      final hasPasscode = (await _verifier.store())?.config.hasPasscode ?? false;
+      if (!hasPasscode) {
+        await _settings.setAppLockEnabled(false);
+        _unlock();
+      }
+    }
+  }
 
   /// 遮罩里的应用密码（或指纹）验证通过。
   void passcodeUnlocked() {
