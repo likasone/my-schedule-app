@@ -14219,41 +14219,57 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get diaryLinkedTodosTitle => '相关待办';
 
-  // Added customizations
   @override
   String get settingsThemeMode => '主题模式';
+
   @override
   String get settingsThemeColor => '主题';
+
   @override
   String get settingsLanguageSubtitle => '切换应用语言';
+
   @override
   String get settingsAppearanceLanguage => '外观与语言';
+
   @override
   String get settingsEditorGroup => '编辑器';
+
   @override
   String get settingsEditorToolsGroup => '工具栏与心情';
+
   @override
   String get settingsMoodOptionsSubtitle => '自定义 10 个心情的符号与颜色';
+
   @override
   String get settingsDataPrivacy => '数据与隐私';
+
   @override
   String get settingsDataPrivacySubtitle => '管理备份、应用锁与回收站';
+
   @override
   String get settingsDataPrivacyTitle => '数据与隐私';
+
   @override
   String get settingsTagManagementSubtitle => '删除标签会自动解除与日记的关联关系';
+
   @override
   String get settingsRecycleBinSubtitle => '管理已删除日记，可恢复或彻底删除';
+
   @override
   String get settingsAboutSubtitle => '应用信息、项目地址与版本信息';
+
   @override
   String get diaryDraftsSettingsSubtitle => '未发布的新建日记，可继续编辑或删除';
+
   @override
   String get diaryTemplatesDragHandle => '拖动排序';
+
   @override
   String get notebookSettingsSubtitle => '整理、排序、合并你的日记本';
+
   @override
   String get notebookDragHandle => '拖动排序';
+
   @override
   String get notebookContentsDragHandle => '拖动排序';
 }

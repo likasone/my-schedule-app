@@ -25785,6 +25785,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Related to-dos'**
   String get diaryLinkedTodosTitle;
+
+  /// Auto-generated metadata for settingsThemeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsThemeMode;
+
+  /// Title for theme color picker in settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsThemeColor;
+
+  /// Auto-generated metadata for settingsLanguageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch app language'**
+  String get settingsLanguageSubtitle;
+
+  /// Settings group title for appearance and language section.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance & Language'**
+  String get settingsAppearanceLanguage;
+
+  /// Settings group title for editor-related options.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get settingsEditorGroup;
+
+  /// Settings group title for editor toolbar and mood options.
+  ///
+  /// In en, this message translates to:
+  /// **'Toolbar & mood'**
+  String get settingsEditorToolsGroup;
+
+  /// Subtitle for mood emoji setting entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize the emoji and color of 10 moods'**
+  String get settingsMoodOptionsSubtitle;
+
+  /// Settings entry label for data and privacy section.
+  ///
+  /// In en, this message translates to:
+  /// **'Data & Privacy'**
+  String get settingsDataPrivacy;
+
+  /// Settings entry subtitle for data and privacy section.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage backups, app lock, and recycle bin'**
+  String get settingsDataPrivacySubtitle;
+
+  /// Secondary page title for data and privacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Data & Privacy'**
+  String get settingsDataPrivacyTitle;
+
+  /// Auto-generated metadata for settingsTagManagementSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting a tag only unlinks it from diaries'**
+  String get settingsTagManagementSubtitle;
+
+  /// Auto-generated metadata for settingsRecycleBinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore or permanently remove deleted diaries'**
+  String get settingsRecycleBinSubtitle;
+
+  /// Auto-generated metadata for settingsAboutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App info, repo, and version'**
+  String get settingsAboutSubtitle;
+
+  /// Subtitle of the drafts entry in Settings → Data & privacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpublished entries you can keep writing or delete'**
+  String get diaryDraftsSettingsSubtitle;
+
+  /// Accessibility label of the drag handle on a template row.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get diaryTemplatesDragHandle;
+
+  /// Subtitle of the Notebooks entry on the settings home.
+  ///
+  /// In en, this message translates to:
+  /// **'Organize, reorder and merge your notebooks'**
+  String get notebookSettingsSubtitle;
+
+  /// Screen-reader label of the drag handle on the management page.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get notebookDragHandle;
+
+  /// Semantics label of the drag handle on a contents row.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get notebookContentsDragHandle;
 }
 
 class _AppLocalizationsDelegate
@@ -25823,24 +25931,4 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
     'that was used.',
   );
-
-  // Added customizations
-  String get settingsThemeMode;
-  String get settingsThemeColor;
-  String get settingsLanguageSubtitle;
-  String get settingsAppearanceLanguage;
-  String get settingsEditorGroup;
-  String get settingsEditorToolsGroup;
-  String get settingsMoodOptionsSubtitle;
-  String get settingsDataPrivacy;
-  String get settingsDataPrivacySubtitle;
-  String get settingsDataPrivacyTitle;
-  String get settingsTagManagementSubtitle;
-  String get settingsRecycleBinSubtitle;
-  String get settingsAboutSubtitle;
-  String get diaryDraftsSettingsSubtitle;
-  String get diaryTemplatesDragHandle;
-  String get notebookSettingsSubtitle;
-  String get notebookDragHandle;
-  String get notebookContentsDragHandle;
 }

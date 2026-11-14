@@ -14471,41 +14471,63 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get diaryLinkedTodosTitle => '関連するToDo';
 
-  // Added customizations
   @override
   String get settingsThemeMode => 'Theme';
+
   @override
   String get settingsThemeColor => 'Theme';
+
   @override
   String get settingsLanguageSubtitle => 'Switch app language';
+
   @override
   String get settingsAppearanceLanguage => 'Appearance & Language';
+
   @override
   String get settingsEditorGroup => 'Editor';
+
   @override
   String get settingsEditorToolsGroup => 'Toolbar & mood';
+
   @override
-  String get settingsMoodOptionsSubtitle => 'Customize the emoji and color of 10 moods';
+  String get settingsMoodOptionsSubtitle =>
+      'Customize the emoji and color of 10 moods';
+
   @override
   String get settingsDataPrivacy => 'Data & Privacy';
+
   @override
-  String get settingsDataPrivacySubtitle => 'Manage backups, app lock, and recycle bin';
+  String get settingsDataPrivacySubtitle =>
+      'Manage backups, app lock, and recycle bin';
+
   @override
   String get settingsDataPrivacyTitle => 'Data & Privacy';
+
   @override
-  String get settingsTagManagementSubtitle => 'Deleting a tag only unlinks it from diaries';
+  String get settingsTagManagementSubtitle =>
+      'Deleting a tag only unlinks it from diaries';
+
   @override
-  String get settingsRecycleBinSubtitle => 'Restore or permanently remove deleted diaries';
+  String get settingsRecycleBinSubtitle =>
+      'Restore or permanently remove deleted diaries';
+
   @override
   String get settingsAboutSubtitle => 'App info, repo, and version';
+
   @override
-  String get diaryDraftsSettingsSubtitle => 'Unpublished entries you can keep writing or delete';
+  String get diaryDraftsSettingsSubtitle =>
+      'Unpublished entries you can keep writing or delete';
+
   @override
   String get diaryTemplatesDragHandle => 'Drag to reorder';
+
   @override
-  String get notebookSettingsSubtitle => 'Organize, reorder and merge your notebooks';
+  String get notebookSettingsSubtitle =>
+      'Organize, reorder and merge your notebooks';
+
   @override
   String get notebookDragHandle => 'Drag to reorder';
+
   @override
   String get notebookContentsDragHandle => 'Drag to reorder';
 }
