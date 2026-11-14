@@ -39,6 +39,12 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
   /// 日程待办视图模式：false 为经典详细大卡片模式，true 为高密紧凑清单模式（屏效提升 300%）
   bool _isCompactMode = false;
 
+  /// 今日日程决策视图模式：
+  /// - 'list': 常规清单模式（支持折叠盒、高密清单与详细卡片）
+  /// - 'focus': 今日极简专注三件事模式（Focus 3 Mode）
+  /// - 'matrix': 全自动四象限决策矩阵看板（Eisenhower Matrix）
+  String _todayDecisionMode = 'list';
+
   /// 花笺（Floral Notepaper）拟真 6 色低饱和东方信笺纸色板
   static const List<({String name, Color lightBg, Color darkBg, Color border, Color accent})> floralSkins = [
     (name: '霜白', lightBg: Color(0xFFFBF9F5), darkBg: Color(0xFF222120), border: Color(0xFFE8E1D3), accent: Color(0xFF6B6B62)),
@@ -709,63 +715,23 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
     final completedEntries = entries.where((e) => e.isCompleted).toList();
     final completionRate = state.todayCompletionRate;
 
+    // 模式决策分流：
+    // - 'focus': 今日极简专注三件事模式 (Focus 3)
+    if (_todayDecisionMode == 'focus') {
+      return _buildFocus3View(context, overdueEntries, pendingEntries, completedEntries, notifier, theme, colorScheme);
+    }
+    // - 'matrix': 全自动四象限决策矩阵看板 (Eisenhower Matrix)
+    if (_todayDecisionMode == 'matrix') {
+      return _buildEisenhowerMatrixView(context, overdueEntries, pendingEntries, completedEntries, notifier, theme, colorScheme);
+    }
+
+    // - 'list': 默认常规清单模式（支持逾期收纳盒、已完成折叠抽屉与高密紧凑切换）
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       children: [
-        // 顶部高密视图切换工具栏：展示未完成待办统计与「高密清单 ⇄ 详细卡片」切换按钮
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10.0, left: 4.0, right: 4.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '待办总览 · 剩余 ${pendingEntries.length + overdueEntries.length} 项进行中',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                ),
-              ),
-              InkWell(
-                onTap: () => setState(() => _isCompactMode = !_isCompactMode),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _isCompactMode
-                        ? colorScheme.primaryContainer
-                        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _isCompactMode
-                          ? colorScheme.primary
-                          : colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isCompactMode ? Icons.view_headline : Icons.view_agenda_outlined,
-                        size: 14,
-                        color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _isCompactMode ? '高密清单' : '详细卡片',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        // 顶部模式切换工具栏：[ ☵ 清单 | 🎯 专注 | ▦ 四象限 ] 与高密紧凑切换
+        _buildTodayModeSwitchBar(context, pendingEntries.length + overdueEntries.length, colorScheme),
+        const SizedBox(height: 6),
 
         // 1. 顶部历史逾期智能收纳盒（折叠归集，支持一键延期、分摊与标记完成）
         if (overdueEntries.isNotEmpty) ...[
@@ -825,6 +791,521 @@ class _SchedulePageState extends ConsumerState<SchedulePage> {
 
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  /// 顶部决策模式切换工具栏：[ ☵ 清单 | 🎯 专注 | ▦ 四象限 ] 与高密紧凑切换
+  Widget _buildTodayModeSwitchBar(
+    BuildContext context,
+    int remainingCount,
+    ColorScheme colorScheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, left: 4.0, right: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 决策模式三联胶囊
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildModeTabPill('list', '清单', Icons.view_list, colorScheme),
+                _buildModeTabPill('focus', '专注 3', Icons.center_focus_strong, colorScheme),
+                _buildModeTabPill('matrix', '四象限', Icons.grid_view_rounded, colorScheme),
+              ],
+            ),
+          ),
+
+          // 右侧辅助开关：清单模式下显示高密清单切换，其他模式下显示剩余项统计
+          if (_todayDecisionMode == 'list')
+            InkWell(
+              onTap: () => setState(() => _isCompactMode = !_isCompactMode),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _isCompactMode
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _isCompactMode
+                        ? colorScheme.primary
+                        : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isCompactMode ? Icons.view_headline : Icons.view_agenda_outlined,
+                      size: 13,
+                      color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isCompactMode ? '高密清单' : '详细卡片',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _isCompactMode ? colorScheme.onPrimaryContainer : colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Text(
+              '待办剩余 $remainingCount 项',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 单个模式切换胶囊项
+  Widget _buildModeTabPill(
+    String modeKey,
+    String label,
+    IconData icon,
+    ColorScheme colorScheme,
+  ) {
+    final isSelected = _todayDecisionMode == modeKey;
+    return InkWell(
+      onTap: () => setState(() => _todayDecisionMode = modeKey),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.outline,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建今日极简专注模式（Focus 3 Mode：当下只盯最核心的 3 件事，避免待办瘫痪）
+  Widget _buildFocus3View(
+    BuildContext context,
+    List<ScheduleEntry> overdueEntries,
+    List<ScheduleEntry> pendingEntries,
+    List<ScheduleEntry> completedEntries,
+    ScheduleNotifier notifier,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    // 整合所有进行中的待办事项
+    final allActive = [...overdueEntries, ...pendingEntries];
+
+    // 智能权重排序：高优 > 遗忘补救 > 逾期前移 > 今日强提醒 > 中优 > 普通
+    allActive.sort((a, b) {
+      int getWeight(ScheduleEntry e) {
+        if (e.priority == SchedulePriority.high) return 100;
+        if (e.kind == ScheduleEntryKind.remedial) return 90;
+        if (e.originalDueDate != null) return 80;
+        if (e.reminderTime != null && e.hasReminder) return 70;
+        if (e.priority == SchedulePriority.medium) return 60;
+        return 10;
+      }
+      return getWeight(b).compareTo(getWeight(a));
+    });
+
+    final focusItems = allActive.take(3).toList();
+    final remainingCount = allActive.length - focusItems.length;
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      children: [
+        // 顶部模式切换工具栏
+        _buildTodayModeSwitchBar(context, allActive.length, colorScheme),
+        const SizedBox(height: 8),
+
+        // 专注心流引导卡
+        Container(
+          padding: const EdgeInsets.all(18),
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primaryContainer.withValues(alpha: 0.4),
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.center_focus_strong, color: colorScheme.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '当下心流 · 极简专注三件事',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '“不要试图做完一切，做完一件自动顺延补入下一件”',
+                      style: TextStyle(fontSize: 12, color: theme.hintColor),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        if (focusItems.isEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.done_all, color: Colors.green, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  '🎉 太棒了！今日待办已全部清空',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '没有更多进行中的待办了，尽情享受专注带来的轻松与自由吧',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          ...focusItems.asMap().entries.map((entryIndex) {
+            final idx = entryIndex.key;
+            final entry = entryIndex.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: idx == 0
+                      ? colorScheme.primary.withValues(alpha: 0.5)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  width: idx == 0 ? 1.6 : 1.0,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 10,
+                    right: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: idx == 0 ? colorScheme.primary : colorScheme.outline.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'FOCUS #${idx + 1}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: idx == 0 ? colorScheme.onPrimary : colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: _buildScheduleEntryCard(context, entry, notifier),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (remainingCount > 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Center(
+                child: Text(
+                  '📦 队列中还有 $remainingCount 项待办在等候...',
+                  style: TextStyle(fontSize: 12, color: theme.hintColor),
+                ),
+              ),
+            ),
+          ],
+        ],
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// 构建全自动四象限决策矩阵看板（Eisenhower Matrix：零填表成本，依据到期日与优先级智能投影）
+  Widget _buildEisenhowerMatrixView(
+    BuildContext context,
+    List<ScheduleEntry> overdueEntries,
+    List<ScheduleEntry> pendingEntries,
+    List<ScheduleEntry> completedEntries,
+    ScheduleNotifier notifier,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final allActive = [...overdueEntries, ...pendingEntries];
+
+    // 全自动推导四象限判定算法
+    bool isUrgent(ScheduleEntry e) =>
+        e.originalDueDate != null ||
+        (e.reminderTime != null && e.hasReminder) ||
+        e.kind == ScheduleEntryKind.remedial ||
+        e.priority == SchedulePriority.high;
+
+    bool isImportant(ScheduleEntry e) =>
+        e.priority == SchedulePriority.high ||
+        e.priority == SchedulePriority.medium ||
+        e.kind == ScheduleEntryKind.initial ||
+        e.kind == ScheduleEntryKind.review ||
+        e.subTasks.isNotEmpty;
+
+    final q1DoFirst = allActive.where((e) => isImportant(e) && isUrgent(e)).toList();
+    final q2Schedule = allActive.where((e) => isImportant(e) && !isUrgent(e)).toList();
+    final q3Delegate = allActive.where((e) => !isImportant(e) && isUrgent(e)).toList();
+    final q4DontDo = allActive.where((e) => !isImportant(e) && !isUrgent(e)).toList();
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      children: [
+        // 顶部模式切换工具栏
+        _buildTodayModeSwitchBar(context, allActive.length, colorScheme),
+        const SizedBox(height: 8),
+
+        // 四象限看板引导横幅
+        Container(
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.grid_view_rounded, size: 20, color: Colors.indigoAccent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '艾森豪威尔决策矩阵 · 系统已依据优先级与到期日全自动智能投影',
+                  style: TextStyle(fontSize: 12, color: theme.hintColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 第一象限：🔥 立即执行（重要且紧急）
+        _buildMatrixQuadrantCard(
+          context: context,
+          title: '🔥 第一象限 · 立即执行 (Do First)',
+          subTitle: '重要且紧急 · 今日最核心攻坚战',
+          badgeColor: Colors.red,
+          entries: q1DoFirst,
+          notifier: notifier,
+          theme: theme,
+        ),
+        const SizedBox(height: 12),
+
+        // 第二象限：📅 计划深耕（重要不紧急）
+        _buildMatrixQuadrantCard(
+          context: context,
+          title: '📅 第二象限 · 计划深耕 (Schedule)',
+          subTitle: '重要不紧急 · 长期复习/深度学习与长远规划',
+          badgeColor: Colors.blue,
+          entries: q2Schedule,
+          notifier: notifier,
+          theme: theme,
+        ),
+        const SizedBox(height: 12),
+
+        // 第三象限：⚡ 快速核销（紧急不重要）
+        _buildMatrixQuadrantCard(
+          context: context,
+          title: '⚡ 第三象限 · 快速核销 (Quick/Delegate)',
+          subTitle: '紧急不重要 · 琐碎提醒与突发待办',
+          badgeColor: Colors.amber,
+          entries: q3Delegate,
+          notifier: notifier,
+          theme: theme,
+        ),
+        const SizedBox(height: 12),
+
+        // 第四象限：🌱 稍后处理（不紧急不重要）
+        _buildMatrixQuadrantCard(
+          context: context,
+          title: '🌱 第四象限 · 稍后处理 (Later)',
+          subTitle: '不紧急不重要 · 低优休闲与延期备选',
+          badgeColor: Colors.teal,
+          entries: q4DontDo,
+          notifier: notifier,
+          theme: theme,
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// 构建四象限单象限模块卡片
+  Widget _buildMatrixQuadrantCard({
+    required BuildContext context,
+    required String title,
+    required String subTitle,
+    required Color badgeColor,
+    required List<ScheduleEntry> entries,
+    required ScheduleNotifier notifier,
+    required ThemeData theme,
+  }) {
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? badgeColor.withValues(alpha: 0.08)
+            : badgeColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: isDark ? 0.4 : 0.25),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 象限抬头栏
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF1F2937),
+                        ),
+                      ),
+                      Text(
+                        subTitle,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${entries.length} 项',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: badgeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 0.6,
+            color: badgeColor.withValues(alpha: 0.2),
+          ),
+          // 象限内部条目列表
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: entries.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Center(
+                      child: Text(
+                        '当前象限无待办，从容无压力',
+                        style: TextStyle(fontSize: 11, color: theme.hintColor),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: entries
+                        .map((entry) => _buildCompactScheduleEntryRow(context, entry, notifier))
+                        .toList(),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
