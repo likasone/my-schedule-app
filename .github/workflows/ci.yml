@@ -31,7 +31,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -73,7 +73,7 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: dart run tool/check_arb.dart
 
-      # 重新生成本地化、drift 代码与插件注册文件，与提交内容不一致即失败。
+      # 重新生成本地化、drift 代码与插件注册文件，与提交内容不一致即自动更新或报错。
       - name: Check generated code is committed
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
@@ -85,8 +85,17 @@ jobs:
           if [[ -n "$changes" ]]; then
             echo "$changes"
             git --no-pager diff
-            echo "::error::Changed files: $(echo "$changes" | tr '\n' '; ')"
-            exit 1
+            if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+              echo "Auto-committing generated localization and drift changes..."
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add lib/
+              git commit -m "chore: auto-commit generated code from flutter gen-l10n [skip ci]" || true
+              git push origin main || true
+            else
+              echo "::error::Changed files: $(echo "$changes" | tr '\n' '; ')"
+              exit 1
+            fi
           fi
 
   test-shards:

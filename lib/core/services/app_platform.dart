@@ -84,4 +84,8 @@ abstract final class AppPlatform {
   /// 应用锁的“闲置时上锁”：只在桌面端（Windows / Linux / macOS）。
   /// 闲置按全局鼠标指针与实体键盘敲击事件动态计算超时（默认 5 分钟），超时后自动进入锁屏保护。
   static bool get supportsIdleLock => isDesktop;
+
+  /// 应用锁的“纯生物识别验证”（`biometricOnly: true`）：
+  /// 只在移动端硬件支持纯生物识别。
+  static bool get supportsBiometricOnly => isMobile;
 }
