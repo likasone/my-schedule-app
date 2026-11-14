@@ -158,7 +158,8 @@ class PasscodeSetupController extends ChangeNotifier {
       if (_disposed) return;
       _saving = false;
       _done = true;
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('[PasscodeSetupController] 密码保存异常: $e\n$stack');
       if (_disposed) return;
       _saving = false;
       _error = PasscodeSetupError.saveFailed;

@@ -18,6 +18,7 @@ import 'dart:math';
 
 import 'package:cryptography/dart.dart';
 
+import '../app_platform.dart';
 import 'app_passcode_config.dart';
 
 class AppPasscodeHasher {
@@ -58,11 +59,18 @@ class AppPasscodeHasher {
     return diff == 0;
   }
 
-  Future<List<int>> _run(String material, List<int> salt, int iterations) {
-    if (!useIsolate) {
+  Future<List<int>> _run(String material, List<int> salt, int iterations) async {
+    // 桌面端（Windows / Linux / macOS）CPU 性能充裕且需避免 AOT 模式下 Isolate.run 闭包分发失败，直接在当前线程高效计算
+    if (!useIsolate || AppPlatform.isDesktop) {
       return _derive(material, salt, iterations);
     }
-    return Isolate.run(() => _derive(material, salt, iterations));
+    try {
+      // 移动端在后台 Isolate 中执行密集型哈希派生
+      return await Isolate.run(() => _derive(material, salt, iterations));
+    } catch (_) {
+      // 若后台 Isolate 创建或执行发生异常，安全降级回退到当前线程同步派生，确保摘要 100% 成功生成
+      return _derive(material, salt, iterations);
+    }
   }
 
   static Future<List<int>> _derive(

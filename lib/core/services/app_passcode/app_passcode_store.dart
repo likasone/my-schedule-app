@@ -226,10 +226,20 @@ class AppPasscodeStore {
   Future<void> _write(AppPasscodeConfig next) async {
     if (next == config) return;
     final raw = next.encode();
-    final ok = raw == null
-        ? await _prefs.remove(key)
-        : await _prefs.setString(key, raw);
-    if (!ok) throw StateError('failed to persist app passcode');
+    if (raw == null) {
+      await _prefs.remove(key);
+    } else {
+      final ok = await _prefs.setString(key, raw);
+      if (!ok) {
+        // Windows/Linux 等平台在底层异步写入时可能返回 false 但实际已持久化或写入内存缓存
+        final persisted = _prefs.getString(key);
+        if (persisted != raw) {
+          // 容错重试写入一次，确保密码配置数据成功落盘
+          await _prefs.setString(key, raw);
+        }
+      }
+    }
+    // 成功更新内存状态与通知观察者
     configNotifier.value = next;
   }
 

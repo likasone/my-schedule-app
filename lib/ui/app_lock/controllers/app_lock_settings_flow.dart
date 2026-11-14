@@ -111,6 +111,10 @@ class AppLockSettingsFlow {
     if (!context.mounted) return;
     final done = await PasscodeSetupPage.open(context);
     if (!context.mounted || !done) return;
+    // 首次在桌面端成功设置应用密码后，若应用锁未开启，自动为用户开启应用锁
+    if (!lockEnabled && AppPlatform.isDesktop && settings != null) {
+      await settings.setAppLockEnabled(true);
+    }
     _hint(context, l10n.passcodeSetDone);
   }
 
