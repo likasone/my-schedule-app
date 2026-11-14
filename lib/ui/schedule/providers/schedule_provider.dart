@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/database/content_codec.dart';
 import '../../../core/services/app_data_directory.dart';
+import '../../../core/services/app_service.dart';
 import '../../../core/services/plan_scheduler.dart';
 import '../../../core/services/reminder_service.dart';
+import '../../../utils/text_stats.dart';
 
 /// 日程与计划页面状态模型（Schedule State）
 @immutable
@@ -1033,6 +1036,77 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       }
     }
 
+    // 解析日记数据（支持系统内置“每日复盘/晚间复盘”模板及任意第三方结构化日记）
+    int parsedDiariesCount = 0;
+    if (decoded is Map<String, dynamic>) {
+      final rawDiaries = decoded['diaries'] ?? (decoded['diary'] != null ? [decoded['diary']] : null);
+      if (rawDiaries is List) {
+        // 获取全局数据库驱动实例
+        final db = ref.read(appDatabaseProvider);
+        for (final item in rawDiaries) {
+          if (item is Map<String, dynamic>) {
+            // 获取正文内容（支持纯文本或 Markdown 格式的复盘内容）
+            final content = item['content'] as String? ?? '';
+            if (content.trim().isNotEmpty) {
+              // 解析日记记录所属日期，默认为当天
+              final dateStr = item['date'] as String? ?? PlanScheduler.formatIsoDate(DateTime.now());
+              final createdAt = DateTime.tryParse(dateStr) ?? DateTime.now();
+
+              // 解析日记标题，默认为“复盘 · YYYY-MM-DD”
+              final rawTitle = item['title'] as String? ?? '';
+              final title = rawTitle.trim().isNotEmpty ? rawTitle.trim() : '复盘 · $dateStr';
+
+              // 将纯文本/复盘内容转换为原生富文本 AppFlowy Document 结构
+              final contentDocJson = plainTextToContentJson(content);
+
+              // 解析标签集合，若未指定则自动赋予“每日复盘”标签
+              final rawTags = (item['tags'] as List?)
+                      ?.map((t) => t.toString().trim())
+                      .where((t) => t.isNotEmpty)
+                      .toList() ??
+                  ['每日复盘'];
+              final tagIds = <int>[];
+              for (final tagName in rawTags) {
+                // 若标签不存在则自动插入，存在则复用现有标签
+                final tagId = await db.createTag(name: tagName, color: 0);
+                tagIds.add(tagId);
+              }
+
+              // 组装 metadata 元数据（包含生成时间、字数统计、天气与心情）
+              final weather = item['weather'] as String?;
+              final mood = item['mood'] as String?;
+              final metaMap = <String, Object?>{
+                'schemaVersion': 1,
+                'generatedAt': DateTime.now().toIso8601String(),
+                'stats': <String, Object?>{
+                  'wordCount': TextStats.of(content).words,
+                  'charCount': TextStats.of(content).characters,
+                },
+                'tagIds': tagIds,
+                'hasCover': false,
+                'source': 'auto_import',
+                'context': <String, Object?>{
+                  if (weather != null && weather.isNotEmpty) 'weather': weather,
+                  if (mood != null && mood.isNotEmpty) 'moodEmoji': mood,
+                },
+              };
+
+              // 调用底层数据存储接口完成日记落库
+              await db.createDiary(
+                title: title,
+                contentDocJson: contentDocJson,
+                contentText: content,
+                metadataJson: jsonEncode(metaMap),
+                tagIds: tagIds,
+                createdAtOverride: createdAt,
+              );
+              parsedDiariesCount++;
+            }
+          }
+        }
+      }
+    }
+
     // 若传入的是单一便签数组形式，进行智能兼容解析
     if (decoded is List) {
       for (final item in decoded) {
@@ -1064,10 +1138,10 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
       }
     }
 
-    // 计算导入的有效数据总量
-    final totalCount = parsedPlans.length + parsedEntries.length + parsedMemos.length;
+    // 计算导入的有效数据总量（含日记、计划、排程待办、便签）
+    final totalCount = parsedPlans.length + parsedEntries.length + parsedMemos.length + parsedDiariesCount;
     if (totalCount == 0) {
-      throw const FormatException('未识别到有效的日程、计划或便签数据');
+      throw const FormatException('未识别到有效的日记、日程、计划或便签数据');
     }
 
     List<PlanItem> finalPlans;
@@ -1155,18 +1229,18 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
           continue;
         }
 
-        // 检索该目录下所有待处理的 JSON 文件（过滤掉以 .imported 结尾的已归档文件）
-        final files = dir.listSync().whereType<File>().where((f) {
+        // 1. 检索该目录下所有待处理的 JSON 文件（过滤掉以 .imported 结尾的已归档文件）
+        final jsonFiles = dir.listSync().whereType<File>().where((f) {
           final filename = f.path.split(Platform.pathSeparator).last.toLowerCase();
           return filename.endsWith('.json') && !filename.contains('.imported');
         });
 
-        for (final file in files) {
+        for (final file in jsonFiles) {
           try {
             // 读取文件文本内容
             final content = await file.readAsString();
             if (content.trim().isNotEmpty) {
-              // 调用底层合并导入接口（保持去重合并安全模式）
+              // 调用底层合并导入接口（保持去重合并安全模式，同时支持计划与日记）
               final count = await importScheduleDataJson(content, overwrite: false);
               totalImportedCount += count;
               debugPrint('[AutoImport] 成功自动导入第三方数据文件: ${file.path}, 新增/更新 $count 条记录');
@@ -1177,6 +1251,70 @@ class ScheduleNotifier extends Notifier<ScheduleState> {
             }
           } catch (err) {
             debugPrint('[AutoImport] 解析第三方文件失败 ${file.path}: $err');
+          }
+        }
+
+        // 2. 检索该目录下所有待处理的 Markdown 文件（方便第三方通过 .md 格式直接导入每日复盘）
+        final mdFiles = dir.listSync().whereType<File>().where((f) {
+          final filename = f.path.split(Platform.pathSeparator).last.toLowerCase();
+          return (filename.endsWith('.md') || filename.endsWith('.markdown')) && !filename.contains('.imported');
+        });
+
+        for (final file in mdFiles) {
+          try {
+            final content = await file.readAsString();
+            if (content.trim().isNotEmpty) {
+              final filename = file.path.split(Platform.pathSeparator).last;
+              // 提取日期：从文件名中提取 YYYY-MM-DD
+              final dateMatch = RegExp(r'\d{4}-\d{2}-\d{2}').firstMatch(filename);
+              final dateStr = dateMatch?.group(0) ?? PlanScheduler.formatIsoDate(DateTime.now());
+              final createdAt = DateTime.tryParse(dateStr) ?? DateTime.now();
+
+              // 提取标题：若第一行以 # 开头则作为标题，否则默认使用 复盘 · 日期
+              final lines = content.split(RegExp(r'\r?\n'));
+              String title = '复盘 · $dateStr';
+              String diaryBody = content;
+              if (lines.isNotEmpty && lines.first.trim().startsWith('# ')) {
+                title = lines.first.trim().substring(2).trim();
+                diaryBody = lines.sublist(1).join('\n').trim();
+              }
+
+              final db = ref.read(appDatabaseProvider);
+              final tagId = await db.createTag(name: '每日复盘', color: 0);
+              final contentDocJson = plainTextToContentJson(diaryBody);
+
+              final metaMap = <String, Object?>{
+                'schemaVersion': 1,
+                'generatedAt': DateTime.now().toIso8601String(),
+                'stats': <String, Object?>{
+                  'wordCount': TextStats.of(diaryBody).words,
+                  'charCount': TextStats.of(diaryBody).characters,
+                },
+                'tagIds': [tagId],
+                'hasCover': false,
+                'source': 'auto_import_md',
+                'context': <String, Object?>{
+                  'moodEmoji': '🌙',
+                },
+              };
+
+              await db.createDiary(
+                title: title,
+                contentDocJson: contentDocJson,
+                contentText: diaryBody,
+                metadataJson: jsonEncode(metaMap),
+                tagIds: [tagId],
+                createdAtOverride: createdAt,
+              );
+
+              totalImportedCount++;
+              debugPrint('[AutoImport] 成功自动导入第三方复盘 Markdown: ${file.path}');
+
+              final archiveName = '${file.path}.${DateTime.now().millisecondsSinceEpoch}.imported';
+              await file.rename(archiveName);
+            }
+          } catch (err) {
+            debugPrint('[AutoImport] 解析 Markdown 文件失败 ${file.path}: $err');
           }
         }
       }
