@@ -166,7 +166,8 @@ class _PublishDiaryPageState extends ConsumerState<PublishDiaryPage>
       diaryId = await _publisher.submit(_database);
     } catch (error) {
       debugPrint('Publish failed: $error');
-      _hint(l10n.publishFailed, abovePanel: false);
+      // 透出详细错误信息，帮助用户与排查快速获知发布失败根本原因
+      _hint('${l10n.publishFailed}: $error', abovePanel: false);
       if (mounted) Navigator.of(context).pop();
       return;
     }

@@ -209,13 +209,45 @@ class PublishMetadataComposer {
   }
 
   /// 写入 metadata.device 的设备上下文。
+  ///
+  /// 在 Windows 等桌面平台，部分区域设置下 [Locale.toLanguageTag] 可能因语言代码为空或格式异常抛错，
+  /// 这里进行全包裹防御性处理，确保采集设备信息失败绝不阻断日记发布与编辑持久化。
   static Map<String, Object?> currentDeviceInfo() {
-    final dispatcher = PlatformDispatcher.instance;
-    return <String, Object?>{
-      'platform': defaultTargetPlatform.name,
-      'locale': dispatcher.locale.toLanguageTag(),
-      'brightness': dispatcher.platformBrightness.name,
-    };
+    try {
+      final dispatcher = PlatformDispatcher.instance;
+      String? localeTag;
+      try {
+        final loc = dispatcher.locale;
+        if (loc.languageCode.trim().isNotEmpty) {
+          localeTag = loc.toLanguageTag();
+        }
+      } catch (_) {
+        // 捕获 Windows 环境下可能的 UnsupportedError/FormatException
+        try {
+          localeTag = dispatcher.locale.languageCode;
+        } catch (_) {
+          localeTag = null;
+        }
+      }
+
+      String? brightnessName;
+      try {
+        brightnessName = dispatcher.platformBrightness.name;
+      } catch (_) {
+        brightnessName = null;
+      }
+
+      return <String, Object?>{
+        'platform': defaultTargetPlatform.name,
+        if (localeTag != null && localeTag.isNotEmpty) 'locale': localeTag,
+        if (brightnessName != null) 'brightness': brightnessName,
+      };
+    } catch (_) {
+      // 极端异常兜底，仅记录平台名称
+      return <String, Object?>{
+        'platform': defaultTargetPlatform.name,
+      };
+    }
   }
 
   /// 过滤掉 map 中无意义的空值键，减少 metadata 噪音。

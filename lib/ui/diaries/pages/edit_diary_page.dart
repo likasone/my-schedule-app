@@ -1051,6 +1051,33 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
                         icon: const FaIcon(FontAwesomeIcons.plus),
                         tooltip: context.l10n.autoT0136,
                       ),
+                    if (widget.entryMode == EditDiaryEntryMode.edit &&
+                        AppPlatform.isDesktop)
+                      IconButton(
+                        onPressed: _saving
+                            ? null
+                            : () async {
+                                setState(() => _saving = true);
+                                try {
+                                  final saved =
+                                      await _controller.flushEditAutoSave();
+                                  if (saved && mounted) {
+                                    _showHint('修改已保存');
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => _saving = false);
+                                }
+                              },
+                        icon: _saving
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const FaIcon(FontAwesomeIcons.check, size: 16),
+                        tooltip: '${context.l10n.commonSave} (Ctrl+S)',
+                      ),
                   ],
                 ),
                 // 底部键盘弹起时（或打开了“始终显示工具栏”时）显示悬浮工具栏，并对
@@ -1213,10 +1240,31 @@ class _EditDiaryPageState extends ConsumerState<EditDiaryPage>
                   // 新建模式直接返回：补存防抖窗口里的输入，草稿静默留在草稿箱。
                   if (_isCreateEntry) unawaited(_controller.flushCreateDraft());
                 },
-                // 桌面上 Esc 与顶栏返回按钮相同（补存、先收起面板与录音）。
-                child: DesktopPageKeys(
-                  onEscape: () => unawaited(_controller.attemptExit()),
-                  child: scaffold,
+                // 桌面上 Esc 与顶栏返回按钮相同（补存、先收起面板与录音）；同时支持 Ctrl+S / Cmd+S 立即保存修改
+                child: CallbackShortcuts(
+                  bindings: <ShortcutActivator, VoidCallback>{
+                    SingleActivator(
+                      LogicalKeyboardKey.keyS,
+                      control: !AppPlatform.isMacOS,
+                      meta: AppPlatform.isMacOS,
+                    ): () async {
+                      if (_isEditEntry && !_saving) {
+                        setState(() => _saving = true);
+                        try {
+                          final saved = await _controller.flushEditAutoSave();
+                          if (saved && mounted) {
+                            _showHint('修改已保存');
+                          }
+                        } finally {
+                          if (mounted) setState(() => _saving = false);
+                        }
+                      }
+                    },
+                  },
+                  child: DesktopPageKeys(
+                    onEscape: () => unawaited(_controller.attemptExit()),
+                    child: scaffold,
+                  ),
                 ),
               );
             },

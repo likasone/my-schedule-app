@@ -48,8 +48,9 @@ String normalizeMetadataJson(String raw) {
     return '{}';
   }
 
-  final decoded = jsonDecode(text);
-  if (decoded is! Map<String, dynamic>) {
+  // 解码 JSON 文本并宽松校验是否为 Map 字典对象（兼容 Map<dynamic, dynamic> 与不同平台的运行时子类型）
+  final dynamic decoded = jsonDecode(text);
+  if (decoded is! Map) {
     throw const FormatException('metadata 必须是 JSON 对象');
   }
   return jsonEncode(decoded);

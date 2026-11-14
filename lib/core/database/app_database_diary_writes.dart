@@ -91,16 +91,26 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
     final normalizedTagIds = tagIds.toSet().toList();
 
     await transaction<void>(() async {
-      final diary = await (select(
+      Diary? diary = await (select(
         diaries,
       )..where((Diaries t) => t.diaryId.equals(diaryId))).getSingleOrNull();
+      // 若按业务 diaryId 未命中，尝试按自增整型主键 id 查找兜底（兼容从某些内部索引或特殊场景传入数字 id 的情况）
+      if (diary == null) {
+        final parsedLocalId = int.tryParse(diaryId);
+        if (parsedLocalId != null) {
+          diary = await (select(
+            diaries,
+          )..where((Diaries t) => t.id.equals(parsedLocalId))).getSingleOrNull();
+        }
+      }
       if (diary == null) {
         throw StateError('未找到 diaryId=$diaryId 对应的日记');
       }
+      final effectiveDiaryBusinessId = diary.diaryId;
 
       await (update(
         diaries,
-      )..where((Diaries t) => t.diaryId.equals(diaryId))).write(
+      )..where((Diaries t) => t.diaryId.equals(effectiveDiaryBusinessId))).write(
         DiariesCompanion(
           title: Value<String>(title.trim()),
           content: Value<String>(contentDocJson),
@@ -362,18 +372,31 @@ mixin _AppDatabaseDiaryWrites on _$AppDatabase, _AppDatabaseNotebookEntryOps {
 
   /// 覆盖写入某条日记的标签关系。
   Future<void> _replaceDiaryTags(int diaryId, List<int> tagIds) async {
+    // 先清理原日记关联的全部标签行
     await (delete(
       diaryTags,
     )..where((DiaryTags t) => t.diaryId.equals(diaryId))).go();
 
-    if (tagIds.isEmpty) {
+    // 标签列表去重
+    final normalizedTagIds = tagIds.toSet().toList();
+    if (normalizedTagIds.isEmpty) {
+      return;
+    }
+
+    // 验证待关联的标签 ID 是否真实存在于 tags 表中，过滤已废弃或无效外键，规避外键冲突与批量写入异常
+    final existingTags = await (select(tags)
+          ..where((Tags t) => t.id.isIn(normalizedTagIds)))
+        .get();
+    final validTagIds = existingTags.map((Tag t) => t.id).toSet();
+    final safeTagIds = normalizedTagIds.where(validTagIds.contains).toList();
+    if (safeTagIds.isEmpty) {
       return;
     }
 
     await batch((Batch batch) {
       batch.insertAll(
         diaryTags,
-        tagIds.map(
+        safeTagIds.map(
           (int tagId) =>
               DiaryTagsCompanion.insert(diaryId: diaryId, tagId: tagId),
         ),
