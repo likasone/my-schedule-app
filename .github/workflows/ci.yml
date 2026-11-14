@@ -59,7 +59,13 @@ jobs:
 
       - name: Analyze
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: flutter analyze --no-pub
+        run: |
+          flutter analyze --no-pub 2>&1 | tee analyze_err.txt || {
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < analyze_err.txt
+            exit 1
+          }
 
       - name: Check ARB metadata
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
@@ -266,7 +272,13 @@ jobs:
       # integration_test 这类 dev_dependencies 插件；跳过时沿用 pub get 生成的
       # 版本，javac 会找不到 dev.flutter.plugins.integration_test。
       - name: Build release APK (arm64)
-        run: flutter build apk --release --target-platform android-arm64
+        run: |
+          flutter build apk --release --target-platform android-arm64 2>&1 | tee apk_err.txt || {
+            tail -n 40 apk_err.txt | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          }
 
       # Flutter 构建会先生成仓库未跟踪的 gradlew；原生测试复用这份 wrapper。
       - name: Test Android picker permissions and result handling
