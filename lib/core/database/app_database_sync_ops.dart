@@ -14,13 +14,8 @@ part of 'app_database.dart';
 mixin _AppDatabaseSyncOps on _$AppDatabase {
   /// 在一个事务里读出日记、标签、标签关联、日记本、成员关系、留言、模板、
   /// 纪念日与这天的心情的原始行。草稿不同步，不读。
-  Future<SyncRawSnapshot> readSyncRows() async {
-    // 优先尝试事务快照读取；若已在外层事务中或嵌套事务受阻，降级直接读取，杜绝异常中断同步
-    try {
-      return await transaction(() => _readSyncRowsImpl());
-    } catch (_) {
-      return _readSyncRowsImpl();
-    }
+  Future<SyncRawSnapshot> readSyncRows() {
+    return transaction(() => _readSyncRowsImpl());
   }
 
   Future<SyncRawSnapshot> _readSyncRowsImpl() async {

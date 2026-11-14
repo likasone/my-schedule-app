@@ -60,18 +60,7 @@ class AppLockOverlay extends ConsumerWidget {
                     autoBiometric: autoPrompt,
                     persistBiometricAcrossBackgrounding: true,
                     onUnlocked: onPasscodeUnlocked,
-                    secondaryAction: AppPlatform.isDesktop && onEmergencyUnlock != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: TextButton.icon(
-                                onPressed: onEmergencyUnlock,
-                                icon: const Icon(Icons.shield_outlined, size: 16),
-                                label: const Text('应急解除应用锁'),
-                              ),
-                            ),
-                          )
-                        : null,
+                    onEmergencyReset: onEmergencyUnlock,
                     viewportHeight: viewportHeight,
                   ),
             )
@@ -79,7 +68,6 @@ class AppLockOverlay extends ConsumerWidget {
               key: const ValueKey<String>('app_lock_system'),
               unlocking: unlocking,
               onTapUnlock: onTapUnlock,
-              onEmergencyUnlock: onEmergencyUnlock,
             ),
     );
   }
@@ -96,12 +84,10 @@ class _SystemLockOverlay extends StatelessWidget {
     super.key,
     required this.unlocking,
     required this.onTapUnlock,
-    this.onEmergencyUnlock,
   });
 
   final bool unlocking;
   final VoidCallback onTapUnlock;
-  final VoidCallback? onEmergencyUnlock;
 
   @override
   Widget build(BuildContext context) {
@@ -167,15 +153,6 @@ class _SystemLockOverlay extends StatelessWidget {
                           ),
                   ),
                 ),
-                if (AppPlatform.isDesktop && onEmergencyUnlock != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: TextButton.icon(
-                      onPressed: onEmergencyUnlock,
-                      icon: const Icon(Icons.shield_outlined, size: 16),
-                      label: const Text('应急解除应用锁'),
-                    ),
-                  ),
               ],
             ),
           ),

@@ -29,9 +29,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:node_diary/l10n/app_localizations.dart';
 
 import '../../../app/theme/app_breakpoints.dart';
+import '../../../app/theme/app_radii.dart';
 import '../../../app/theme/app_spacing.dart';
 import '../../../app/theme/expressive_motion.dart';
 import '../../../core/services/app_passcode/app_passcode_store.dart';
+import '../../../core/services/app_platform.dart';
 import '../../widgets/route_entrance_waiter.dart';
 import '../controllers/identity_verifier.dart';
 import '../controllers/passcode_entry_controller.dart';
@@ -49,8 +51,12 @@ class PasscodeUnlockView extends ConsumerStatefulWidget {
     this.autoBiometric = false,
     this.persistBiometricAcrossBackgrounding = false,
     this.secondaryAction,
+    this.onEmergencyReset,
     this.viewportHeight = double.infinity,
   });
+
+  /// 桌面端在忘记密码时的高危应急重置回调（带二次弹窗确认）。
+  final VoidCallback? onEmergencyReset;
 
   /// 标题；null 时按形式取“输入应用密码 / 绘制解锁图案”。
   final String? title;
@@ -246,6 +252,7 @@ class _PasscodeUnlockViewState extends ConsumerState<PasscodeUnlockView> {
               expanded: _forgotExpanded,
               onToggle: () =>
                   setState(() => _forgotExpanded = !_forgotExpanded),
+              onEmergencyReset: widget.onEmergencyReset,
             ),
             ?widget.secondaryAction,
           ],
@@ -256,11 +263,33 @@ class _PasscodeUnlockViewState extends ConsumerState<PasscodeUnlockView> {
 }
 
 /// “忘记密码？”：应用密码无法找回，点按在原地展开说明。
-class _ForgotPasscode extends StatelessWidget {
-  const _ForgotPasscode({required this.expanded, required this.onToggle});
+/// 在桌面端支持二次确认的高危“应急解除应用锁”。
+class _ForgotPasscode extends StatefulWidget {
+  const _ForgotPasscode({
+    required this.expanded,
+    required this.onToggle,
+    this.onEmergencyReset,
+  });
 
   final bool expanded;
   final VoidCallback onToggle;
+  final VoidCallback? onEmergencyReset;
+
+  @override
+  State<_ForgotPasscode> createState() => _ForgotPasscodeState();
+}
+
+class _ForgotPasscodeState extends State<_ForgotPasscode> {
+  bool _confirming = false;
+
+  @override
+  void didUpdateWidget(covariant _ForgotPasscode oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 折叠时自动复位二次确认状态，防止重新展开时意外停留在危险态
+    if (!widget.expanded && _confirming) {
+      _confirming = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +301,12 @@ class _ForgotPasscode extends StatelessWidget {
       children: <Widget>[
         Center(
           child: TextButton(
-            onPressed: onToggle,
+            onPressed: () {
+              if (widget.expanded && _confirming) {
+                setState(() => _confirming = false);
+              }
+              widget.onToggle();
+            },
             child: Text(l10n.passcodeForgot),
           ),
         ),
@@ -283,15 +317,96 @@ class _ForgotPasscode extends StatelessWidget {
           ),
           curve: ExpressiveMotion.effects,
           alignment: Alignment.topCenter,
-          child: expanded
+          child: widget.expanded
               ? Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.s),
-                  child: Text(
-                    l10n.passcodeForgotMessage,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        l10n.passcodeForgotMessage,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (AppPlatform.isDesktop && widget.onEmergencyReset != null)
+                        _confirming
+                            ? Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.all(AppSpacing.m),
+                                decoration: BoxDecoration(
+                                  color: scheme.errorContainer.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(AppRadii.input),
+                                  border: Border.all(
+                                    color: scheme.error.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: <Widget>[
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: scheme.error,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '确定应急解除应用锁？',
+                                          style: theme.textTheme.titleSmall?.copyWith(
+                                            color: scheme.error,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '此操作将彻底清除应用密码并关闭应用锁，所有本地日记将直接对任何人可见。\n\n请仅在遗忘密码且确实无法解锁时继续。',
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: scheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: <Widget>[
+                                        TextButton(
+                                          onPressed: () => setState(() => _confirming = false),
+                                          child: const Text('取消'),
+                                        ),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: scheme.error,
+                                            foregroundColor: scheme.onError,
+                                          ),
+                                          onPressed: () {
+                                            setState(() => _confirming = false);
+                                            widget.onEmergencyReset?.call();
+                                          },
+                                          child: const Text('确认解除'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: scheme.error,
+                                  ),
+                                  onPressed: () => setState(() => _confirming = true),
+                                  icon: const Icon(Icons.warning_amber_rounded, size: 16),
+                                  label: const Text('应急解除应用锁'),
+                                ),
+                              ),
+                    ],
                   ),
                 )
               : const SizedBox(width: double.infinity),

@@ -113,14 +113,17 @@ extension _Sessions on LanSyncService {
     final sameKey =
         existing != null &&
         lanSyncBytesEqual(existing.publicKey, hello.publicKey);
+    final nowUtc = _now().toUtc();
     await _store.upsertPeer(
       LanSyncPairedDevice(
         deviceId: hello.deviceId,
         name: hello.name,
         platform: hello.platform,
         publicKey: hello.publicKey,
-        pairedAt: _now().toUtc(),
-        lastSyncAt: sameKey ? existing.lastSyncAt : null,
+        pairedAt: nowUtc,
+        // 新配对时初始化 lastSyncAt 为当前时间，避免首同步判定无共同祖先冲突 (firstSync)
+        // 引发自动同步无限抛出 needsConfirmation 并标记 needsAttention 自锁
+        lastSyncAt: sameKey ? existing.lastSyncAt : nowUtc,
         lastHost: host ?? existing?.lastHost,
         lastPort: port ?? existing?.lastPort,
         autoSync: existing?.autoSync ?? true,

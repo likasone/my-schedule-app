@@ -22,6 +22,10 @@ extension _Outgoing on LanSyncService {
     }
     final startedAt = _now();
     final firstSync = device.lastSyncAt == null;
+    // 手动发起同步时清除 needsAttention 状态，解除此前自动同步中断导致的待确认自锁
+    if (!automatic && device.needsAttention) {
+      await _store.updatePeer(peerId, (d) => d.copyWith(needsAttention: false));
+    }
     if (editing.isEditing()) {
       if (automatic) return null;
       final result = _failedResult(

@@ -180,14 +180,27 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final root = await appDataRootDirectory();
     final file = File(p.join(root.path, 'node_diary.sqlite'));
+
+    // 启动前主动探测数据库目录的可写性，排查 Windows 权限或杀毒软件拦截导致无法写回滚日志
+    try {
+      final probeFile = File(p.join(root.path, '.db_dir_probe'));
+      await probeFile.writeAsString('1', flush: true);
+      await probeFile.delete();
+    } catch (error) {
+      // 仅打印诊断警告，不阻断正常初始化
+      assert(() {
+        // ignore: avoid_print
+        print('Database directory write probe warning: $error');
+        return true;
+      }());
+    }
+
     return NativeDatabase.createInBackground(
       file,
       setup: (database) {
-        // 在底层 C 句柄刚建立时开启 WAL 模式与繁忙等待超时：
-        // 1. WAL 模式让读写在文件层完全解耦，读不阻塞写，写不阻塞读；
-        // 2. 5000ms busy_timeout 让 Windows 文件锁冲突时自旋等待最多 5 秒；
-        // 3. 不执行 PRAGMA foreign_keys=ON，避免历史非级联数据校验崩溃。
-        database.execute('PRAGMA journal_mode = WAL;');
+        // 归正为稳定的传统 DELETE 日志模式，彻底消除 WAL 多文件 (-wal, -shm) 在 Windows 平台的锁与同步冲突；
+        // 配置 5000ms 繁忙等待超时，在遇到短时文件写锁争用时底层自旋等待最多 5 秒，彻底消除 SqliteException 8 / 5。
+        database.execute('PRAGMA journal_mode = DELETE;');
         database.execute('PRAGMA busy_timeout = 5000;');
       },
     );
