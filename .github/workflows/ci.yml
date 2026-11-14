@@ -81,8 +81,8 @@ jobs:
           changes="$(git status --porcelain --untracked-files=all)"
           if [[ -n "$changes" ]]; then
             echo "$changes"
-            git --no-pager diff --stat
-            echo "::error::Generated files differ from the commit. Run 'flutter pub get', 'flutter gen-l10n' and 'dart run build_runner build --delete-conflicting-outputs', then commit the result."
+            git --no-pager diff
+            echo "::error::Changed files: $(echo "$changes" | tr '\n' '; ')"
             exit 1
           fi
 
@@ -274,9 +274,8 @@ jobs:
       - name: Build release APK (arm64)
         run: |
           flutter build apk --release --target-platform android-arm64 2>&1 | tee apk_err.txt || {
-            tail -n 40 apk_err.txt | while IFS= read -r line; do
-              echo "::error::$line"
-            done
+            tail -n 30 apk_err.txt
+            echo "::error::Android Build Failed: $(tail -n 15 apk_err.txt | tr '\r\n' ' ')"
             exit 1
           }
 
@@ -348,7 +347,13 @@ jobs:
         uses: ./.github/actions/setup-flutter
 
       - name: Build Windows release
-        run: flutter build windows --release
+        shell: bash
+        run: |
+          flutter build windows --release 2>&1 | tee win_err.txt || {
+            tail -n 30 win_err.txt
+            echo "::error::Windows Build Failed: $(tail -n 15 win_err.txt | tr '\r\n' ' ')"
+            exit 1
+          }
 
       - name: Report build size
         shell: bash
